@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withDataCors } from "@/lib/cors";
+import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 
+export async function OPTIONS(req: NextRequest) {
+  return handleDataApiOptions(req);
+}
+
 export const GET = withDataCors(async function handler(
-  req: NextRequest
+  req: NextRequest,
+  context: { params: { recordId: string } }
 ): Promise<NextResponse> {
   const authHeader =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
@@ -22,7 +27,7 @@ export const GET = withDataCors(async function handler(
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
   }
 
-  const { recordId } = req.params as { recordId: string };
+  const { recordId } = context.params;
 
   const record = await prisma.record.findUnique({
     where: { id: recordId }

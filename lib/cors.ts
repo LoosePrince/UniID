@@ -2,10 +2,37 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type DataApiHandler = (req: NextRequest) => Promise<NextResponse>;
+type DataApiHandler = (
+  req: NextRequest,
+  context: { params: Record<string, string> }
+) => Promise<NextResponse>;
 
-async function resolveAllowedOrigin(origin: string | null): Promise<string | null> {
+const isDev = process.env.NODE_ENV !== "production";
+
+function isLocalOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function resolveAllowedOrigin(
+  origin: string | null
+): Promise<string | null> {
   if (!origin) return null;
+
+  if (isDev && isLocalOrigin(origin)) {
+    return origin;
+  }
+
   try {
     const url = new URL(origin);
     const host = url.host;
@@ -50,7 +77,10 @@ export async function handleDataApiOptions(
 }
 
 export function withDataCors(handler: DataApiHandler) {
-  return async function wrapped(req: NextRequest): Promise<NextResponse> {
+  return async function wrapped(
+    req: NextRequest,
+    context: { params: Record<string, string> }
+  ): Promise<NextResponse> {
     if (req.method === "OPTIONS") {
       return handleDataApiOptions(req);
     }
@@ -65,7 +95,7 @@ export function withDataCors(handler: DataApiHandler) {
       );
     }
 
-    const res = await handler(req);
+    const res = await handler(req, context);
     res.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     res.headers.set("Vary", "Origin");
     res.headers.set("Access-Control-Allow-Credentials", "true");

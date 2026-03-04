@@ -511,3 +511,51 @@ const posts = await auth.query({
 - 按app_id隔离不同应用的数据
 - 跨应用数据访问需额外授权
 - 敏感字段加密存储
+
+## 八、Demo 示例站点
+
+### 8.1 访问方式
+
+- 在开发环境启动 Next.js 服务后，可直接访问：
+  - `http://localhost:3000/demo`
+- 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/auth.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
+
+### 8.2 示例流程
+
+- 初始化 SDK（在 `public/demo/index.html` 中）：
+
+```html
+<script src="/sdk/auth.js"></script>
+<script>
+  const auth = new window.AuthSDK({
+    authServer: window.location.origin,
+    appId: "demo-blog"
+  });
+</script>
+```
+
+- 登录 / 授权：
+  - 点击页面右上角“登录 / 授权”按钮。
+  - SDK 会通过隐藏 iframe 打开 UniID 的登录与授权流程，并在授权完成后通过 `postMessage` 返回 token 与用户信息。
+  - Demo 页面根据返回的 `user` 更新登录状态显示。
+
+- 发表帖子：
+  - 在“发表新帖子”表单中填写标题与内容，点击“发布帖子”。
+  - Demo 会调用：
+
+```js
+await auth.create("post", data, permissions);
+```
+
+  - 后端将数据写入 `records` 表，并返回记录 ID 与权限配置；Demo 会在页面右侧列表中展示本次会话创建的帖子。
+
+### 8.3 与 CORS / 应用白名单的关系
+
+- Demo 默认与 UniID 服务同域部署（如 `http://localhost:3000/demo`），请求的 `Origin` 为当前站点地址。
+- 数据 API `/api/data/*` 仍受 CORS 白名单控制：
+  - 通过 `apps` 表中的 `domain` 字段判断是否允许该 Origin。
+  - 推荐在 `apps` 表中创建一个应用：
+    - `id`: `demo-blog`
+    - `domain`: `localhost:3000`（或实际部署域名）
+- 示例站点只是一个使用 SDK 的参考实现，真实外部网站可以拷贝 `public/demo/index.html` 的结构，并将 `authServer` 与 `appId` 替换为自己的配置。
+

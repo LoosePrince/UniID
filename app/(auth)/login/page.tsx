@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo");
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,11 +34,13 @@ export default function LoginPage() {
         return;
       }
 
-      // 后端会通过 Set-Cookie 写入 HttpOnly Cookie（uniid_token 等），
-      // 前端不再在 localStorage 中持久化 token。
-      await res.json(); // 方便未来使用响应体中的 user 信息
+      await res.json();
 
-      router.push("/dashboard");
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else {
+        router.push("/dashboard");
+      }
     } catch (err) {
       console.error(err);
       setError("网络错误，请稍后重试");

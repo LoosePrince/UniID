@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <title>UniID Demo Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --bg-soft: #020824;
+      --card-bg: rgba(15, 23, 42, 0.9);
+      --card-border: rgba(148, 163, 184, 0.1);
+      --accent: #0ea5e9;
+      --accent-soft: rgba(56, 189, 248, 0.25);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --divider: rgba(15, 23, 42, 0.9);
+      --radius-lg: 0.9rem;
+      --radius-md: 0.5rem;
+      --shadow-strong: 0 24px 60px rgba(15, 23, 42, 0.9);
+      --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.8);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 55%),
+        radial-gradient(circle at bottom, rgba(129, 140, 248, 0.2), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .card {
+      position: relative;
+      width: 100%;
+      max-width: 880px;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 55%),
+        var(--card-bg);
+      border-radius: var(--radius-lg);
+      padding: 1.8rem 1.8rem 1.9rem;
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-strong);
+      backdrop-filter: blur(22px);
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 1px solid rgba(148, 163, 184, 0.06);
+      pointer-events: none;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.38rem;
+      letter-spacing: 0.03em;
+    }
+
+    .page-subtitle {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .page-subtitle span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 999px;
+      padding: 0.1rem 0.55rem;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      background: rgba(15, 23, 42, 0.65);
+      font-size: 0.7rem;
+      color: #e5e7eb;
+    }
+
+    .pill-dot {
+      width: 0.35rem;
+      height: 0.35rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
+    }
+
+    .muted {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .status {
+      font-size: 0.8rem;
+      color: #cbd5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.35rem;
+      text-align: right;
+    }
+
+    .status-labels {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #0ea5e9, #22c1c3);
+      color: white;
+      padding: 0.42rem 0.95rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      box-shadow: 0 12px 25px rgba(14, 165, 233, 0.45);
+      transition:
+        transform 130ms ease-out,
+        box-shadow 130ms ease-out,
+        background 130ms ease-out,
+        opacity 130ms ease-out;
+      border: 1px solid rgba(34, 211, 238, 0.5);
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 30px rgba(14, 165, 233, 0.55);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 8px 16px rgba(14, 165, 233, 0.45);
+    }
+
+    button.secondary {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #1e293b;
+      color: #e2e8f0;
+      box-shadow: none;
+    }
+
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .divider {
+      height: 1px;
+      border-radius: 999px;
+      background: linear-gradient(90deg,
+          rgba(15, 23, 42, 0),
+          rgba(148, 163, 184, 0.45),
+          rgba(15, 23, 42, 0));
+      margin: 0.5rem 0 1.1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 1.6rem;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.7rem;
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .section-caption {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .field {
+      margin-bottom: 0.8rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      margin-bottom: 0.32rem;
+      color: #cbd5f5;
+      letter-spacing: 0.02em;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border-radius: var(--radius-md);
+      border: 1px solid #1e293b;
+      background: rgba(2, 6, 23, 0.9);
+      color: var(--text);
+      padding: 0.5rem 0.7rem;
+      font-size: 0.85rem;
+      outline: none;
+      transition:
+        border-color 130ms ease-out,
+        box-shadow 130ms ease-out,
+        background 130ms ease-out;
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: rgba(148, 163, 184, 0.75);
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent-soft);
+      background: #020617;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 0.4rem;
+    }
+
+    .form-hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .error {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #fecaca;
+    }
+
+    .posts {
+      border-radius: var(--radius-md);
+      border: 1px solid #0f172a;
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), #020617);
+      padding: 0.75rem 0.9rem;
+      max-height: 260px;
+      overflow-y: auto;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .posts::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .posts::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .posts::-webkit-scrollbar-thumb {
+      background: rgba(30, 64, 175, 0.8);
+      border-radius: 999px;
+    }
+
+    .post {
+      border-radius: 0.45rem;
+      border: 1px solid rgba(30, 64, 175, 0.65);
+      padding: 0.6rem 0.68rem;
+      margin-bottom: 0.55rem;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.06), transparent 55%),
+        rgba(15, 23, 42, 0.96);
+      transition:
+        border-color 130ms ease-out,
+        transform 130ms ease-out,
+        box-shadow 130ms ease-out,
+        background 130ms ease-out;
+    }
+
+    .post:hover {
+      border-color: rgba(56, 189, 248, 0.8);
+      transform: translateY(-1px);
+      box-shadow: 0 12px 25px rgba(15, 23, 42, 0.9);
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 55%),
+        rgba(15, 23, 42, 1);
+    }
+
+    .post-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+
+    .post-meta {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-bottom: 0.25rem;
+    }
+
+    .post-content {
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+
+    #uniid-auth-frame,
+    .auth-iframe {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(420px, 100% - 2.5rem);
+      height: min(520px, 100% - 2.5rem);
+      border-radius: var(--radius-lg);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow:
+        0 28px 80px rgba(15, 23, 42, 0.98),
+        0 0 0 100vmax rgba(15, 23, 42, 0.75);
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.96), #020617);
+      backdrop-filter: blur(18px);
+      z-index: 50;
+      overflow: hidden;
+      animation: auth-modal-in 170ms ease-out;
+    }
+
+    @keyframes auth-modal-in {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -46%) scale(0.97);
+      }
+
+      to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    .footer {
+      margin-top: 1.15rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      background: #020617;
+      padding: 0.1rem 0.25rem;
+      border-radius: 0.25rem;
+    }
+
+    @media (max-width: 768px) {
+      .page {
+        padding: 1.1rem;
+      }
+
+      .card {
+        padding: 1.4rem 1.3rem 1.5rem;
+      }
+
+      .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .status {
+        align-items: flex-start;
+        text-align: left;
+      }
+
+      .grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.3rem;
+      }
+
+      .footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h1>UniID Demo Blog</h1>
+          <div class="page-subtitle">
+            <span>示例：使用 UniID SDK 登录并在统一数据存储中创建帖子。</span>
+            <span class="pill">
+              <span class="pill-dot"></span>
+              Demo 环境，仅用于调试
+            </span>
+          </div>
+        </div>
+        <div class="status">
+          <div class="status-labels">
+            <span id="statusText">状态：未登录</span>
+            <span id="userText" class="muted">用户：-</span>
+          </div>
+          <button id="loginButton">
+            <span>登录 / 授权</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="grid">
+        <div class="section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">发表新帖子</div>
+              <div class="section-caption">登录后，你可以在统一数据存储中创建一条新的博客帖子。</div>
+            </div>
+          </div>
+          <form id="postForm">
+            <div class="field">
+              <label for="title">标题</label>
+              <input id="title" name="title" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="content">内容</label>
+              <textarea id="content" name="content" placeholder="写点什么吧……"></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="submit" id="postButton">发布帖子</button>
+              <div class="form-hint">
+                数据会以 <code>post</code> 类型存储在 UniID 的统一数据层。
+              </div>
+            </div>
+            <div id="formError" class="error" style="display: none"></div>
+          </form>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">所有帖子</div>
+              <div class="section-caption">按创建时间倒序展示当前应用下的所有公开帖子。</div>
+            </div>
+          </div>
+          <div class="posts" id="allPosts">
+            <div class="muted">尚未创建任何帖子。</div>
+          </div>
+          <div class="section-header" style="margin-top: 0.85rem">
+            <div>
+              <div class="section-title">由我发布的帖子</div>
+              <div class="section-caption">登录后，这里会筛选出当前用户作为所有者的记录。</div>
+            </div>
+          </div>
+          <div class="posts" id="myPosts">
+            <div class="muted">暂无由你发布的帖子。</div>
+          </div>
+        </div>
+      </div>
+      <div id="uniid-auth-frame" class="auth-iframe" style="display: none;"></div>
+      <div class="footer">
+        <span>本页面仅作 UniID 能力演示，不建议直接用于生产环境。</span>
+        <span>需要了解接入方式，可查看 SDK 说明文档。</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="http://localhost:3000/sdk/auth.js"></script>
+  <script>
+    (function () {
+      if (!window.AuthSDK) {
+        console.error("AuthSDK not found. Make sure /sdk/auth.js is served.");
+        return;
+      }
+
+      var auth = new window.AuthSDK({
+        authServer: "http://localhost:3000",
+        appId: "demo-blog",
+        mountId: "uniid-auth-frame"
+      });
+
+      var state = {
+        user: null,
+        posts: []
+      };
+
+      var statusText = document.getElementById("statusText");
+      var userText = document.getElementById("userText");
+      var loginButton = document.getElementById("loginButton");
+      var postForm = document.getElementById("postForm");
+      var postButton = document.getElementById("postButton");
+      var formError = document.getElementById("formError");
+      var allPostsContainer = document.getElementById("allPosts");
+      var myPostsContainer = document.getElementById("myPosts");
+
+      function loadUserFromStorage() {
+        try {
+          var raw = window.localStorage.getItem("uniid_demo_user");
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function saveUserToStorage(user) {
+        try {
+          window.localStorage.setItem("uniid_demo_user", JSON.stringify(user));
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      async function loadPostsFromServer() {
+        if (!auth.token) return;
+        try {
+          var res = await fetch(auth.authServer + "/api/data/query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + auth.token
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              app_id: auth.appId,
+              data_type: "post"
+            })
+          });
+          if (!res.ok) return;
+          var data = await res.json();
+          if (!data || !Array.isArray(data.items)) return;
+          state.posts = data.items.map(function (item) {
+            return {
+              id: item.id,
+              title: item.data && item.data.title ? item.data.title : "",
+              content: item.data && item.data.content ? item.data.content : "",
+              created_at: item.created_at,
+              owner_id: item.owner_id || null
+            };
+          });
+          renderState();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      function renderState() {
+        if (state.user) {
+          statusText.textContent = "状态：已登录";
+          userText.textContent =
+            "用户：" + (state.user.username || state.user.id || "-");
+          loginButton.textContent = "重新授权";
+        } else {
+          statusText.textContent = "状态：未登录";
+          userText.textContent = "用户：-";
+          loginButton.textContent = "登录 / 授权";
+        }
+
+        while (allPostsContainer.firstChild) {
+          allPostsContainer.removeChild(allPostsContainer.firstChild);
+        }
+        while (myPostsContainer.firstChild) {
+          myPostsContainer.removeChild(myPostsContainer.firstChild);
+        }
+
+        if (state.posts.length === 0) {
+          var emptyAll = document.createElement("div");
+          emptyAll.className = "muted";
+          emptyAll.textContent = "尚未创建任何帖子。";
+          allPostsContainer.appendChild(emptyAll);
+
+          var emptyMine = document.createElement("div");
+          emptyMine.className = "muted";
+          emptyMine.textContent = "暂无由你发布的帖子。";
+          myPostsContainer.appendChild(emptyMine);
+        } else {
+          state.posts.forEach(function (p) {
+            var el = document.createElement("div");
+            el.className = "post";
+            var title = document.createElement("div");
+            title.className = "post-title";
+            title.textContent = p.title;
+            var meta = document.createElement("div");
+            meta.className = "post-meta";
+            meta.textContent =
+              "ID: " +
+              p.id +
+              " · 创建时间: " +
+              new Date(p.created_at * 1000).toLocaleString();
+            var content = document.createElement("div");
+            content.className = "post-content";
+            content.textContent = p.content;
+            el.appendChild(title);
+            el.appendChild(meta);
+            el.appendChild(content);
+            allPostsContainer.appendChild(el);
+          });
+
+          if (state.user) {
+            var mine = state.posts.filter(function (p) {
+              return p.owner_id === state.user.id;
+            });
+            if (mine.length === 0) {
+              var emptyMine2 = document.createElement("div");
+              emptyMine2.className = "muted";
+              emptyMine2.textContent = "暂无由你发布的帖子。";
+              myPostsContainer.appendChild(emptyMine2);
+            } else {
+              mine.forEach(function (p) {
+                var el2 = document.createElement("div");
+                el2.className = "post";
+                var title2 = document.createElement("div");
+                title2.className = "post-title";
+                title2.textContent = p.title;
+                var meta2 = document.createElement("div");
+                meta2.className = "post-meta";
+                meta2.textContent =
+                  "ID: " +
+                  p.id +
+                  " · 创建时间: " +
+                  new Date(p.created_at * 1000).toLocaleString();
+                var content2 = document.createElement("div");
+                content2.className = "post-content";
+                content2.textContent = p.content;
+                el2.appendChild(title2);
+                el2.appendChild(meta2);
+                el2.appendChild(content2);
+                myPostsContainer.appendChild(el2);
+              });
+            }
+          } else {
+            var tip = document.createElement("div");
+            tip.className = "muted";
+            tip.textContent = "登录后可查看由你发布的帖子。";
+            myPostsContainer.appendChild(tip);
+          }
+        }
+      }
+
+      loginButton.onclick = async function () {
+        loginButton.disabled = true;
+        loginButton.textContent = "登录中...";
+        try {
+          var result = await auth.login();
+          if (result && result.user) {
+            state.user = result.user;
+            saveUserToStorage(result.user);
+          }
+          await loadPostsFromServer();
+        } catch (e) {
+          console.error(e);
+          alert("登录失败，请稍后重试。");
+        } finally {
+          loginButton.disabled = false;
+          renderState();
+        }
+      };
+
+      postForm.onsubmit = async function (e) {
+        e.preventDefault();
+        formError.style.display = "none";
+        formError.textContent = "";
+
+        var titleInput = document.getElementById("title");
+        var contentInput = document.getElementById("content");
+
+        var title = titleInput.value.trim();
+        var content = contentInput.value.trim();
+
+        if (!title || !content) {
+          formError.textContent = "标题和内容均不能为空。";
+          formError.style.display = "block";
+          return;
+        }
+
+        postButton.disabled = true;
+        postButton.textContent = "发布中...";
+
+        try {
+          var data = {
+            title: title,
+            content: content,
+            metadata: {
+              createdAt: Date.now()
+            }
+          };
+
+          var permissions = {
+            fields: {
+              "data.title": { read: ["$all"], write: ["$owner"] },
+              "data.content": { read: ["$all"], write: ["$owner"] }
+            }
+          };
+
+          var created = await auth.create("post", data, permissions);
+
+          state.posts.unshift({
+            id: created.id,
+            title: data.title,
+            content: data.content,
+            created_at: created.created_at,
+            owner_id: state.user ? state.user.id : null
+          });
+
+          titleInput.value = "";
+          contentInput.value = "";
+
+          renderState();
+        } catch (err) {
+          console.error(err);
+          formError.textContent =
+            "发帖失败：" + (err && err.message ? err.message : "未知错误");
+          formError.style.display = "block";
+        } finally {
+          postButton.disabled = false;
+          postButton.textContent = "发布帖子";
+        }
+      };
+
+      renderState();
+
+      (function initFromToken() {
+        if (!auth.token) return;
+        var storedUser = loadUserFromStorage();
+        if (storedUser) {
+          state.user = storedUser;
+          loadPostsFromServer().then(function () {
+            renderState();
+          });
+        }
+      })();
+    })();
+  </script>
+</body>
+
+</html>

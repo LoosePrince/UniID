@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withDataCors } from "@/lib/cors";
+import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 
+export async function OPTIONS(req: NextRequest) {
+  return handleDataApiOptions(req);
+}
+
 export const POST = withDataCors(async function handler(
-  req: NextRequest
+  req: NextRequest,
+  context: { params: { appId: string; dataType: string } }
 ): Promise<NextResponse> {
   const authHeader =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
@@ -24,10 +29,7 @@ export const POST = withDataCors(async function handler(
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
   }
 
-  const { appId, dataType } = req.params as {
-    appId: string;
-    dataType: string;
-  };
+  const { appId, dataType } = context.params;
 
   const body = (await req.json().catch(() => null)) as
     | {

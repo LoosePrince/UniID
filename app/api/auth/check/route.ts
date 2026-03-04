@@ -8,13 +8,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ valid: false }, { status: 403 });
   }
 
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  let token: string | null = null;
 
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ valid: false }, { status: 401 });
+  const authHeader =
+    req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice("Bearer ".length).trim();
   }
 
-  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token) {
+    const cookieHeader =
+      req.headers.get("cookie") ?? req.headers.get("Cookie") ?? "";
+    if (cookieHeader) {
+      const parts = cookieHeader.split(";").map((p) => p.trim());
+      for (const part of parts) {
+        if (part.startsWith("uniid_token=")) {
+          token = part.substring("uniid_token=".length);
+          break;
+        }
+      }
+    }
+  }
+
+  if (!token) {
+    return NextResponse.json({ valid: false }, { status: 401 });
+  }
 
   try {
     const payload = await verifyToken(token);

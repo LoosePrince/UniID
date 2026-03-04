@@ -1,20 +1,61 @@
 (function () {
   function AuthSDK(config) {
+    if (!config || !config.mountId) {
+      throw new Error("AuthSDK: mountId is required to initialize iframe.");
+    }
     this.authServer = config.authServer.replace(/\/+$/, "");
     this.appId = config.appId;
+    this.mountId = config.mountId;
     this.token = null;
     this.iframe = null;
     this.loginResolver = null;
+    this._restoreTokenFromCookie();
     this._init();
   }
 
+  AuthSDK.prototype._getCookie = function (name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length === 2) {
+      return parts.pop().split(";").shift() || null;
+    }
+    return null;
+  };
+
+  AuthSDK.prototype._setCookie = function (name, value, maxAgeSeconds) {
+    var cookie =
+      name +
+      "=" +
+      encodeURIComponent(value) +
+      "; path=/; SameSite=Lax";
+    if (typeof maxAgeSeconds === "number") {
+      cookie += "; max-age=" + String(maxAgeSeconds);
+    }
+    document.cookie = cookie;
+  };
+
+  AuthSDK.prototype._restoreTokenFromCookie = function () {
+    var token = this._getCookie("uniid_sdk_token");
+    if (token) {
+      this.token = token;
+    }
+  };
+
   AuthSDK.prototype._init = function () {
     if (this.iframe) return;
+    var mount = document.getElementById(this.mountId);
+    if (!mount || !mount.parentNode) {
+      throw new Error(
+        "AuthSDK: mount element with id '" + this.mountId + "' not found."
+      );
+    }
     var iframe = document.createElement("iframe");
     iframe.src = this.authServer + "/embed?app_id=" + encodeURIComponent(this.appId);
+    iframe.id = mount.id;
+    iframe.className = mount.className;
+    iframe.title = "UniID 授权窗口";
     iframe.style.display = "none";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
+    mount.parentNode.replaceChild(iframe, mount);
     this.iframe = iframe;
 
     var self = this;
@@ -23,6 +64,7 @@
       if (event.data.type === "uniid_login_success") {
         if (event.data.token) {
           self.token = event.data.token;
+          self._setCookie("uniid_sdk_token", event.data.token, event.data.expires_in || 3600);
         }
         if (self.loginResolver) {
           self.loginResolver({
@@ -59,6 +101,9 @@
   };
 
   AuthSDK.prototype._fetch = function (method, path, body) {
+    if (!this.token) {
+      this._restoreTokenFromCookie();
+    }
     if (!this.token) {
       return Promise.reject(new Error("NO_TOKEN"));
     }
