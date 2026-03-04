@@ -1,0 +1,33 @@
+### Node / Next.js
+node_modules
+.next
+.turbo
+.swc
+dist
+out
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+### Env files
+.env
+.env.*
+!.env.example
+
+### OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+### Prisma / Databases
+prisma/dev.db
+prisma/dev.db-journal
+
+### Testing / Coverage
+coverage
+
+### Vercel / Deployment
+.vercel
