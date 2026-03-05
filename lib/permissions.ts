@@ -82,26 +82,33 @@ export async function getAppAdminIds(appId: string): Promise<string[]> {
  * @param appId 应用 ID
  * @param ownerId 记录所有者 ID
  * @param action 操作类型: read, write, delete
+ * @param authType 授权类型: full(完整授权) 或 restricted(限制授权)
  */
 export async function checkRecordPermission(
   permissions: string,
   userId: string,
   appId: string,
   ownerId: string | null,
-  action: "read" | "write" | "delete"
+  action: "read" | "write" | "delete",
+  authType: "full" | "restricted" = "restricted"
 ): Promise<boolean> {
   // 记录所有者有所有权限
   if (ownerId === userId) {
     return true;
   }
 
-  // 检查是否是系统管理员 (role=admin)
+  // 限制授权模式下，只能操作自己的数据
+  if (authType === "restricted") {
+    return false;
+  }
+
+  // 完整授权模式下，检查系统管理员权限
   const systemAdmin = await isSystemAdmin(userId);
   if (systemAdmin) {
     return true;
   }
 
-  // 检查是否是应用管理员
+  // 完整授权模式下，检查应用管理员权限
   const appAdmin = await isAppAdmin(appId, userId);
   if (appAdmin) {
     return true;

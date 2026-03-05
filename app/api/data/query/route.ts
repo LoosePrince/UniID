@@ -52,6 +52,7 @@ export const POST = withDataCors(async function handler(
   }
 
   const userId = tokenValidation.payload!.sub;
+  const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
   const where: {
     appId: string;
@@ -81,7 +82,8 @@ export const POST = withDataCors(async function handler(
       userId,
       record.appId,
       record.ownerId,
-      "read"
+      "read",
+      authType
     );
     if (hasPermission) {
       accessibleRecords.push(record);

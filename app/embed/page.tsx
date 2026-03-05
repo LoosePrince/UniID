@@ -17,8 +17,9 @@ export default function EmbedPage() {
 
   const [step, setStep] = useState<Step>("idle");
   const [user, setUser] = useState<EmbedUser | null>(null);
+  const [isAppAdmin, setIsAppAdmin] = useState<boolean>(false);
   const [parentOrigin, setParentOrigin] = useState<string | null>(null);
-  const [authType, setAuthType] = useState<"full" | "restricted">("full");
+  const [authType, setAuthType] = useState<"full" | "restricted">("restricted");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -40,6 +41,19 @@ export default function EmbedPage() {
               username: data.user.username,
               role: data.user.role
             });
+            // 查询用户是否是该应用的管理员
+            const adminRes = await fetch(`/api/app/${appId}/admin-check`, {
+              method: "GET",
+              credentials: "include"
+            });
+            if (adminRes.ok) {
+              const adminData = await adminRes.json();
+              setIsAppAdmin(adminData.isAdmin || false);
+              // 如果是应用管理员，默认使用 restricted 授权
+              if (adminData.isAdmin || data.user.role === "admin") {
+                setAuthType("restricted");
+              }
+            }
             setStep("authorize");
             return;
           }
@@ -163,29 +177,31 @@ export default function EmbedPage() {
                 </span>
               </p>
             )}
-            <div className="space-y-1">
-              <p className="text-xs text-slate-300">授权类型</p>
-              <label className="flex items-center gap-2 text-xs text-slate-300">
-                <input
-                  type="radio"
-                  name="authType"
-                  value="full"
-                  checked={authType === "full"}
-                  onChange={() => setAuthType("full")}
-                />
-                完整授权（账户级权限）
-              </label>
-              <label className="flex items-center gap-2 text-xs text-slate-300">
-                <input
-                  type="radio"
-                  name="authType"
-                  value="restricted"
-                  checked={authType === "restricted"}
-                  onChange={() => setAuthType("restricted")}
-                />
-                限制授权（仅数据级权限）
-              </label>
-            </div>
+            {(user?.role === "admin" || isAppAdmin) && (
+              <div className="space-y-1">
+                <p className="text-xs text-slate-300">授权类型</p>
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="radio"
+                    name="authType"
+                    value="full"
+                    checked={authType === "full"}
+                    onChange={() => setAuthType("full")}
+                  />
+                  完整授权（账户级权限）
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <input
+                    type="radio"
+                    name="authType"
+                    value="restricted"
+                    checked={authType === "restricted"}
+                    onChange={() => setAuthType("restricted")}
+                  />
+                  限制授权（仅数据级权限）
+                </label>
+              </div>
+            )}
             {error && (
               <p className="text-xs text-red-400">
                 {error}

@@ -52,6 +52,7 @@ export const GET = withDataCors(async function handler(
   }
 
   const userId = tokenValidation.payload!.sub;
+  const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
   // 检查读取权限
   const hasPermission = await checkRecordPermission(
@@ -59,7 +60,8 @@ export const GET = withDataCors(async function handler(
     userId,
     record.appId,
     record.ownerId,
-    "read"
+    "read",
+    authType
   );
 
   if (!hasPermission) {
