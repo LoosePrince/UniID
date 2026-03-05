@@ -1,68 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/jwt";
 import { isSameOriginAuthRequest } from "@/lib/origin";
+import { getAuthContextFromRequest } from "@/lib/auth-context";
 
 export async function POST(req: NextRequest) {
   if (!isSameOriginAuthRequest(req)) {
-    return NextResponse.json({ error: "CROSS_ORIGIN_AUTH_FORBIDDEN" }, { status: 403 });
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
   }
 
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  const auth = await getAuthContextFromRequest(req);
 
-  let token: string | null = null;
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.status }
+    );
+  }
 
-  if (authHeader?.startsWith("Bearer ")) {
-    token = authHeader.slice("Bearer ".length).trim();
-  } else {
-    const cookieHeader = req.headers.get("cookie") ?? req.headers.get("Cookie");
-    if (cookieHeader) {
-      const parts = cookieHeader.split(";").map((p) => p.trim());
-      for (const part of parts) {
-        if (part.startsWith("uniid_token=")) {
-          token = part.substring("uniid_token=".length);
-          break;
-        }
-      }
+  await prisma.session.deleteMany({
+    where: {
+      token: auth.token
     }
-  }
+  });
 
-  if (!token) {
-    return NextResponse.json({ error: "MISSING_TOKEN" }, { status: 401 });
-  }
+  const res = NextResponse.json({ success: true });
 
-  try {
-    await verifyToken(token);
+  const isProd = process.env.NODE_ENV === "production";
 
-    await prisma.session.deleteMany({
-      where: {
-        token
-      }
-    });
-    const res = NextResponse.json({ success: true });
+  res.cookies.set("uniid_token", "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProd,
+    path: "/",
+    maxAge: 0
+  });
 
-    const isProd = process.env.NODE_ENV === "production";
+  res.cookies.set("uniid_refresh_token", "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isProd,
+    path: "/",
+    maxAge: 0
+  });
 
-    res.cookies.set("uniid_token", "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: isProd,
-      path: "/",
-      maxAge: 0
-    });
-
-    res.cookies.set("uniid_refresh_token", "", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: isProd,
-      path: "/",
-      maxAge: 0
-    });
-
-    return res;
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
-  }
+  return res;
 }
 

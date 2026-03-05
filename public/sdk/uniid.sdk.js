@@ -66,7 +66,11 @@
       if (event.data.type === "uniid_login_success") {
         if (event.data.token) {
           self.token = event.data.token;
-          self._setCookie("uniid_sdk_token", event.data.token, event.data.expires_in || 3600);
+          self._setCookie(
+            "uniid_sdk_token",
+            event.data.token,
+            event.data.expires_in || 3600
+          );
         }
         if (self.loginResolver) {
           self.loginResolver({
@@ -74,6 +78,21 @@
             user: event.data.user || null
           });
           self.loginResolver = null;
+        }
+        if (self.iframe) {
+          self.iframe.style.display = "none";
+        }
+      } else if (event.data.type === "uniid_login_cancel") {
+        if (self.loginResolver) {
+          self.loginResolver({
+            token: null,
+            user: null,
+            cancelled: true
+          });
+          self.loginResolver = null;
+        }
+        if (self.iframe) {
+          self.iframe.style.display = "none";
         }
       }
     });
@@ -281,6 +300,8 @@
       if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'uniid_login_success') {
         callback({ type: 'login', user: event.data.user });
+      } else if (event.data.type === 'uniid_login_cancel') {
+        callback({ type: 'logout', user: null, reason: 'cancel' });
       }
     };
     window.addEventListener('message', handler);

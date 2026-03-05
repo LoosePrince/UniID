@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 import { handleDataApiOptions } from "@/lib/cors";
+import { revokeAuthorizationForUserAndApp } from "@/lib/authorization-helpers";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -97,21 +97,15 @@ export async function POST(req: NextRequest) {
 
   const userId = tokenValidation.payload!.sub;
 
-  const now = Math.floor(Date.now() / 1000);
-
-  // 查找并更新授权记录
-  const authorization = await prisma.authorization.findUnique({
-    where: {
-      userId_appId: {
-        userId: userId,
-        appId: appId
-      }
-    }
+  const result = await revokeAuthorizationForUserAndApp({
+    userId,
+    appId,
+    sessionTokenPrefix: token.substring(0, 20)
   });
 
-  if (!authorization) {
+  if (!result.ok) {
     const res = NextResponse.json(
-      { error: "AUTHORIZATION_NOT_FOUND" },
+      { error: result.reason },
       { status: 404 }
     );
     if (allowedOrigin) {
@@ -122,37 +116,11 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // 标记授权为已撤销
-  await prisma.authorization.update({
-    where: {
-      userId_appId: {
-        userId: userId,
-        appId: appId
-      }
-    },
-    data: {
-      revoked: 1
-    }
-  });
-
-  // 使该用户的所有相关会话过期
-  await prisma.session.updateMany({
-    where: {
-      userId: userId,
-      token: {
-        startsWith: token.substring(0, 20) // 匹配当前 token 开头的会话
-      }
-    },
-    data: {
-      expiresAt: now
-    }
-  });
-
   const res = NextResponse.json({
     success: true,
     message: "Authorization revoked successfully",
     app_id: appId,
-    revoked_at: now
+    revoked_at: result.revokedAt
   });
 
   // 添加 CORS 头

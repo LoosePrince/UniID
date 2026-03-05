@@ -1,5 +1,7 @@
 "use client";
 
+import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -24,6 +26,7 @@ export default function EmbedPage() {
   const [authType, setAuthType] = useState<"full" | "restricted">("restricted");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
     // 如果从登录页面返回（URL中有parent_origin参数），自动开始检查登录状态
@@ -146,98 +149,148 @@ export default function EmbedPage() {
     }
   }
 
+  function handleCancelAuthorize() {
+    setCancelled(true);
+    setStep("idle");
+    if (parentOrigin) {
+      window.parent.postMessage(
+        {
+          type: "uniid_login_cancel",
+          app_id: appId
+        },
+        parentOrigin
+      );
+    }
+  }
+
   if (!appId) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-50">
-        <div className="rounded-lg bg-slate-900 px-6 py-4 text-sm">
-          <p>缺少必须的查询参数：app_id。</p>
-        </div>
+        <main className="w-full max-w-md">
+          <Card className="space-y-2 text-sm">
+            <h1 className="text-base font-semibold text-slate-50">
+              UniID 授权中心
+            </h1>
+            <p className="text-xs text-slate-400">
+              缺少必须的查询参数：<span className="font-mono">app_id</span>。
+            </p>
+          </Card>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-50">
-      <div className="w-full max-w-md rounded-lg bg-slate-900 px-6 py-5 text-sm shadow-xl shadow-slate-900/60">
-        <h1 className="mb-1 text-base font-semibold">
-          UniID 授权中心
-        </h1>
-        <p className="mb-4 text-xs text-slate-400">
-          站点 <span className="font-mono text-sky-300">{appId}</span>{" "}
-          正在请求访问你的账户数据。
-        </p>
-
-        {step === "checking" && (
-          <div className="space-y-2 text-xs text-slate-300">
-            <p>正在检查登录状态，请稍候...</p>
-          </div>
-        )}
-
-        {step === "authorize" && (
-          <form onSubmit={handleAuthorize} className="space-y-3">
-            <p className="text-xs text-slate-300">
-              第二步：授权站点访问你的数据。
+      <main className="w-full max-w-md">
+        <Card className="space-y-4 text-sm">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-300">
+              授权中心
             </p>
-            {user && (
-              <p className="text-xs text-slate-400">
-                当前登录用户：{" "}
-                <span className="font-mono text-sky-300">
-                  {user.username}
-                </span>
+            <h1 className="text-base font-semibold text-slate-50">
+              UniID 授权中心
+            </h1>
+            <p className="text-xs text-slate-400">
+              站点 <span className="font-mono text-sky-300">{appId}</span>{" "}
+              正在请求使用你的 UniID 账户信息。
+            </p>
+          </div>
+
+          {step === "checking" && (
+            <div className="space-y-2 text-xs text-slate-300">
+              <p>正在检查登录状态，请稍候...</p>
+            </div>
+          )}
+
+          {step === "authorize" && (
+            <form onSubmit={handleAuthorize} className="space-y-3">
+              <p className="text-xs text-slate-300">
+                确认是否允许该站点访问你的账户数据？
               </p>
-            )}
-            {(user?.role === "admin" || isAppAdmin) && (
-              <div className="space-y-1">
-                <p className="text-xs text-slate-300">授权类型</p>
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <input
-                    type="radio"
-                    name="authType"
-                    value="full"
-                    checked={authType === "full"}
-                    onChange={() => setAuthType("full")}
-                  />
-                  完整授权（账户级权限）
-                </label>
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <input
-                    type="radio"
-                    name="authType"
-                    value="restricted"
-                    checked={authType === "restricted"}
-                    onChange={() => setAuthType("restricted")}
-                  />
-                  限制授权（仅数据级权限）
-                </label>
+              {user && (
+                <p className="text-xs text-slate-400">
+                  当前登录用户：{" "}
+                  <span className="font-mono text-sky-300">
+                    {user.username}
+                  </span>
+                </p>
+              )}
+              {(user?.role === "admin" || isAppAdmin) && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300">选择授权范围</p>
+                  <div className="flex gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setAuthType("restricted")}
+                      className={`flex-1 rounded-md border px-3 py-1.5 text-left transition ${authType === "restricted"
+                          ? "border-sky-500 bg-sky-600/20 text-sky-100"
+                          : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                        }`}
+                    >
+                      <p className="font-medium">限制授权</p>
+                      <p className="text-[11px] text-slate-400">
+                        仅允许访问必要的数据，推荐使用。
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthType("full")}
+                      className={`flex-1 rounded-md border px-3 py-1.5 text-left transition ${authType === "full"
+                          ? "border-sky-500 bg-sky-600/20 text-sky-100"
+                          : "border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500"
+                        }`}
+                    >
+                      <p className="font-medium">完整授权</p>
+                      <p className="text-[11px] text-slate-400">
+                        授权站点访问账户级信息，仅在完全信任时使用。
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {error && (
+                <p className="text-xs text-red-400">
+                  {error}
+                </p>
+              )}
+              <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+                <PrimaryButton
+                  type="submit"
+                  disabled={loading}
+                  className="sm:flex-1"
+                >
+                  {loading ? "授权中..." : "同意并授权"}
+                </PrimaryButton>
+                <SecondaryButton
+                  type="button"
+                  onClick={handleCancelAuthorize}
+                  disabled={loading}
+                  className="sm:flex-1 border-red-500/60 text-red-300 hover:border-red-400 hover:text-red-200"
+                >
+                  取消并关闭
+                </SecondaryButton>
               </div>
-            )}
-            {error && (
-              <p className="text-xs text-red-400">
-                {error}
-              </p>
-            )}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-1 w-full rounded-md bg-emerald-600 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
-            >
-              {loading ? "授权中..." : "同意并授权"}
-            </button>
-          </form>
-        )}
+            </form>
+          )}
 
-        {step === "done" && (
-          <div className="space-y-2 text-xs text-slate-300">
-            <p>授权已完成，可以关闭此窗口。</p>
-          </div>
-        )}
+          {step === "done" && (
+            <div className="space-y-2 text-xs text-slate-300">
+              <p>授权已完成，你可以返回刚才的站点继续使用。</p>
+            </div>
+          )}
 
-        {step === "idle" && (
-          <div className="space-y-2 text-xs text-slate-300">
-            <p>请从集成了 UniID SDK 的站点中点击“登录 / 授权”按钮。</p>
-          </div>
-        )}
-      </div>
+          {step === "idle" && (
+            <div className="space-y-2 text-xs text-slate-300">
+              {cancelled ? (
+                <p>你已取消本次授权请求，可以回到原站点继续浏览。</p>
+              ) : (
+                <p>请在集成了 UniID 的站点中点击“使用 UniID 登录 / 授权”按钮以继续。</p>
+              )}
+            </div>
+          )}
+        </Card>
+      </main>
     </div>
   );
 }

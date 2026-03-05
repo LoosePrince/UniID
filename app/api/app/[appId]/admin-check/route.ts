@@ -35,12 +35,13 @@ export async function GET(
     });
 
     if (!app) {
-      return NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
+      // 应用不存在时也返回 200，统一由前端按“非管理员 / 未配置应用”处理
+      return NextResponse.json({ isAdmin: false, appExists: false });
     }
 
     // 检查是否是应用所有者
     if (app.ownerId === userId) {
-      return NextResponse.json({ isAdmin: true });
+      return NextResponse.json({ isAdmin: true, appExists: true });
     }
 
     // 检查是否在 adminIds 列表中
@@ -48,14 +49,14 @@ export async function GET(
       try {
         const adminIds: string[] = JSON.parse(app.adminIds);
         if (adminIds.includes(userId)) {
-          return NextResponse.json({ isAdmin: true });
+          return NextResponse.json({ isAdmin: true, appExists: true });
         }
       } catch {
         // 解析失败，忽略
       }
     }
 
-    return NextResponse.json({ isAdmin: false });
+    return NextResponse.json({ isAdmin: false, appExists: true });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });

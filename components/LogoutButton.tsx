@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { SecondaryButton } from "./ui/button";
 
 export function LogoutButton() {
   const router = useRouter();
@@ -22,14 +23,9 @@ export function LogoutButton() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleLogout}
-      disabled={loading}
-      className="rounded-md border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-red-500 hover:text-red-300"
-    >
+    <SecondaryButton onClick={handleLogout} disabled={loading}>
       {loading ? "正在退出..." : "退出登录"}
-    </button>
+    </SecondaryButton>
   );
 }
 
