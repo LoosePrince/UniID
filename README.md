@@ -16,13 +16,13 @@
 
 ### 1.3 技术选型
 
-前端框架：Next.js 14+ (App Router)
-UI 框架：React 18+
-语言：TypeScript 5+
-数据库：SQLite (better-sqlite3) + Prisma ORM
-认证：NextAuth.js / Auth.js
-API：Next.js Route Handlers + tRPC
-实时通信：WebSocket (ws) / Server-Sent Events
+- 前端框架：Next.js 14+ (App Router)
+- UI 框架：React 18+
+- 语言：TypeScript 5+
+- 数据库：SQLite + Prisma ORM
+- 认证：NextAuth.js / Auth.js + Jose (JWT)
+- API：Next.js Route Handlers
+- 状态管理：React Hooks
 
 ## 二、系统架构
 
@@ -59,81 +59,109 @@ API：Next.js Route Handlers + tRPC
 
 ## 三、数据库设计
 
-### 3.1 核心表结构
+### 3.1 核心表结构 (SQLite)
 
 ```sql
 -- 用户表
 CREATE TABLE users (
-    id TEXT PRIMARY KEY,                    -- 用户ID (UUID)
+    id TEXT PRIMARY KEY,                    -- 用户ID (CUID)
     username TEXT UNIQUE NOT NULL,           -- 用户名
-    password_hash TEXT NOT NULL,              -- 密码哈希
+    passwordHash TEXT NOT NULL,              -- 密码哈希
     email TEXT UNIQUE,                        -- 邮箱
     role TEXT DEFAULT 'user',                  -- 角色: admin/user
-    created_at INTEGER NOT NULL,               -- 创建时间戳
-    updated_at INTEGER NOT NULL,                -- 更新时间戳
-    settings JSON,                              -- 用户设置(JSON)
+    createdAt INTEGER NOT NULL,               -- 创建时间戳
+    updatedAt INTEGER NOT NULL,                -- 更新时间戳
+    settings TEXT,                              -- 用户设置(JSON字符串)
     deleted INTEGER DEFAULT 0                    -- 软删除标记
 );
 
 -- 会话表
 CREATE TABLE sessions (
     id TEXT PRIMARY KEY,                       -- 会话ID
-    user_id TEXT NOT NULL,                      -- 用户ID
-    token TEXT UNIQUE NOT NULL,                  -- 访问令牌
-    refresh_token TEXT UNIQUE,                    -- 刷新令牌
-    expires_at INTEGER NOT NULL,                   -- 过期时间
-    created_at INTEGER NOT NULL,                    -- 创建时间
-    last_activity INTEGER,                           -- 最后活动时间
-    user_agent TEXT,                                  -- 用户代理
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    userId TEXT NOT NULL,                      -- 用户ID
+    token TEXT UNIQUE NOT NULL,                -- 访问令牌
+    refreshToken TEXT UNIQUE,                  -- 刷新令牌
+    expiresAt INTEGER NOT NULL,                -- 过期时间
+    createdAt INTEGER NOT NULL,                -- 创建时间
+    lastActivity INTEGER,                      -- 最后活动时间
+    userAgent TEXT,                            -- 用户代理
+    FOREIGN KEY (userId) REFERENCES users(id)
 );
 
 -- 应用(网站)表
 CREATE TABLE apps (
-    id TEXT PRIMARY KEY,                          -- 应用ID
-    name TEXT NOT NULL,                             -- 应用名称
-    domain TEXT UNIQUE NOT NULL,                     -- 应用域名
-    description TEXT,                                  -- 应用描述
-    created_at INTEGER NOT NULL,                        -- 创建时间
-    owner_id TEXT NOT NULL,                              -- 创建者ID
-    status TEXT DEFAULT 'active',                         -- 状态
-    api_key TEXT UNIQUE,                                   -- API密钥
-    settings JSON,                                          -- 应用设置
-    FOREIGN KEY (owner_id) REFERENCES users(id)
+    id TEXT PRIMARY KEY,                       -- 应用ID
+    name TEXT NOT NULL,                        -- 应用名称
+    domain TEXT UNIQUE NOT NULL,               -- 应用域名
+    description TEXT,                          -- 应用描述
+    createdAt INTEGER NOT NULL,                -- 创建时间
+    ownerId TEXT NOT NULL,                     -- 创建者ID
+    status TEXT DEFAULT 'active',              -- 状态
+    apiKey TEXT UNIQUE,                        -- API密钥
+    settings TEXT,                             -- 应用设置(JSON字符串)
+    adminIds TEXT,                             -- 应用管理员ID列表(JSON数组)
+    FOREIGN KEY (ownerId) REFERENCES users(id)
 );
 
 -- 授权表
 CREATE TABLE authorizations (
-    id TEXT PRIMARY KEY,                              -- 授权ID
-    user_id TEXT NOT NULL,                              -- 用户ID
-    app_id TEXT NOT NULL,                                -- 应用ID
-    auth_type TEXT NOT NULL,                              -- 授权类型: full/restricted
-    granted_at INTEGER NOT NULL,                           -- 授权时间
-    expires_at INTEGER,                                      -- 过期时间(空表示永久)
-    revoked INTEGER DEFAULT 0,                               -- 是否撤销
-    permissions JSON,                                        -- 额外权限配置
-    UNIQUE(user_id, app_id),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (app_id) REFERENCES apps(id)
+    id TEXT PRIMARY KEY,                       -- 授权ID
+    userId TEXT NOT NULL,                      -- 用户ID
+    appId TEXT NOT NULL,                       -- 应用ID
+    authType TEXT NOT NULL,                    -- 授权类型: full/restricted
+    grantedAt INTEGER NOT NULL,                -- 授权时间
+    expiresAt INTEGER,                         -- 过期时间(空表示永久)
+    revoked INTEGER DEFAULT 0,                 -- 是否撤销
+    permissions TEXT,                          -- 额外权限配置(JSON字符串)
+    UNIQUE(userId, appId),
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (appId) REFERENCES apps(id)
 );
 
 -- 数据记录表 (核心灵活存储)
 CREATE TABLE records (
-    id TEXT PRIMARY KEY,                              -- 记录ID
-    app_id TEXT NOT NULL,                               -- 所属应用
-    owner_id TEXT,                                       -- 所有者ID(空表示应用级数据)
-    data_type TEXT NOT NULL,                             -- 数据类型(如: post, form)
-    data JSON NOT NULL,                                   -- 实际数据(JSON格式)
-    permissions JSON NOT NULL,                             -- 权限配置
-    created_at INTEGER NOT NULL,                           -- 创建时间
-    updated_at INTEGER NOT NULL,                            -- 更新时间
-    created_by TEXT,                                         -- 创建者ID
-    updated_by TEXT,                                         -- 更新者ID
-    deleted INTEGER DEFAULT 0,                               -- 软删除
-    FOREIGN KEY (app_id) REFERENCES apps(id),
-    FOREIGN KEY (owner_id) REFERENCES users(id)
+    id TEXT PRIMARY KEY,                       -- 记录ID
+    appId TEXT NOT NULL,                       -- 所属应用
+    ownerId TEXT,                              -- 所有者ID(空表示应用级数据)
+    dataType TEXT NOT NULL,                    -- 数据类型(如: post, form)
+    data TEXT NOT NULL,                        -- 实际数据(JSON字符串)
+    permissions TEXT NOT NULL,                 -- 权限配置(JSON字符串)
+    createdAt INTEGER NOT NULL,                -- 创建时间
+    updatedAt INTEGER NOT NULL,                -- 更新时间
+    createdById TEXT,                          -- 创建者ID
+    updatedById TEXT,                          -- 更新者ID
+    deleted INTEGER DEFAULT 0,                 -- 软删除
+    FOREIGN KEY (appId) REFERENCES apps(id),
+    FOREIGN KEY (ownerId) REFERENCES users(id),
+    FOREIGN KEY (createdById) REFERENCES users(id),
+    FOREIGN KEY (updatedById) REFERENCES users(id)
 );
 
+-- NextAuth.js 账户表 (OAuth支持)
+CREATE TABLE accounts (
+    id TEXT PRIMARY KEY,                       -- 账户ID
+    userId TEXT NOT NULL,                      -- 用户ID
+    type TEXT NOT NULL,                        -- 账户类型
+    provider TEXT NOT NULL,                    -- 提供商
+    providerAccountId TEXT NOT NULL,           -- 提供商账户ID
+    refresh_token TEXT,                        -- 刷新令牌
+    access_token TEXT,                         -- 访问令牌
+    expires_at INTEGER,                        -- 过期时间
+    token_type TEXT,                           -- 令牌类型
+    scope TEXT,                                -- 授权范围
+    id_token TEXT,                             -- ID令牌
+    session_state TEXT,                        -- 会话状态
+    FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(provider, providerAccountId)
+);
+
+-- NextAuth.js 验证令牌表
+CREATE TABLE verification_tokens (
+    identifier TEXT NOT NULL,                  -- 标识符
+    token TEXT UNIQUE NOT NULL,                -- 令牌
+    expires DATETIME NOT NULL,                 -- 过期时间
+    UNIQUE(identifier, token)
+);
 ```
 
 ### 3.2 权限数据结构
@@ -265,7 +293,7 @@ Response:
 }
 
 // 读取记录
-GET /api/data/{record_id}
+GET /api/data/record/{record_id}
 Headers:
     Authorization: Bearer {token}
 Query Params:
@@ -273,7 +301,7 @@ Query Params:
 Response: 记录对象
 
 // 更新记录(部分更新)
-PATCH /api/data/{record_id}
+PATCH /api/data/record/{record_id}
 Headers:
     Authorization: Bearer {token}
 Request:
@@ -284,12 +312,12 @@ Request:
 Response: 更新后的记录
 
 // 删除记录
-DELETE /api/data/{record_id}
+DELETE /api/data/record/{record_id}
 Headers:
     Authorization: Bearer {token}
 
 // 删除字段
-DELETE /api/data/{record_id}/fields/{field_path}
+DELETE /api/data/record/{record_id}/fields/{field_path}
 Headers:
     Authorization: Bearer {token}
 Response:
@@ -356,132 +384,268 @@ Response:
 ### 6.1 SDK初始化
 
 ```javascript
-// auth.js
+// auth.js (浏览器端 SDK)
 class AuthSDK {
     constructor(config) {
-        this.authServer = config.authServer;
+        if (!config || !config.mountId) {
+            throw new Error("AuthSDK: mountId is required to initialize iframe.");
+        }
+        this.authServer = config.authServer.replace(/\/+$/, '');
         this.appId = config.appId;
-        this.token = localStorage.getItem('auth_token');
+        this.mountId = config.mountId;
+        this.token = null;
         this.iframe = null;
-        this.init();
+        this.loginResolver = null;
+        this._restoreTokenFromCookie();
+        this._init();
     }
-    
-    init() {
-        // 创建隐藏iframe
-        this.iframe = document.createElement('iframe');
-        this.iframe.src = `${this.authServer}/embed?app_id=${this.appId}`;
-        this.iframe.style.display = 'none';
-        document.body.appendChild(this.iframe);
-        
-        // 监听消息
-        window.addEventListener('message', this.handleMessage.bind(this));
+
+    // 从 Cookie 恢复 token
+    _restoreTokenFromCookie() {
+        var token = this._getCookie("uniid_sdk_token");
+        if (token) {
+            this.token = token;
+        }
     }
-    
+
+    _getCookie(name) {
+        var value = "; " + document.cookie;
+        var parts = value.split("; " + name + "=");
+        if (parts.length === 2) {
+            return parts.pop().split(";").shift() || null;
+        }
+        return null;
+    }
+
+    _setCookie(name, value, maxAgeSeconds) {
+        var cookie = name + "=" + encodeURIComponent(value) + "; path=/; SameSite=Lax";
+        if (typeof maxAgeSeconds === "number") {
+            cookie += "; max-age=" + String(maxAgeSeconds);
+        }
+        document.cookie = cookie;
+    }
+
+    _init() {
+        // 创建 iframe 并替换挂载点元素
+        var mount = document.getElementById(this.mountId);
+        if (!mount || !mount.parentNode) {
+            throw new Error("AuthSDK: mount element with id '" + this.mountId + "' not found.");
+        }
+        var iframe = document.createElement("iframe");
+        iframe.src = this.authServer + "/embed?app_id=" + encodeURIComponent(this.appId);
+        iframe.id = mount.id;
+        iframe.className = mount.className;
+        iframe.title = "UniID 授权窗口";
+        iframe.style.display = "none";
+        mount.parentNode.replaceChild(iframe, mount);
+        this.iframe = iframe;
+
+        var self = this;
+        window.addEventListener("message", function (event) {
+            if (!event.data || typeof event.data !== "object") return;
+            if (event.data.type === "uniid_login_success") {
+                if (event.data.token) {
+                    self.token = event.data.token;
+                    self._setCookie("uniid_sdk_token", event.data.token, event.data.expires_in || 3600);
+                }
+                if (self.loginResolver) {
+                    self.loginResolver({
+                        token: event.data.token,
+                        user: event.data.user || null
+                    });
+                    self.loginResolver = null;
+                }
+            }
+        });
+    }
+
     // 登录
     login() {
-        return new Promise((resolve) => {
-            this.showAuthModal();  // 显示登录授权弹窗
-            this.loginResolver = resolve;
+        var self = this;
+        return new Promise(function (resolve) {
+            self.loginResolver = resolve;
+            if (self.iframe) {
+                self.iframe.style.display = "block";
+                self.iframe.focus();
+                self.iframe.contentWindow &&
+                    self.iframe.contentWindow.postMessage(
+                        { type: "uniid_open_login" },
+                        self.authServer
+                    );
+            }
+        }).finally(function () {
+            if (self.iframe) {
+                self.iframe.style.display = "none";
+            }
         });
     }
-    
+
     // 数据操作
-    async create(type, data, permissions = null) {
-        return this.apiCall('POST', `/api/data/${this.appId}/${type}`, {
-            data, permissions
+    create(type, data, permissions) {
+        return this._fetch("POST", "/api/data/" + encodeURIComponent(this.appId) + "/" + encodeURIComponent(type), {
+            data: data,
+            permissions: permissions || undefined
         });
     }
-    
-    async read(recordId, fields = null) {
-        const url = fields 
-            ? `/api/data/${recordId}?fields=${fields.join(',')}`
-            : `/api/data/${recordId}`;
-        return this.apiCall('GET', url);
+
+    read(recordId) {
+        return this._fetch("GET", "/api/data/record/" + encodeURIComponent(recordId));
     }
-    
-    async update(recordId, data, permissions = null) {
-        return this.apiCall('PATCH', `/api/data/${recordId}`, {
-            data, permissions
-        });
+
+    update(recordId, data, permissions) {
+        var body = {};
+        if (data != null) body.data = data;
+        if (permissions != null) body.permissions = permissions;
+        return this._fetch("PATCH", "/api/data/record/" + encodeURIComponent(recordId), body);
     }
-    
-    async delete(recordId) {
-        return this.apiCall('DELETE', `/api/data/${recordId}`);
+
+    delete(recordId) {
+        return this._fetch("DELETE", "/api/data/record/" + encodeURIComponent(recordId));
     }
-    
-    async deleteField(recordId, fieldPath) {
-        return this.apiCall('DELETE', `/api/data/${recordId}/fields/${fieldPath}`);
-    }
-    
-    async query(queryParams) {
-        return this.apiCall('POST', '/api/data/query', queryParams);
-    }
-    
-    // 权限检查
-    async checkPermission(recordId, fieldPath, operation) {
-        return this.apiCall('GET', 
-            `/api/permissions/check?record_id=${recordId}&field_path=${fieldPath}&operation=${operation}`
+
+    deleteField(recordId, fieldPath) {
+        return this._fetch(
+            "DELETE",
+            "/api/data/record/" + encodeURIComponent(recordId) + "/fields/" + encodeURIComponent(fieldPath)
         );
+    }
+
+    query(queryParams) {
+        var params = queryParams || {};
+        params.app_id = this.appId;
+        return this._fetch("POST", "/api/data/query", params);
+    }
+
+    // 撤销授权/登出
+    revoke() {
+        var self = this;
+        return new Promise(function (resolve, reject) {
+            if (!self.token) {
+                self._restoreTokenFromCookie();
+            }
+            if (!self.token) {
+                reject(new Error("NO_TOKEN"));
+                return;
+            }
+            fetch(self.authServer + "/api/auth/revoke", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + self.token
+                },
+                credentials: "include",
+                body: JSON.stringify({ app_id: self.appId })
+            })
+                .then(function (res) {
+                    if (!res.ok) throw new Error("Revoke failed");
+                    self.token = null;
+                    self._setCookie("uniid_sdk_token", "", 0);
+                    resolve(res.json());
+                })
+                .catch(reject);
+        });
+    }
+
+    logout() {
+        return this.revoke();
+    }
+
+    _fetch(method, path, body) {
+        if (!this.token) {
+            this._restoreTokenFromCookie();
+        }
+        if (!this.token) {
+            return Promise.reject(new Error("NO_TOKEN"));
+        }
+        var url = this.authServer + path;
+        var headers = { Authorization: "Bearer " + this.token };
+        var init = { method: method, headers: headers, credentials: "include" };
+        if (body != null) {
+            headers["Content-Type"] = "application/json";
+            init.body = JSON.stringify(body);
+        }
+        return fetch(url, init).then(function (res) {
+            if (!res.ok) throw new Error("Request failed with status " + res.status);
+            return res.json();
+        });
     }
 }
 ```
 
 ### 6.2 使用示例
 
-```javascript
-// 网站中引入SDK
+```html
+<!-- 网站中引入 SDK -->
 <script src="https://auth.example.com/sdk/auth.js"></script>
+
+<!-- 在页面中放置挂载点 -->
+<div id="auth-iframe-mount"></div>
 
 <script>
 const auth = new AuthSDK({
     authServer: 'https://auth.example.com',
-    appId: 'my-blog-site'
+    appId: 'my-blog-site',
+    mountId: 'auth-iframe-mount'  // 必需：iframe 挂载点元素 ID
 });
 
-// 检查登录状态
-if (!auth.isLoggedIn()) {
-    await auth.login();
+// 登录（显示 iframe 登录窗口）
+async function handleLogin() {
+    const result = await auth.login();
+    console.log('登录成功:', result.user);
 }
 
 // 创建帖子
-const post = await auth.create('post', {
-    title: 'Hello World',
-    content: 'This is my first post',
-    metadata: {
-        tags: ['test'],
-        comments: {}
-    }
-}, {
-    fields: {
-        'data.title': {
-            read: ['$all'],
-            write: ['$owner']
-        },
-        'data.metadata.comments': {
-            read: ['$all'],
-            write: ['$dynamic:comments.$user']
+async function createPost() {
+    const post = await auth.create('post', {
+        title: 'Hello World',
+        content: 'This is my first post',
+        metadata: {
+            tags: ['test'],
+            comments: {}
         }
-    }
-});
+    }, {
+        fields: {
+            'data.title': {
+                read: ['$all'],
+                write: ['$owner']
+            },
+            'data.metadata.comments': {
+                read: ['$all'],
+                write: ['$dynamic:comments.$user']
+            }
+        }
+    });
+    return post;
+}
 
 // 用户评论
-await auth.update(post.id, {
-    metadata: {
-        comments: {
-            [userId]: 'Great post!'
+async function addComment(postId, userId, comment) {
+    await auth.update(postId, {
+        metadata: {
+            comments: {
+                [userId]: comment
+            }
         }
-    }
-});
+    });
+}
 
 // 查询帖子
-const posts = await auth.query({
-    data_type: 'post',
-    filter: {
-        'data.metadata.tags': 'test'
-    },
-    sort: {created_at: 'desc'},
-    limit: 10
-});
+async function getPosts() {
+    const posts = await auth.query({
+        data_type: 'post',
+        filter: {
+            'data.metadata.tags': 'test'
+        },
+        sort: {created_at: 'desc'},
+        limit: 10
+    });
+    return posts;
+}
+
+// 撤销授权/登出
+async function handleLogout() {
+    await auth.logout();
+}
 </script>
 ```
 
@@ -517,12 +681,13 @@ const posts = await auth.query({
 ### 8.1 访问方式
 
 - 在开发环境启动 Next.js 服务后，可直接访问：
-  - `http://localhost:3000/demo`
+  - `http://localhost:3000/demo/index.html`
 - 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/auth.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
+- 源码位于项目根目录的 `demo/index.html`
 
 ### 8.2 示例流程
 
-- 初始化 SDK（在 `public/demo/index.html` 中）：
+- 初始化 SDK（在 `demo/index.html` 中）：
 
 ```html
 <script src="/sdk/auth.js"></script>
