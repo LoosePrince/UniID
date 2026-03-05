@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyToken, signAccessToken, signRefreshToken } from "@/lib/jwt";
-import { isSameOriginAuthRequest } from "@/lib/origin";
+import { isSameOriginAuthRequest, validateAppIdOriginMatch } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
   if (!isSameOriginAuthRequest(req)) {
@@ -22,6 +22,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "INVALID_AUTH_REQUEST" },
       { status: 400 }
+    );
+  }
+
+  // 验证 app_id 与 Origin 是否匹配
+  const validation = await validateAppIdOriginMatch(req, appId);
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error || "FORBIDDEN" },
+      { status: 403 }
     );
   }
 

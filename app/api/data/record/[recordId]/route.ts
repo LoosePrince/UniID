@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { validateAppIdOriginMatch } from "@/lib/origin";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -11,6 +12,26 @@ export const GET = withDataCors(async function handler(
   req: NextRequest,
   context: { params: { recordId: string } }
 ): Promise<NextResponse> {
+  const { recordId } = context.params;
+
+  // 先查询记录获取 app_id
+  const record = await prisma.record.findUnique({
+    where: { id: recordId }
+  });
+
+  if (!record || record.deleted === 1) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  // 验证 app_id 与 Origin 是否匹配
+  const validation = await validateAppIdOriginMatch(req, record.appId);
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error || "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
   const authHeader =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
 
@@ -25,16 +46,6 @@ export const GET = withDataCors(async function handler(
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
-  }
-
-  const { recordId } = context.params;
-
-  const record = await prisma.record.findUnique({
-    where: { id: recordId }
-  });
-
-  if (!record || record.deleted === 1) {
-    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
   return NextResponse.json({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hash } from "bcrypt";
+import { hash } from "bcryptjs";
 import { signAccessToken, signRefreshToken } from "@/lib/jwt";
 
 export async function POST(req: NextRequest) {
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { hash } from "bcrypt";
+import { hash } from "bcryptjs";
 import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {

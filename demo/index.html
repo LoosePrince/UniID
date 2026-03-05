@@ -185,6 +185,24 @@
       box-shadow: none;
     }
 
+    button.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+      box-shadow: none;
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.3);
+      box-shadow: 0 8px 16px rgba(239, 68, 68, 0.25);
+    }
+
+    .status-buttons {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
     button:disabled {
       opacity: 0.65;
       cursor: not-allowed;
@@ -468,9 +486,14 @@
             <span id="statusText">状态：未登录</span>
             <span id="userText" class="muted">用户：-</span>
           </div>
-          <button id="loginButton">
-            <span>登录 / 授权</span>
-          </button>
+          <div class="status-buttons">
+            <button id="loginButton">
+              <span>登录 / 授权</span>
+            </button>
+            <button id="revokeButton" style="display: none;">
+              <span>取消授权</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -554,6 +577,7 @@
       var statusText = document.getElementById("statusText");
       var userText = document.getElementById("userText");
       var loginButton = document.getElementById("loginButton");
+      var revokeButton = document.getElementById("revokeButton");
       var postForm = document.getElementById("postForm");
       var postButton = document.getElementById("postButton");
       var formError = document.getElementById("formError");
@@ -579,14 +603,20 @@
       }
 
       async function loadPostsFromServer() {
-        if (!auth.token) return;
         try {
-          var res = await fetch(auth.authServer + "/api/data/query", {
+          // 未登录时使用公开接口，登录后使用需要认证的接口
+          var endpoint = auth.token
+            ? auth.authServer + "/api/data/query"
+            : auth.authServer + "/api/data/public";
+          var headers = {
+            "Content-Type": "application/json"
+          };
+          if (auth.token) {
+            headers["Authorization"] = "Bearer " + auth.token;
+          }
+          var res = await fetch(endpoint, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + auth.token
-            },
+            headers: headers,
             credentials: "include",
             body: JSON.stringify({
               app_id: auth.appId,
@@ -617,10 +647,13 @@
           userText.textContent =
             "用户：" + (state.user.username || state.user.id || "-");
           loginButton.textContent = "重新授权";
+          revokeButton.style.display = "inline-flex";
+          revokeButton.className = "danger";
         } else {
           statusText.textContent = "状态：未登录";
           userText.textContent = "用户：-";
           loginButton.textContent = "登录 / 授权";
+          revokeButton.style.display = "none";
         }
 
         while (allPostsContainer.firstChild) {
@@ -723,6 +756,33 @@
         }
       };
 
+      revokeButton.onclick = async function () {
+        if (!confirm("确定要取消对该应用的授权吗？取消后需要重新登录授权。")) {
+          return;
+        }
+        revokeButton.disabled = true;
+        revokeButton.textContent = "取消中...";
+        try {
+          await auth.revoke();
+          // 清除本地状态
+          state.user = null;
+          try {
+            window.localStorage.removeItem("uniid_demo_user");
+          } catch (e) {
+            // ignore
+          }
+          alert("授权已取消");
+          await loadPostsFromServer();
+        } catch (e) {
+          console.error(e);
+          alert("取消授权失败：" + (e && e.message ? e.message : "未知错误"));
+        } finally {
+          revokeButton.disabled = false;
+          revokeButton.textContent = "取消授权";
+          renderState();
+        }
+      };
+
       postForm.onsubmit = async function (e) {
         e.preventDefault();
         formError.style.display = "none";
@@ -786,14 +846,18 @@
 
       renderState();
 
+      // 页面加载时获取帖子（无论是否登录）
+      loadPostsFromServer().then(function () {
+        renderState();
+      });
+
+      // 如果有 token，恢复用户状态
       (function initFromToken() {
         if (!auth.token) return;
         var storedUser = loadUserFromStorage();
         if (storedUser) {
           state.user = storedUser;
-          loadPostsFromServer().then(function () {
-            renderState();
-          });
+          renderState();
         }
       })();
     })();

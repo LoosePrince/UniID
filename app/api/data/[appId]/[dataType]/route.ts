@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
+import { validateAppIdOriginMatch } from "@/lib/origin";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -11,6 +12,17 @@ export const POST = withDataCors(async function handler(
   req: NextRequest,
   context: { params: { appId: string; dataType: string } }
 ): Promise<NextResponse> {
+  const { appId, dataType } = context.params;
+
+  // 验证 app_id 与 Origin 是否匹配
+  const validation = await validateAppIdOriginMatch(req, appId);
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error || "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
+
   const authHeader =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
 
@@ -28,8 +40,6 @@ export const POST = withDataCors(async function handler(
     console.error(err);
     return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
   }
-
-  const { appId, dataType } = context.params;
 
   const body = (await req.json().catch(() => null)) as
     | {

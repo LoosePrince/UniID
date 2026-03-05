@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withDataCors, handleDataApiOptions } from "@/lib/cors";
-import { verifyToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 
@@ -30,22 +29,6 @@ export const POST = withDataCors(async function handler(
       { error: validation.error || "FORBIDDEN" },
       { status: 403 }
     );
-  }
-
-  const authHeader =
-    req.headers.get("authorization") ?? req.headers.get("Authorization");
-
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "MISSING_TOKEN" }, { status: 401 });
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-
-  try {
-    await verifyToken(token);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
   }
 
   const where: {
@@ -82,4 +65,3 @@ export const POST = withDataCors(async function handler(
     }))
   });
 });
-

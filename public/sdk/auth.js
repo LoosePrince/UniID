@@ -141,6 +141,52 @@
     return this._fetch("GET", "/api/data/" + encodeURIComponent(recordId));
   };
 
+  AuthSDK.prototype.revoke = function () {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+      if (!self.token) {
+        self._restoreTokenFromCookie();
+      }
+      if (!self.token) {
+        reject(new Error("NO_TOKEN"));
+        return;
+      }
+      var url = self.authServer + "/api/auth/revoke";
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + self.token
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          app_id: self.appId
+        })
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            var err = new Error("Revoke failed with status " + res.status);
+            err.status = res.status;
+            throw err;
+          }
+          return res.json();
+        })
+        .then(function (data) {
+          // 清除本地 token
+          self.token = null;
+          self._setCookie("uniid_sdk_token", "", 0);
+          resolve(data);
+        })
+        .catch(function (err) {
+          reject(err);
+        });
+    });
+  };
+
+  AuthSDK.prototype.logout = function () {
+    return this.revoke();
+  };
+
   window.AuthSDK = AuthSDK;
 })();
 
