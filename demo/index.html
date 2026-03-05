@@ -615,7 +615,7 @@
   <!-- 授权 iframe -->
   <div id="uniid-auth-frame" style="display: none;"></div>
 
-  <script src="http://localhost:3000/sdk/auth.js"></script>
+  <script src="http://localhost:3000/sdk/uniid.sdk.js"></script>
   <script>
     (function () {
       // 初始化 AuthSDK
@@ -694,23 +694,10 @@
       // 加载帖子列表
       async function loadPosts() {
         try {
-          // 统一使用 /api/data/query 接口，根据有无 Token 返回不同数据
-          const headers = { "Content-Type": "application/json" };
-          if (auth.token) {
-            headers["Authorization"] = "Bearer " + auth.token;
-          }
-
-          const res = await fetch(auth.authServer + "/api/data/query", {
-            method: "POST",
-            headers,
-            credentials: "include",
-            body: JSON.stringify({
-              app_id: "demo-blog",
-              data_type: "post"
-            })
+          // 使用 SDK 的 query 方法
+          const result = await auth.query({
+            data_type: "post"
           });
-
-          const result = await res.json();
           state.posts = result.items || [];
           renderPosts();
         } catch (err) {
@@ -1066,14 +1053,17 @@
 
       // 初始化
       function init() {
-        // 恢复用户状态
-        const savedUser = localStorage.getItem("demo_user");
-        if (savedUser) {
-          try {
-            state.user = JSON.parse(savedUser);
-          } catch (e) {
-            console.error("恢复用户状态失败", e);
-          }
+        // 从 SDK 恢复用户状态（与 token 同步）
+        state.user = auth.getUser();
+        
+        // 调试信息
+        console.log("SDK Token:", auth.getToken());
+        console.log("SDK User:", auth.getUser());
+        console.log("Is Authenticated:", auth.isAuthenticated());
+        
+        // 如果 SDK 没有用户，清除 localStorage
+        if (!state.user) {
+          localStorage.removeItem("demo_user");
         }
 
         updateUserUI();

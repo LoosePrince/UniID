@@ -14,16 +14,23 @@ interface EmbedUser {
 export default function EmbedPage() {
   const searchParams = useSearchParams();
   const appId = searchParams.get("app_id") ?? "";
+  // 从 URL 参数中恢复 parentOrigin（登录后返回时使用）
+  const parentOriginFromUrl = searchParams.get("parent_origin");
 
   const [step, setStep] = useState<Step>("idle");
   const [user, setUser] = useState<EmbedUser | null>(null);
   const [isAppAdmin, setIsAppAdmin] = useState<boolean>(false);
-  const [parentOrigin, setParentOrigin] = useState<string | null>(null);
+  const [parentOrigin, setParentOrigin] = useState<string | null>(parentOriginFromUrl);
   const [authType, setAuthType] = useState<"full" | "restricted">("restricted");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // 如果从登录页面返回（URL中有parent_origin参数），自动开始检查登录状态
+    if (parentOriginFromUrl && appId) {
+      void checkLoginAndMaybeRedirect();
+    }
+
     async function checkLoginAndMaybeRedirect() {
       if (!appId) return;
       setStep("checking");
@@ -62,7 +69,8 @@ export default function EmbedPage() {
         console.error(err);
       }
 
-      const redirectTo = `/embed?app_id=${encodeURIComponent(appId)}`;
+      // 将 parentOrigin 传递给登录页面，以便登录后返回时能恢复
+      const redirectTo = `/embed?app_id=${encodeURIComponent(appId)}&parent_origin=${encodeURIComponent(parentOrigin || '')}`;
       window.location.href = `/login?redirectTo=${encodeURIComponent(
         redirectTo
       )}`;
@@ -71,9 +79,10 @@ export default function EmbedPage() {
     function handleMessage(event: MessageEvent) {
       if (!event.data || typeof event.data !== "object") return;
 
-      if (!parentOrigin) {
+      // 如果没有从 URL 获取到 parentOrigin，则从 message 中获取
+      if (!parentOrigin && !parentOriginFromUrl) {
         setParentOrigin(event.origin);
-      } else if (event.origin !== parentOrigin) {
+      } else if (event.origin !== (parentOrigin || parentOriginFromUrl)) {
         return;
       }
 
@@ -86,7 +95,7 @@ export default function EmbedPage() {
     return () => {
       window.removeEventListener("message", handleMessage);
     };
-  }, [appId, parentOrigin]);
+  }, [appId, parentOrigin, parentOriginFromUrl]);
 
   async function handleAuthorize(e: React.FormEvent) {
     e.preventDefault();

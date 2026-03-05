@@ -384,7 +384,7 @@ Response:
 ### 6.1 SDK初始化
 
 ```javascript
-// auth.js (浏览器端 SDK)
+// uniid.sdk.js (浏览器端 SDK)
 class AuthSDK {
     constructor(config) {
         if (!config || !config.mountId) {
@@ -576,7 +576,7 @@ class AuthSDK {
 
 ```html
 <!-- 网站中引入 SDK -->
-<script src="https://auth.example.com/sdk/auth.js"></script>
+<script src="https://auth.example.com/sdk/uniid.sdk.js"></script>
 
 <!-- 在页面中放置挂载点 -->
 <div id="auth-iframe-mount"></div>
@@ -682,7 +682,7 @@ async function handleLogout() {
 
 - 在开发环境启动 Next.js 服务后，可直接访问：
   - `http://localhost:3000/demo/index.html`
-- 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/auth.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
+- 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/uniid.sdk.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
 - 源码位于项目根目录的 `demo/index.html`
 
 ### 8.2 示例流程
@@ -690,7 +690,7 @@ async function handleLogout() {
 - 初始化 SDK（在 `demo/index.html` 中）：
 
 ```html
-<script src="/sdk/auth.js"></script>
+<script src="/sdk/uniid.sdk.js"></script>
 <script>
   const auth = new window.AuthSDK({
     authServer: window.location.origin,
