@@ -138,7 +138,35 @@
   };
 
   AuthSDK.prototype.read = function (recordId) {
-    return this._fetch("GET", "/api/data/" + encodeURIComponent(recordId));
+    return this._fetch("GET", "/api/data/record/" + encodeURIComponent(recordId));
+  };
+
+  AuthSDK.prototype.update = function (recordId, data, permissions) {
+    var body = {};
+    if (data != null) {
+      body.data = data;
+    }
+    if (permissions != null) {
+      body.permissions = permissions;
+    }
+    return this._fetch("PATCH", "/api/data/record/" + encodeURIComponent(recordId), body);
+  };
+
+  AuthSDK.prototype.delete = function (recordId) {
+    return this._fetch("DELETE", "/api/data/record/" + encodeURIComponent(recordId));
+  };
+
+  AuthSDK.prototype.deleteField = function (recordId, fieldPath) {
+    return this._fetch(
+      "DELETE",
+      "/api/data/record/" + encodeURIComponent(recordId) + "/fields/" + encodeURIComponent(fieldPath)
+    );
+  };
+
+  AuthSDK.prototype.query = function (queryParams) {
+    var params = queryParams || {};
+    params.app_id = this.appId;
+    return this._fetch("POST", "/api/data/query", params);
   };
 
   AuthSDK.prototype.revoke = function () {

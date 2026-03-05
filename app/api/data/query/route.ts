@@ -90,12 +90,26 @@ export const POST = withDataCors(async function handler(
     }
   }
 
+  // 获取所有者的用户信息
+  const ownerIds = [...new Set(accessibleRecords.map(r => r.ownerId).filter(Boolean))];
+  const users = await prisma.user.findMany({
+    where: {
+      id: { in: ownerIds }
+    },
+    select: {
+      id: true,
+      username: true
+    }
+  });
+  const userMap = new Map(users.map(u => [u.id, u.username]));
+
   return NextResponse.json({
     total: accessibleRecords.length,
     items: accessibleRecords.map((record) => ({
       id: record.id,
       app_id: record.appId,
       owner_id: record.ownerId,
+      owner_name: record.ownerId ? userMap.get(record.ownerId) || "未知用户" : "未知用户",
       data_type: record.dataType,
       data: JSON.parse(record.data),
       permissions: JSON.parse(record.permissions),

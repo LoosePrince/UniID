@@ -1,6 +1,61 @@
 import { prisma } from "./prisma";
 
 /**
+ * 解析权限配置中的变量
+ * @param perm 权限字符串
+ * @param context 上下文信息
+ */
+function resolvePermissionVariable(
+  perm: string,
+  context: {
+    userId: string;
+    ownerId: string | null;
+    appId: string;
+    appAdmin: boolean;
+    systemAdmin: boolean;
+  }
+): boolean {
+  // 系统管理员拥有所有权限
+  if (context.systemAdmin) {
+    return true;
+  }
+
+  // 记录所有者拥有所有权限
+  if (context.ownerId === context.userId) {
+    return true;
+  }
+
+  switch (perm) {
+    case "$owner":
+      return context.ownerId === context.userId;
+    case "$app_admin":
+      return context.appAdmin;
+    case "$all":
+    case "$anyone":
+      return true;
+    case "$public":
+      // 公开权限，所有人可访问
+      return true;
+    case "$app":
+      // 应用自身权限
+      return false;
+    default:
+      // 检查特定用户权限: $user:{id}
+      if (perm.startsWith("$user:")) {
+        const targetUserId = perm.slice(6);
+        return targetUserId === context.userId;
+      }
+      // 检查特定角色权限: $role:{role}
+      if (perm.startsWith("$role:")) {
+        // 需要查询用户角色，这里简化处理
+        return false;
+      }
+      // 直接匹配用户ID
+      return perm === context.userId;
+  }
+}
+
+/**
  * 检查用户是否是系统管理员 (role=admin)
  * 系统管理员拥有所有权限
  */
@@ -223,4 +278,202 @@ export async function removeAppAdmin(appId: string, userId: string): Promise<boo
   });
 
   return true;
+}
+
+/**
+ * 检查用户对特定字段是否有指定权限
+ * @param permissions 记录的权限配置 JSON 字符串
+ * @param userId 当前用户 ID
+ * @param appId 应用 ID
+ * @param ownerId 记录所有者 ID
+ * @param fieldPath 字段路径，如 "data.title" 或 "data.metadata.comments"
+ * @param action 操作类型: read, write, delete
+ */
+export async function checkFieldPermission(
+  permissions: string,
+  userId: string,
+  appId: string,
+  ownerId: string | null,
+  fieldPath: string,
+  action: "read" | "write" | "delete"
+): Promise<boolean> {
+  // 记录所有者有所有字段权限
+  if (ownerId === userId) {
+    return true;
+  }
+
+  // 检查系统管理员权限
+  const systemAdmin = await isSystemAdmin(userId);
+  if (systemAdmin) {
+    return true;
+  }
+
+  // 检查应用管理员权限
+  const appAdmin = await isAppAdmin(appId, userId);
+  if (appAdmin) {
+    return true;
+  }
+
+  // 解析权限配置
+  let permConfig: Record<string, any>;
+  try {
+    permConfig = JSON.parse(permissions);
+  } catch {
+    // 默认权限：只有所有者可读写
+    return false;
+  }
+
+  const context = {
+    userId,
+    ownerId,
+    appId,
+    appAdmin,
+    systemAdmin
+  };
+
+  // 1. 检查字段特定权限
+  const fieldsConfig = permConfig.fields || {};
+  const fieldConfig = fieldsConfig[fieldPath];
+
+  if (fieldConfig && typeof fieldConfig === "object") {
+    const actionPerms = fieldConfig[action];
+    if (Array.isArray(actionPerms)) {
+      for (const perm of actionPerms) {
+        if (resolvePermissionVariable(perm, context)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 2. 检查默认权限
+  const defaultConfig = permConfig.default || {};
+  const defaultActionPerms = defaultConfig[action];
+  if (Array.isArray(defaultActionPerms)) {
+    for (const perm of defaultActionPerms) {
+      if (resolvePermissionVariable(perm, context)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 合并权限配置
+ * @param current 当前权限配置
+ * @param updates 更新的权限配置
+ */
+export function mergeFieldPermissions(
+  current: Record<string, any>,
+  updates: Record<string, any>
+): Record<string, any> {
+  const merged = { ...current };
+
+  // 合并 default 配置
+  if (updates.default) {
+    merged.default = { ...merged.default, ...updates.default };
+  }
+
+  // 合并 fields 配置
+  if (updates.fields) {
+    merged.fields = { ...merged.fields };
+    for (const [fieldPath, fieldConfig] of Object.entries(updates.fields)) {
+      if (merged.fields[fieldPath]) {
+        merged.fields[fieldPath] = { ...merged.fields[fieldPath], ...fieldConfig };
+      } else {
+        merged.fields[fieldPath] = fieldConfig;
+      }
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * 过滤数据，只返回用户有权限读取的字段
+ * @param data 原始数据
+ * @param permissions 权限配置
+ * @param userId 当前用户 ID
+ * @param appId 应用 ID
+ * @param ownerId 记录所有者 ID
+ */
+export async function filterReadableFields(
+  data: Record<string, any>,
+  permissions: string,
+  userId: string,
+  appId: string,
+  ownerId: string | null
+): Promise<Record<string, any>> {
+  // 所有者有所有权限
+  if (ownerId === userId) {
+    return data;
+  }
+
+  // 系统管理员或应用管理员有所有权限
+  const systemAdmin = await isSystemAdmin(userId);
+  if (systemAdmin) return data;
+
+  const appAdmin = await isAppAdmin(appId, userId);
+  if (appAdmin) return data;
+
+  // 解析权限配置
+  let permConfig: Record<string, any>;
+  try {
+    permConfig = JSON.parse(permissions);
+  } catch {
+    // 默认权限：只有所有者可读
+    return {};
+  }
+
+  const context = {
+    userId,
+    ownerId,
+    appId,
+    appAdmin,
+    systemAdmin
+  };
+
+  const result: Record<string, any> = {};
+
+  // 检查每个顶层字段
+  for (const [key, value] of Object.entries(data)) {
+    const fieldPath = `data.${key}`;
+
+    // 检查字段特定读权限
+    const fieldsConfig = permConfig.fields || {};
+    const fieldConfig = fieldsConfig[fieldPath];
+
+    let hasReadPermission = false;
+
+    if (fieldConfig && Array.isArray(fieldConfig.read)) {
+      for (const perm of fieldConfig.read) {
+        if (resolvePermissionVariable(perm, context)) {
+          hasReadPermission = true;
+          break;
+        }
+      }
+    }
+
+    // 如果没有字段特定权限，检查默认权限
+    if (!hasReadPermission) {
+      const defaultConfig = permConfig.default || {};
+      const defaultReadPerms = defaultConfig.read;
+      if (Array.isArray(defaultReadPerms)) {
+        for (const perm of defaultReadPerms) {
+          if (resolvePermissionVariable(perm, context)) {
+            hasReadPermission = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (hasReadPermission) {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }

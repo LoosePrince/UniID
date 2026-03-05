@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>UniID Demo Blog</title>
+  <title>UniID Demo Blog - 完整功能演示</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root {
@@ -21,11 +21,12 @@
       --radius-md: 0.5rem;
       --shadow-strong: 0 24px 60px rgba(15, 23, 42, 0.9);
       --shadow-soft: 0 18px 40px rgba(15, 23, 42, 0.8);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -38,28 +39,29 @@
         var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
     }
 
     .page {
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       padding: 1.5rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
     }
 
     .card {
       position: relative;
-      width: 100%;
-      max-width: 880px;
       background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 55%),
         var(--card-bg);
       border-radius: var(--radius-lg);
-      padding: 1.8rem 1.8rem 1.9rem;
+      padding: 1.8rem;
       border: 1px solid var(--card-border);
       box-shadow: var(--shadow-strong);
       backdrop-filter: blur(22px);
-      overflow: hidden;
+      margin-bottom: 1.5rem;
     }
 
     .card::before {
@@ -71,80 +73,57 @@
       pointer-events: none;
     }
 
-    .card-header {
+    .header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 1.5rem;
-      margin-bottom: 1.4rem;
-    }
-
-    .card-title-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
     }
 
     h1 {
       margin: 0;
-      font-size: 1.38rem;
+      font-size: 1.5rem;
       letter-spacing: 0.03em;
     }
 
-    .page-subtitle {
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .user-info {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 0.4rem 0.6rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
+      gap: 1rem;
     }
 
-    .page-subtitle span {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      border-radius: 999px;
-      padding: 0.1rem 0.55rem;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(15, 23, 42, 0.65);
-      font-size: 0.7rem;
-      color: #e5e7eb;
-    }
-
-    .pill-dot {
-      width: 0.35rem;
-      height: 0.35rem;
-      border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.25);
-    }
-
-    .muted {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .status {
-      font-size: 0.8rem;
-      color: #cbd5f5;
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #22c1c3);
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 0.35rem;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .user-details {
       text-align: right;
     }
 
-    .status-labels {
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
+    .username {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .user-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
     }
 
     button {
@@ -152,19 +131,15 @@
       border: none;
       background: linear-gradient(135deg, #0ea5e9, #22c1c3);
       color: white;
-      padding: 0.42rem 0.95rem;
-      font-size: 0.8rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
       font-weight: 500;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 0.28rem;
+      gap: 0.35rem;
       box-shadow: 0 12px 25px rgba(14, 165, 233, 0.45);
-      transition:
-        transform 130ms ease-out,
-        box-shadow 130ms ease-out,
-        background 130ms ease-out,
-        opacity 130ms ease-out;
+      transition: all 130ms ease-out;
       border: 1px solid rgba(34, 211, 238, 0.5);
     }
 
@@ -185,6 +160,11 @@
       box-shadow: none;
     }
 
+    button.secondary:hover:not(:disabled) {
+      background: rgba(30, 41, 59, 0.9);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.5);
+    }
+
     button.danger {
       background: rgba(239, 68, 68, 0.2);
       border: 1px solid rgba(239, 68, 68, 0.5);
@@ -197,10 +177,9 @@
       box-shadow: 0 8px 16px rgba(239, 68, 68, 0.25);
     }
 
-    .status-buttons {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
+    button.small {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
     }
 
     button:disabled {
@@ -209,81 +188,61 @@
       box-shadow: none;
     }
 
+    button.active {
+      background: linear-gradient(135deg, var(--success), #16a34a);
+    }
+
     .divider {
       height: 1px;
-      border-radius: 999px;
-      background: linear-gradient(90deg,
-          rgba(15, 23, 42, 0),
-          rgba(148, 163, 184, 0.45),
-          rgba(15, 23, 42, 0));
-      margin: 0.5rem 0 1.1rem;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-      gap: 1.6rem;
-    }
-
-    .section {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      margin-bottom: 0.7rem;
+      background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.45), transparent);
+      margin: 1.5rem 0;
     }
 
     .section-title {
-      font-size: 0.9rem;
+      font-size: 1.1rem;
       font-weight: 600;
-      letter-spacing: 0.03em;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .section-caption {
-      font-size: 0.75rem;
-      color: var(--text-muted);
+    .form-section {
+      background: rgba(2, 6, 23, 0.5);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      border: 1px solid #1e293b;
     }
 
     .field {
-      margin-bottom: 0.8rem;
+      margin-bottom: 1rem;
     }
 
     label {
       display: block;
-      font-size: 0.78rem;
-      margin-bottom: 0.32rem;
+      font-size: 0.85rem;
+      margin-bottom: 0.4rem;
       color: #cbd5f5;
-      letter-spacing: 0.02em;
     }
 
-    input,
-    textarea {
+    input, textarea {
       width: 100%;
       border-radius: var(--radius-md);
       border: 1px solid #1e293b;
       background: rgba(2, 6, 23, 0.9);
       color: var(--text);
-      padding: 0.5rem 0.7rem;
-      font-size: 0.85rem;
+      padding: 0.6rem 0.8rem;
+      font-size: 0.9rem;
       outline: none;
-      transition:
-        border-color 130ms ease-out,
-        box-shadow 130ms ease-out,
-        background 130ms ease-out;
+      transition: all 130ms ease-out;
+      font-family: inherit;
     }
 
-    input::placeholder,
-    textarea::placeholder {
+    input::placeholder, textarea::placeholder {
       color: rgba(148, 163, 184, 0.75);
     }
 
-    input:focus,
-    textarea:focus {
+    input:focus, textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 1px var(--accent-soft);
       background: #020617;
@@ -297,86 +256,238 @@
     .form-actions {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: 0.75rem;
-      margin-top: 0.4rem;
+      margin-top: 1rem;
     }
 
-    .form-hint {
+    .error {
+      padding: 0.75rem;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: var(--radius-md);
+      color: #fecaca;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    .success {
+      padding: 0.75rem;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: var(--radius-md);
+      color: #86efac;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    .posts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .post-card {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(30, 64, 175, 0.4);
+      padding: 1.25rem;
+      transition: all 130ms ease-out;
+    }
+
+    .post-card:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.8);
+    }
+
+    .post-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .post-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0;
+      color: #f1f5f9;
+    }
+
+    .post-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .post-author {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .post-content {
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.7;
+      margin-bottom: 1rem;
+      white-space: pre-wrap;
+    }
+
+    .post-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(30, 41, 59, 0.8);
+    }
+
+    .post-stats {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-left: auto;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .stat-item.liked {
+      color: var(--danger);
+    }
+
+    .comments-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(30, 41, 59, 0.8);
+    }
+
+    .comments-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .comment {
+      background: rgba(2, 6, 23, 0.4);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .comment-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.35rem;
+    }
+
+    .comment-author {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .comment-time {
       font-size: 0.7rem;
       color: var(--text-muted);
     }
 
-    .error {
-      margin-top: 0.5rem;
-      font-size: 0.8rem;
-      color: #fecaca;
+    .comment-content {
+      font-size: 0.85rem;
+      color: #cbd5e1;
     }
 
-    .posts {
-      border-radius: var(--radius-md);
-      border: 1px solid #0f172a;
-      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.9), #020617);
-      padding: 0.75rem 0.9rem;
-      max-height: 260px;
+    .comment-form {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .comment-form input {
+      flex: 1;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      opacity: 0.5;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1rem;
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--card-border);
+      box-shadow: var(--shadow-strong);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
       overflow-y: auto;
-      box-shadow: var(--shadow-soft);
+      padding: 1.5rem;
     }
 
-    .posts::-webkit-scrollbar {
-      width: 6px;
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
     }
 
-    .posts::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .posts::-webkit-scrollbar-thumb {
-      background: rgba(30, 64, 175, 0.8);
-      border-radius: 999px;
-    }
-
-    .post {
-      border-radius: 0.45rem;
-      border: 1px solid rgba(30, 64, 175, 0.65);
-      padding: 0.6rem 0.68rem;
-      margin-bottom: 0.55rem;
-      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.06), transparent 55%),
-        rgba(15, 23, 42, 0.96);
-      transition:
-        border-color 130ms ease-out,
-        transform 130ms ease-out,
-        box-shadow 130ms ease-out,
-        background 130ms ease-out;
-    }
-
-    .post:hover {
-      border-color: rgba(56, 189, 248, 0.8);
-      transform: translateY(-1px);
-      box-shadow: 0 12px 25px rgba(15, 23, 42, 0.9);
-      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 55%),
-        rgba(15, 23, 42, 1);
-    }
-
-    .post-title {
-      font-size: 0.9rem;
+    .modal-title {
+      font-size: 1.2rem;
       font-weight: 600;
-      margin-bottom: 0.2rem;
+      margin: 0;
     }
 
-    .post-meta {
-      font-size: 0.7rem;
-      color: #64748b;
-      margin-bottom: 0.25rem;
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: none;
     }
 
-    .post-content {
-      font-size: 0.8rem;
+    .close-btn:hover {
       color: var(--text);
+      background: rgba(255, 255, 255, 0.1);
     }
 
-    #uniid-auth-frame,
-    .auth-iframe {
+    #uniid-auth-frame {
       position: fixed;
       top: 50%;
       left: 50%;
@@ -385,481 +496,551 @@
       height: min(520px, 100% - 2.5rem);
       border-radius: var(--radius-lg);
       border: 1px solid rgba(148, 163, 184, 0.35);
-      box-shadow:
-        0 28px 80px rgba(15, 23, 42, 0.98),
-        0 0 0 100vmax rgba(15, 23, 42, 0.75);
+      box-shadow: 0 28px 80px rgba(15, 23, 42, 0.98), 0 0 0 100vmax rgba(15, 23, 42, 0.75);
       background: radial-gradient(circle at top, rgba(15, 23, 42, 0.96), #020617);
       backdrop-filter: blur(18px);
       z-index: 50;
       overflow: hidden;
-      animation: auth-modal-in 170ms ease-out;
     }
 
-    @keyframes auth-modal-in {
-      from {
-        opacity: 0;
-        transform: translate(-50%, -46%) scale(0.97);
-      }
-
-      to {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-      }
-    }
-
-    .footer {
-      margin-top: 1.15rem;
+    #userView {
       display: flex;
-      justify-content: space-between;
       align-items: center;
       gap: 0.75rem;
-      font-size: 0.7rem;
-      color: var(--text-muted);
     }
 
-    .footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .footer a:hover {
-      text-decoration: underline;
-    }
-
-    code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-        "Liberation Mono", "Courier New", monospace;
-      font-size: 0.75rem;
-      background: #020617;
-      padding: 0.1rem 0.25rem;
-      border-radius: 0.25rem;
-    }
+    .hidden { display: none !important; }
 
     @media (max-width: 768px) {
-      .page {
-        padding: 1.1rem;
-      }
-
-      .card {
-        padding: 1.4rem 1.3rem 1.5rem;
-      }
-
-      .card-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .status {
-        align-items: flex-start;
-        text-align: left;
-      }
-
-      .grid {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 1.3rem;
-      }
-
-      .footer {
-        flex-direction: column;
-        align-items: flex-start;
-      }
+      .page { padding: 1rem; }
+      .card { padding: 1.25rem; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .user-info { width: 100%; justify-content: space-between; }
+      .user-details { text-align: left; }
+      .post-header { flex-direction: column; }
+      .post-actions { flex-wrap: wrap; }
+      .post-stats { width: 100%; margin-left: 0; margin-top: 0.5rem; }
     }
   </style>
 </head>
 
 <body>
   <div class="page">
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title-group">
-          <h1>UniID Demo Blog</h1>
-          <div class="page-subtitle">
-            <span>示例：使用 UniID SDK 登录并在统一数据存储中创建帖子。</span>
-            <span class="pill">
-              <span class="pill-dot"></span>
-              Demo 环境，仅用于调试
-            </span>
+    <div class="container">
+      <!-- 头部卡片 -->
+      <div class="card">
+        <div class="header">
+          <div>
+            <h1>📝 UniID Demo Blog</h1>
+            <div class="subtitle">完整功能演示：发帖、查看、编辑、删除、评论、点赞</div>
           </div>
-        </div>
-        <div class="status">
-          <div class="status-labels">
-            <span id="statusText">状态：未登录</span>
-            <span id="userText" class="muted">用户：-</span>
-          </div>
-          <div class="status-buttons">
-            <button id="loginButton">
-              <span>登录 / 授权</span>
-            </button>
-            <button id="revokeButton" style="display: none;">
-              <span>取消授权</span>
-            </button>
+          <div class="user-info" id="userSection">
+            <div id="guestView">
+              <button id="loginButton">登录 / 授权</button>
+            </div>
+            <div id="userView" class="hidden">
+              <div class="user-details">
+                <div class="username" id="usernameDisplay">-</div>
+                <div class="user-status">已登录</div>
+              </div>
+              <div class="user-avatar" id="userAvatar">-</div>
+              <button id="logoutButton" class="secondary small">退出</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="divider"></div>
-
-      <div class="grid">
-        <div class="section">
-          <div class="section-header">
-            <div>
-              <div class="section-title">发表新帖子</div>
-              <div class="section-caption">登录后，你可以在统一数据存储中创建一条新的博客帖子。</div>
-            </div>
-          </div>
+      <!-- 发帖表单 -->
+      <div class="card" id="postFormCard">
+        <div class="section-title">✏️ 发表新帖子</div>
+        <div class="form-section">
           <form id="postForm">
             <div class="field">
-              <label for="title">标题</label>
-              <input id="title" name="title" autocomplete="off" />
+              <label for="postTitle">标题</label>
+              <input type="text" id="postTitle" placeholder="输入帖子标题..." required />
             </div>
             <div class="field">
-              <label for="content">内容</label>
-              <textarea id="content" name="content" placeholder="写点什么吧……"></textarea>
+              <label for="postContent">内容</label>
+              <textarea id="postContent" placeholder="分享你的想法..." required></textarea>
             </div>
             <div class="form-actions">
-              <button type="submit" id="postButton">发布帖子</button>
-              <div class="form-hint">
-                数据会以 <code>post</code> 类型存储在 UniID 的统一数据层。
-              </div>
+              <button type="submit" id="submitPostBtn">发布帖子</button>
             </div>
-            <div id="formError" class="error" style="display: none"></div>
           </form>
-        </div>
-
-        <div class="section">
-          <div class="section-header">
-            <div>
-              <div class="section-title">所有帖子</div>
-              <div class="section-caption">按创建时间倒序展示当前应用下的所有公开帖子。</div>
-            </div>
-          </div>
-          <div class="posts" id="allPosts">
-            <div class="muted">尚未创建任何帖子。</div>
-          </div>
-          <div class="section-header" style="margin-top: 0.85rem">
-            <div>
-              <div class="section-title">由我发布的帖子</div>
-              <div class="section-caption">登录后，这里会筛选出当前用户作为所有者的记录。</div>
-            </div>
-          </div>
-          <div class="posts" id="myPosts">
-            <div class="muted">暂无由你发布的帖子。</div>
-          </div>
+          <div id="formMessage" class="hidden"></div>
         </div>
       </div>
-      <div id="uniid-auth-frame" class="auth-iframe" style="display: none;"></div>
-      <div class="footer">
-        <span>本页面仅作 UniID 能力演示，不建议直接用于生产环境。</span>
-        <span>需要了解接入方式，可查看 SDK 说明文档。</span>
+
+      <!-- 帖子列表 -->
+      <div class="card">
+        <div class="section-title">
+          <span>📚 帖子列表</span>
+          <button class="secondary small" id="refreshBtn">🔄 刷新</button>
+        </div>
+        <div id="postsContainer" class="posts-list">
+          <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <div>暂无帖子，快来发表第一篇吧！</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- 编辑帖子模态框 -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ 编辑帖子</h3>
+        <button class="close-btn" id="closeEditModal">&times;</button>
+      </div>
+      <form id="editForm">
+        <input type="hidden" id="editPostId" />
+        <div class="field">
+          <label for="editTitle">标题</label>
+          <input type="text" id="editTitle" required />
+        </div>
+        <div class="field">
+          <label for="editContent">内容</label>
+          <textarea id="editContent" required></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="secondary" id="cancelEdit">取消</button>
+          <button type="submit">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 授权 iframe -->
+  <div id="uniid-auth-frame" style="display: none;"></div>
+
   <script src="http://localhost:3000/sdk/auth.js"></script>
   <script>
     (function () {
-      if (!window.AuthSDK) {
-        console.error("AuthSDK not found. Make sure /sdk/auth.js is served.");
-        return;
-      }
-
-      var auth = new window.AuthSDK({
+      // 初始化 AuthSDK
+      const auth = new window.AuthSDK({
         authServer: "http://localhost:3000",
         appId: "demo-blog",
         mountId: "uniid-auth-frame"
       });
 
-      var state = {
+      // 状态管理
+      const state = {
         user: null,
-        posts: []
+        posts: [],
+        editingPostId: null
       };
 
-      var statusText = document.getElementById("statusText");
-      var userText = document.getElementById("userText");
-      var loginButton = document.getElementById("loginButton");
-      var revokeButton = document.getElementById("revokeButton");
-      var postForm = document.getElementById("postForm");
-      var postButton = document.getElementById("postButton");
-      var formError = document.getElementById("formError");
-      var allPostsContainer = document.getElementById("allPosts");
-      var myPostsContainer = document.getElementById("myPosts");
+      // DOM 元素
+      const elements = {
+        loginButton: document.getElementById("loginButton"),
+        logoutButton: document.getElementById("logoutButton"),
+        guestView: document.getElementById("guestView"),
+        userView: document.getElementById("userView"),
+        usernameDisplay: document.getElementById("usernameDisplay"),
+        userAvatar: document.getElementById("userAvatar"),
+        postForm: document.getElementById("postForm"),
+        postFormCard: document.getElementById("postFormCard"),
+        postTitle: document.getElementById("postTitle"),
+        postContent: document.getElementById("postContent"),
+        submitPostBtn: document.getElementById("submitPostBtn"),
+        formMessage: document.getElementById("formMessage"),
+        postsContainer: document.getElementById("postsContainer"),
+        refreshBtn: document.getElementById("refreshBtn"),
+        editModal: document.getElementById("editModal"),
+        editForm: document.getElementById("editForm"),
+        editPostId: document.getElementById("editPostId"),
+        editTitle: document.getElementById("editTitle"),
+        editContent: document.getElementById("editContent"),
+        closeEditModal: document.getElementById("closeEditModal"),
+        cancelEdit: document.getElementById("cancelEdit")
+      };
 
-      function loadUserFromStorage() {
-        try {
-          var raw = window.localStorage.getItem("uniid_demo_user");
-          if (!raw) return null;
-          return JSON.parse(raw);
-        } catch (e) {
-          return null;
-        }
+      // 工具函数
+      function formatTime(timestamp) {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleString("zh-CN");
       }
 
-      function saveUserToStorage(user) {
-        try {
-          window.localStorage.setItem("uniid_demo_user", JSON.stringify(user));
-        } catch (e) {
-          // ignore
-        }
+      function getAvatarLetter(username) {
+        return username ? username.charAt(0).toUpperCase() : "?";
       }
 
-      async function loadPostsFromServer() {
-        try {
-          // 未登录时使用公开接口，登录后使用需要认证的接口
-          var endpoint = auth.token
-            ? auth.authServer + "/api/data/query"
-            : auth.authServer + "/api/data/public";
-          var headers = {
-            "Content-Type": "application/json"
-          };
-          if (auth.token) {
-            headers["Authorization"] = "Bearer " + auth.token;
-          }
-          var res = await fetch(endpoint, {
-            method: "POST",
-            headers: headers,
-            credentials: "include",
-            body: JSON.stringify({
-              app_id: auth.appId,
-              data_type: "post"
-            })
-          });
-          if (!res.ok) return;
-          var data = await res.json();
-          if (!data || !Array.isArray(data.items)) return;
-          state.posts = data.items.map(function (item) {
-            return {
-              id: item.id,
-              title: item.data && item.data.title ? item.data.title : "",
-              content: item.data && item.data.content ? item.data.content : "",
-              created_at: item.created_at,
-              owner_id: item.owner_id || null
-            };
-          });
-          renderState();
-        } catch (e) {
-          console.error(e);
-        }
+      function showMessage(message, type = "error") {
+        elements.formMessage.textContent = message;
+        elements.formMessage.className = type === "success" ? "success" : "error";
+        elements.formMessage.classList.remove("hidden");
+        setTimeout(() => {
+          elements.formMessage.classList.add("hidden");
+        }, 5000);
       }
 
-      function renderState() {
+      // 用户状态管理
+      function updateUserUI() {
         if (state.user) {
-          statusText.textContent = "状态：已登录";
-          userText.textContent =
-            "用户：" + (state.user.username || state.user.id || "-");
-          loginButton.textContent = "重新授权";
-          revokeButton.style.display = "inline-flex";
-          revokeButton.className = "danger";
+          elements.guestView.classList.add("hidden");
+          elements.userView.classList.remove("hidden");
+          elements.usernameDisplay.textContent = state.user.username;
+          elements.userAvatar.textContent = getAvatarLetter(state.user.username);
+          elements.postFormCard.classList.remove("hidden");
         } else {
-          statusText.textContent = "状态：未登录";
-          userText.textContent = "用户：-";
-          loginButton.textContent = "登录 / 授权";
-          revokeButton.style.display = "none";
-        }
-
-        while (allPostsContainer.firstChild) {
-          allPostsContainer.removeChild(allPostsContainer.firstChild);
-        }
-        while (myPostsContainer.firstChild) {
-          myPostsContainer.removeChild(myPostsContainer.firstChild);
-        }
-
-        if (state.posts.length === 0) {
-          var emptyAll = document.createElement("div");
-          emptyAll.className = "muted";
-          emptyAll.textContent = "尚未创建任何帖子。";
-          allPostsContainer.appendChild(emptyAll);
-
-          var emptyMine = document.createElement("div");
-          emptyMine.className = "muted";
-          emptyMine.textContent = "暂无由你发布的帖子。";
-          myPostsContainer.appendChild(emptyMine);
-        } else {
-          state.posts.forEach(function (p) {
-            var el = document.createElement("div");
-            el.className = "post";
-            var title = document.createElement("div");
-            title.className = "post-title";
-            title.textContent = p.title;
-            var meta = document.createElement("div");
-            meta.className = "post-meta";
-            meta.textContent =
-              "ID: " +
-              p.id +
-              " · 创建时间: " +
-              new Date(p.created_at * 1000).toLocaleString();
-            var content = document.createElement("div");
-            content.className = "post-content";
-            content.textContent = p.content;
-            el.appendChild(title);
-            el.appendChild(meta);
-            el.appendChild(content);
-            allPostsContainer.appendChild(el);
-          });
-
-          if (state.user) {
-            var mine = state.posts.filter(function (p) {
-              return p.owner_id === state.user.id;
-            });
-            if (mine.length === 0) {
-              var emptyMine2 = document.createElement("div");
-              emptyMine2.className = "muted";
-              emptyMine2.textContent = "暂无由你发布的帖子。";
-              myPostsContainer.appendChild(emptyMine2);
-            } else {
-              mine.forEach(function (p) {
-                var el2 = document.createElement("div");
-                el2.className = "post";
-                var title2 = document.createElement("div");
-                title2.className = "post-title";
-                title2.textContent = p.title;
-                var meta2 = document.createElement("div");
-                meta2.className = "post-meta";
-                meta2.textContent =
-                  "ID: " +
-                  p.id +
-                  " · 创建时间: " +
-                  new Date(p.created_at * 1000).toLocaleString();
-                var content2 = document.createElement("div");
-                content2.className = "post-content";
-                content2.textContent = p.content;
-                el2.appendChild(title2);
-                el2.appendChild(meta2);
-                el2.appendChild(content2);
-                myPostsContainer.appendChild(el2);
-              });
-            }
-          } else {
-            var tip = document.createElement("div");
-            tip.className = "muted";
-            tip.textContent = "登录后可查看由你发布的帖子。";
-            myPostsContainer.appendChild(tip);
-          }
+          elements.guestView.classList.remove("hidden");
+          elements.userView.classList.add("hidden");
+          elements.postFormCard.classList.add("hidden");
         }
       }
 
-      loginButton.onclick = async function () {
-        loginButton.disabled = true;
-        loginButton.textContent = "登录中...";
+      // 加载帖子列表
+      async function loadPosts() {
         try {
-          var result = await auth.login();
-          if (result && result.user) {
-            state.user = result.user;
-            saveUserToStorage(result.user);
-          }
-          await loadPostsFromServer();
-        } catch (e) {
-          console.error(e);
-          alert("登录失败，请稍后重试。");
-        } finally {
-          loginButton.disabled = false;
-          renderState();
-        }
-      };
+          const result = await auth.query({
+            data_type: "post",
+            sort: { created_at: "desc" },
+            limit: 50
+          });
 
-      revokeButton.onclick = async function () {
-        if (!confirm("确定要取消对该应用的授权吗？取消后需要重新登录授权。")) {
+          state.posts = result.items || [];
+          renderPosts();
+        } catch (err) {
+          console.error("加载帖子失败:", err);
+          elements.postsContainer.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">⚠️</div>
+              <div>加载失败，请稍后重试</div>
+            </div>
+          `;
+        }
+      }
+
+      // 渲染帖子列表
+      function renderPosts() {
+        if (state.posts.length === 0) {
+          elements.postsContainer.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📝</div>
+              <div>暂无帖子，快来发表第一篇吧！</div>
+            </div>
+          `;
           return;
         }
-        revokeButton.disabled = true;
-        revokeButton.textContent = "取消中...";
-        try {
-          await auth.revoke();
-          // 清除本地状态
-          state.user = null;
-          try {
-            window.localStorage.removeItem("uniid_demo_user");
-          } catch (e) {
-            // ignore
-          }
-          alert("授权已取消");
-          await loadPostsFromServer();
-        } catch (e) {
-          console.error(e);
-          alert("取消授权失败：" + (e && e.message ? e.message : "未知错误"));
-        } finally {
-          revokeButton.disabled = false;
-          revokeButton.textContent = "取消授权";
-          renderState();
+
+        elements.postsContainer.innerHTML = state.posts.map(post => {
+          const data = post.data || {};
+          const isOwner = state.user && post.owner_id === state.user.id;
+          const comments = data.comments || {};
+          const commentCount = Object.keys(comments).length;
+          const likes = data.likes || {};
+          const likeCount = Object.keys(likes).length;
+          const userLiked = state.user && likes[state.user.id];
+
+          return `
+            <div class="post-card" data-post-id="${post.id}">
+              <div class="post-header">
+                <div>
+                  <h3 class="post-title">${escapeHtml(data.title || "无标题")}</h3>
+                  <div class="post-meta">
+                    <span class="post-author">@${escapeHtml(post.owner_name || "未知用户")}</span>
+                    <span>·</span>
+                    <span>${formatTime(post.created_at)}</span>
+                  </div>
+                </div>
+                ${isOwner ? `
+                  <div>
+                    <button class="secondary small" onclick="editPost('${post.id}')">编辑</button>
+                    <button class="danger small" onclick="deletePost('${post.id}')">删除</button>
+                  </div>
+                ` : ""}
+              </div>
+              <div class="post-content">${escapeHtml(data.content || "")}</div>
+              <div class="post-actions">
+                <button class="small ${userLiked ? "active" : "secondary"}" onclick="toggleLike('${post.id}')">
+                  ${userLiked ? "❤️" : "🤍"} 点赞 (${likeCount})
+                </button>
+                <button class="secondary small" onclick="toggleComments('${post.id}')">
+                  💬 评论 (${commentCount})
+                </button>
+              </div>
+              <div id="comments-${post.id}" class="comments-section hidden">
+                <div class="comments-title">评论 (${commentCount})</div>
+                ${renderComments(comments)}
+                ${state.user ? `
+                  <div class="comment-form">
+                    <input type="text" id="comment-input-${post.id}" placeholder="写下你的评论..." />
+                    <button onclick="addComment('${post.id}')">发送</button>
+                  </div>
+                ` : `<div class="comment-form"><em style="color: var(--text-muted); font-size: 0.85rem;">登录后可发表评论</em></div>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function renderComments(comments) {
+        const commentList = Object.entries(comments);
+        if (commentList.length === 0) {
+          return `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">暂无评论</div>`;
         }
-      };
+        return commentList.map(([userId, comment]) => `
+          <div class="comment">
+            <div class="comment-header">
+              <span class="comment-author">@${escapeHtml(comment.username || userId)}</span>
+              <span class="comment-time">${formatTime(comment.time)}</span>
+            </div>
+            <div class="comment-content">${escapeHtml(comment.content)}</div>
+          </div>
+        `).join("");
+      }
 
-      postForm.onsubmit = async function (e) {
+      function escapeHtml(text) {
+        if (!text) return "";
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // 发帖
+      elements.postForm.onsubmit = async (e) => {
         e.preventDefault();
-        formError.style.display = "none";
-        formError.textContent = "";
+        if (!state.user) {
+          showMessage("请先登录");
+          return;
+        }
 
-        var titleInput = document.getElementById("title");
-        var contentInput = document.getElementById("content");
-
-        var title = titleInput.value.trim();
-        var content = contentInput.value.trim();
+        const title = elements.postTitle.value.trim();
+        const content = elements.postContent.value.trim();
 
         if (!title || !content) {
-          formError.textContent = "标题和内容均不能为空。";
-          formError.style.display = "block";
+          showMessage("标题和内容不能为空");
           return;
         }
 
-        postButton.disabled = true;
-        postButton.textContent = "发布中...";
+        elements.submitPostBtn.disabled = true;
+        elements.submitPostBtn.textContent = "发布中...";
 
         try {
-          var data = {
-            title: title,
-            content: content,
-            metadata: {
-              createdAt: Date.now()
-            }
+          const data = {
+            title,
+            content,
+            likes: {},
+            comments: {}
           };
 
-          var permissions = {
+          const permissions = {
+            default: {
+              read: ["$all"],
+              write: ["$owner"],
+              delete: ["$owner"]
+            },
             fields: {
               "data.title": { read: ["$all"], write: ["$owner"] },
-              "data.content": { read: ["$all"], write: ["$owner"] }
+              "data.content": { read: ["$all"], write: ["$owner"] },
+              "data.likes": { read: ["$all"], write: ["$all"] },
+              "data.comments": { read: ["$all"], write: ["$all"] }
             }
           };
 
-          var created = await auth.create("post", data, permissions);
-
-          state.posts.unshift({
-            id: created.id,
-            title: data.title,
-            content: data.content,
-            created_at: created.created_at,
-            owner_id: state.user ? state.user.id : null
-          });
-
-          titleInput.value = "";
-          contentInput.value = "";
-
-          renderState();
+          await auth.create("post", data, permissions);
+          showMessage("发布成功！", "success");
+          elements.postTitle.value = "";
+          elements.postContent.value = "";
+          await loadPosts();
         } catch (err) {
-          console.error(err);
-          formError.textContent =
-            "发帖失败：" + (err && err.message ? err.message : "未知错误");
-          formError.style.display = "block";
+          console.error("发帖失败:", err);
+          showMessage("发布失败: " + (err.message || "未知错误"));
         } finally {
-          postButton.disabled = false;
-          postButton.textContent = "发布帖子";
+          elements.submitPostBtn.disabled = false;
+          elements.submitPostBtn.textContent = "发布帖子";
         }
       };
 
-      renderState();
+      // 编辑帖子
+      window.editPost = (postId) => {
+        const post = state.posts.find(p => p.id === postId);
+        if (!post) return;
 
-      // 页面加载时获取帖子（无论是否登录）
-      loadPostsFromServer().then(function () {
-        renderState();
-      });
+        state.editingPostId = postId;
+        elements.editPostId.value = postId;
+        elements.editTitle.value = post.data.title || "";
+        elements.editContent.value = post.data.content || "";
+        elements.editModal.classList.remove("hidden");
+      };
 
-      // 如果有 token，恢复用户状态
-      (function initFromToken() {
-        if (!auth.token) return;
-        var storedUser = loadUserFromStorage();
-        if (storedUser) {
-          state.user = storedUser;
-          renderState();
+      elements.closeEditModal.onclick = () => {
+        elements.editModal.classList.add("hidden");
+        state.editingPostId = null;
+      };
+
+      elements.cancelEdit.onclick = () => {
+        elements.editModal.classList.add("hidden");
+        state.editingPostId = null;
+      };
+
+      elements.editForm.onsubmit = async (e) => {
+        e.preventDefault();
+        if (!state.editingPostId) return;
+
+        const title = elements.editTitle.value.trim();
+        const content = elements.editContent.value.trim();
+
+        try {
+          await auth.update(state.editingPostId, { title, content });
+          showMessage("修改成功！", "success");
+          elements.editModal.classList.add("hidden");
+          state.editingPostId = null;
+          await loadPosts();
+        } catch (err) {
+          console.error("编辑失败:", err);
+          showMessage("编辑失败: " + (err.message || "未知错误"));
         }
-      })();
+      };
+
+      // 删除帖子
+      window.deletePost = async (postId) => {
+        if (!confirm("确定要删除这篇帖子吗？此操作不可恢复。")) return;
+
+        try {
+          await auth.delete(postId);
+          showMessage("删除成功！", "success");
+          await loadPosts();
+        } catch (err) {
+          console.error("删除失败:", err);
+          showMessage("删除失败: " + (err.message || "未知错误"));
+        }
+      };
+
+      // 点赞功能
+      window.toggleLike = async (postId) => {
+        if (!state.user) {
+          showMessage("请先登录");
+          return;
+        }
+
+        try {
+          const post = state.posts.find(p => p.id === postId);
+          if (!post) return;
+
+          const likes = { ...(post.data.likes || {}) };
+          const userId = state.user.id;
+
+          if (likes[userId]) {
+            delete likes[userId];
+          } else {
+            likes[userId] = { time: Math.floor(Date.now() / 1000) };
+          }
+
+          await auth.update(postId, { likes });
+          await loadPosts();
+        } catch (err) {
+          console.error("点赞失败:", err);
+          showMessage("操作失败: " + (err.message || "未知错误"));
+        }
+      };
+
+      // 评论功能
+      window.toggleComments = (postId) => {
+        const commentsSection = document.getElementById(`comments-${postId}`);
+        if (commentsSection) {
+          commentsSection.classList.toggle("hidden");
+        }
+      };
+
+      window.addComment = async (postId) => {
+        if (!state.user) {
+          showMessage("请先登录");
+          return;
+        }
+
+        const input = document.getElementById(`comment-input-${postId}`);
+        const content = input.value.trim();
+
+        if (!content) {
+          showMessage("评论内容不能为空");
+          return;
+        }
+
+        try {
+          const post = state.posts.find(p => p.id === postId);
+          if (!post) return;
+
+          const comments = { ...(post.data.comments || {}) };
+          const commentId = `${state.user.id}_${Date.now()}`;
+
+          comments[commentId] = {
+            userId: state.user.id,
+            username: state.user.username,
+            content,
+            time: Math.floor(Date.now() / 1000)
+          };
+
+          await auth.update(postId, { comments });
+          input.value = "";
+          await loadPosts();
+
+          // 保持评论区展开
+          setTimeout(() => {
+            const commentsSection = document.getElementById(`comments-${postId}`);
+            if (commentsSection) commentsSection.classList.remove("hidden");
+          }, 100);
+        } catch (err) {
+          console.error("评论失败:", err);
+          showMessage("评论失败: " + (err.message || "未知错误"));
+        }
+      };
+
+      // 登录/退出
+      elements.loginButton.onclick = async () => {
+        elements.loginButton.disabled = true;
+        elements.loginButton.textContent = "登录中...";
+
+        try {
+          const result = await auth.login();
+          if (result && result.user) {
+            state.user = result.user;
+            localStorage.setItem("demo_user", JSON.stringify(result.user));
+            updateUserUI();
+            await loadPosts();
+          }
+        } catch (err) {
+          console.error("登录失败:", err);
+          showMessage("登录失败");
+        } finally {
+          elements.loginButton.disabled = false;
+          elements.loginButton.textContent = "登录 / 授权";
+        }
+      };
+
+      elements.logoutButton.onclick = async () => {
+        try {
+          await auth.logout();
+          state.user = null;
+          localStorage.removeItem("demo_user");
+          updateUserUI();
+          await loadPosts();
+        } catch (err) {
+          console.error("退出失败:", err);
+        }
+      };
+
+      elements.refreshBtn.onclick = loadPosts;
+
+      // 初始化
+      function init() {
+        // 恢复用户状态
+        const savedUser = localStorage.getItem("demo_user");
+        if (savedUser) {
+          try {
+            state.user = JSON.parse(savedUser);
+          } catch (e) {
+            console.error("恢复用户状态失败", e);
+          }
+        }
+
+        updateUserUI();
+        loadPosts();
+      }
+
+      init();
     })();
   </script>
 </body>
