@@ -839,15 +839,15 @@
 
           const permissions = {
             default: {
-              read: ["$all"],
+              read: ["$public"],
               write: ["$owner"],
               delete: ["$owner"]
             },
             fields: {
-              "data.title": { read: ["$all"], write: ["$owner"] },
-              "data.content": { read: ["$all"], write: ["$owner"] },
-              "data.likes": { read: ["$all"], write: ["$all"] },
-              "data.comments": { read: ["$all"], write: ["$all"] }
+              "title": { read: ["$public"], write: ["$owner"] },
+              "content": { read: ["$public"], write: ["$owner"] },
+              "likes": { read: ["$public"], write: ["$dynamic:likes.$user"] },
+              "comments": { read: ["$public"], write: ["$dynamic:comments.$user"] }
             }
           };
 
@@ -974,10 +974,14 @@
           const post = state.posts.find(p => p.id === postId);
           if (!post) return;
 
+          // 使用嵌套结构：comments[userId][commentId] = commentData
           const comments = { ...(post.data.comments || {}) };
-          const commentId = `${state.user.id}_${Date.now()}`;
+          if (!comments[state.user.id]) {
+            comments[state.user.id] = {};
+          }
+          const commentId = `${Date.now()}`;
 
-          comments[commentId] = {
+          comments[state.user.id][commentId] = {
             userId: state.user.id,
             username: state.user.username,
             content,

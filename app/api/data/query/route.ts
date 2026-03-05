@@ -73,27 +73,21 @@ export const POST = withDataCors(async function handler(
     }
   });
 
-  // 过滤记录
-  let accessibleRecords = records;
-  
-  if (isAuthenticated && userId) {
-    // 已登录：进行权限验证
-    accessibleRecords = [];
-    for (const record of records) {
-      const hasPermission = await checkRecordPermission(
-        record.permissions,
-        userId,
-        record.appId,
-        record.ownerId,
-        "read",
-        authType
-      );
-      if (hasPermission) {
-        accessibleRecords.push(record);
-      }
+  // 过滤记录 - 对所有用户（包括未登录）进行权限检查
+  let accessibleRecords = [];
+  for (const record of records) {
+    const hasPermission = await checkRecordPermission(
+      record.permissions,
+      userId,  // 未登录时为 null
+      record.appId,
+      record.ownerId,
+      "read",
+      authType
+    );
+    if (hasPermission) {
+      accessibleRecords.push(record);
     }
   }
-  // 未登录：返回所有记录（公开接口）
 
   // 获取所有者的用户信息
   const ownerIds = [...new Set(accessibleRecords.map(r => r.ownerId).filter(Boolean))];

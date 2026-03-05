@@ -1,6 +1,76 @@
 import { prisma } from "./prisma";
 
 /**
+ * 检查用户是否具有指定角色
+ * @param userId 用户ID
+ * @param role 角色名称
+ * @returns 是否具有该角色
+ */
+async function checkUserRole(userId: string, role: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true }
+  });
+
+  return user?.role === role;
+}
+
+/**
+ * 解析权限配置中的变量（异步版本）
+ * @param perm 权限字符串
+ * @param context 上下文信息
+ */
+async function resolvePermissionVariableAsync(
+  perm: string,
+  context: {
+    userId: string;
+    ownerId: string | null;
+    appId: string;
+    appAdmin: boolean;
+    systemAdmin: boolean;
+  }
+): Promise<boolean> {
+  // 系统管理员拥有所有权限
+  if (context.systemAdmin) {
+    return true;
+  }
+
+  // 记录所有者拥有所有权限
+  if (context.ownerId === context.userId) {
+    return true;
+  }
+
+  switch (perm) {
+    case "$owner":
+      return context.ownerId === context.userId;
+    case "$app_admin":
+      return context.appAdmin;
+    case "$all":
+    case "$anyone":
+      return true;
+    case "$public":
+      // 公开权限，所有人可访问
+      return true;
+    case "$app":
+      // 应用管理员权限
+      return context.appAdmin;
+    default:
+      // 检查特定用户权限: $user:{id}
+      if (perm.startsWith("$user:")) {
+        const targetUserId = perm.slice(6);
+        return targetUserId === context.userId;
+      }
+      // 检查特定角色权限: $role:{role}
+      if (perm.startsWith("$role:")) {
+        const targetRole = perm.slice(6);
+        return await checkUserRole(context.userId, targetRole);
+      }
+      // 直接匹配用户ID
+      return perm === context.userId;
+  }
+}
+
+/**
  * 解析权限配置中的变量
  * @param perm 权限字符串
  * @param context 上下文信息
@@ -37,8 +107,8 @@ function resolvePermissionVariable(
       // 公开权限，所有人可访问
       return true;
     case "$app":
-      // 应用自身权限
-      return false;
+      // 应用管理员权限
+      return context.appAdmin;
     default:
       // 检查特定用户权限: $user:{id}
       if (perm.startsWith("$user:")) {
@@ -47,8 +117,8 @@ function resolvePermissionVariable(
       }
       // 检查特定角色权限: $role:{role}
       if (perm.startsWith("$role:")) {
-        // 需要查询用户角色，这里简化处理
-        return false;
+        const targetRole = perm.slice(6);
+        return checkUserRole(context.userId, targetRole);
       }
       // 直接匹配用户ID
       return perm === context.userId;
@@ -141,31 +211,35 @@ export async function getAppAdminIds(appId: string): Promise<string[]> {
  */
 export async function checkRecordPermission(
   permissions: string,
-  userId: string,
+  userId: string | null,
   appId: string,
   ownerId: string | null,
   action: "read" | "write" | "delete",
   authType: "full" | "restricted" = "restricted"
 ): Promise<boolean> {
-  // 记录所有者有所有权限
-  if (ownerId === userId) {
-    return true;
-  }
+  // 未登录用户只能访问公开权限
+  if (!userId) {
+    // 解析权限配置，检查是否有 $public 权限
+    let permConfig: Record<string, any>;
+    try {
+      permConfig = JSON.parse(permissions);
+    } catch {
+      return false;
+    }
 
-  // 限制授权模式下，只能操作自己的数据
-  if (authType === "restricted") {
+    const actionPerms = permConfig[action] || permConfig.default?.[action];
+    if (Array.isArray(actionPerms)) {
+      for (const perm of actionPerms) {
+        if (perm === "$public") {
+          return true;
+        }
+      }
+    }
     return false;
   }
 
-  // 完整授权模式下，检查系统管理员权限
-  const systemAdmin = await isSystemAdmin(userId);
-  if (systemAdmin) {
-    return true;
-  }
-
-  // 完整授权模式下，检查应用管理员权限
-  const appAdmin = await isAppAdmin(appId, userId);
-  if (appAdmin) {
+  // 记录所有者有所有权限
+  if (ownerId === userId) {
     return true;
   }
 
@@ -184,18 +258,45 @@ export async function checkRecordPermission(
     return false;
   }
 
-  // 检查权限列表
+  // 检查公开权限（所有模式都适用）
+  for (const perm of actionPerms) {
+    if (perm === "$all" || perm === "$anyone" || perm === "$public") {
+      return true;
+    }
+  }
+
+  // 限制授权模式下，只能访问自己的数据或公开数据
+  // 不再检查管理员权限和特定用户权限
+  if (authType === "restricted") {
+    return false;
+  }
+
+  // 完整授权模式下，检查系统管理员权限
+  const systemAdmin = await isSystemAdmin(userId);
+  if (systemAdmin) {
+    return true;
+  }
+
+  // 完整授权模式下，检查应用管理员权限
+  const appAdmin = await isAppAdmin(appId, userId);
+  if (appAdmin) {
+    return true;
+  }
+
+  const context = {
+    userId,
+    ownerId,
+    appId,
+    appAdmin,
+    systemAdmin
+  };
+
+  // 完整授权模式下，检查其他权限（包括 $role:{role}）
   for (const perm of actionPerms) {
     if (perm === userId) {
       return true;
     }
-    if (perm === "$owner" && ownerId === userId) {
-      return true;
-    }
-    if (perm === "$app_admin" && appAdmin) {
-      return true;
-    }
-    if (perm === "$anyone") {
+    if (await resolvePermissionVariableAsync(perm, context)) {
       return true;
     }
   }
@@ -289,28 +390,105 @@ export async function removeAppAdmin(appId: string, userId: string): Promise<boo
  * @param fieldPath 字段路径，如 "data.title" 或 "data.metadata.comments"
  * @param action 操作类型: read, write, delete
  */
+/**
+ * 检查动态路径权限
+ * @param perm 权限字符串，如 "$dynamic:likes.$user"
+ * @param fieldPath 字段路径，如 "likes"
+ * @param dataValue 要写入的数据
+ * @param userId 当前用户ID
+ * @returns 是否有权限
+ */
+function checkDynamicPermission(
+  perm: string,
+  fieldPath: string,
+  dataValue: any,
+  userId: string
+): boolean {
+  if (!perm.startsWith("$dynamic:")) {
+    return false;
+  }
+
+  // 解析动态路径，如 "likes.$user" 或 "comments.$user"
+  const dynamicPath = perm.slice(9); // 去掉 "$dynamic:" 前缀
+  const pathParts = dynamicPath.split(".");
+
+  // 第一个部分应该是字段名
+  if (pathParts[0] !== fieldPath) {
+    return false;
+  }
+
+  // 递归检查数据路径
+  return checkDynamicPath(dataValue, pathParts, 1, userId);
+}
+
+/**
+ * 递归检查动态路径
+ * @param data 当前数据
+ * @param pathParts 路径部分数组
+ * @param index 当前检查的路径索引
+ * @param userId 当前用户ID
+ * @returns 是否有权限
+ */
+function checkDynamicPath(
+  data: any,
+  pathParts: string[],
+  index: number,
+  userId: string
+): boolean {
+  // 如果已经检查完所有路径部分，说明有权限
+  if (index >= pathParts.length) {
+    return true;
+  }
+
+  // 如果数据不是对象，无法继续检查
+  if (data == null || typeof data !== "object") {
+    return false;
+  }
+
+  const part = pathParts[index];
+
+  // 检查数据中的每个键
+  for (const key of Object.keys(data)) {
+    let matches = false;
+
+    if (part === "$user") {
+      // 键必须等于当前用户ID
+      matches = key === userId;
+    } else if (part === "*") {
+      // 通配符，匹配任意值
+      matches = true;
+    } else {
+      // 固定值匹配
+      matches = key === part;
+    }
+
+    if (matches) {
+      // 递归检查下一层
+      const hasPermission = checkDynamicPath(data[key], pathParts, index + 1, userId);
+      if (!hasPermission) {
+        return false;
+      }
+    } else {
+      // 当前键不匹配权限规则
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function checkFieldPermission(
   permissions: string,
   userId: string,
   appId: string,
   ownerId: string | null,
   fieldPath: string,
-  action: "read" | "write" | "delete"
+  action: "read" | "write" | "delete",
+  authType: "full" | "restricted" = "restricted",
+  dataValue?: any
 ): Promise<boolean> {
   // 记录所有者有所有字段权限
   if (ownerId === userId) {
-    return true;
-  }
-
-  // 检查系统管理员权限
-  const systemAdmin = await isSystemAdmin(userId);
-  if (systemAdmin) {
-    return true;
-  }
-
-  // 检查应用管理员权限
-  const appAdmin = await isAppAdmin(appId, userId);
-  if (appAdmin) {
     return true;
   }
 
@@ -323,6 +501,69 @@ export async function checkFieldPermission(
     return false;
   }
 
+  // 1. 检查字段特定权限中的公开权限（所有模式都适用）
+  const fieldsConfig = permConfig.fields || {};
+  const fieldConfig = fieldsConfig[fieldPath];
+
+  if (fieldConfig && typeof fieldConfig === "object") {
+    const actionPerms = fieldConfig[action];
+    if (Array.isArray(actionPerms)) {
+      for (const perm of actionPerms) {
+        if (perm === "$all" || perm === "$anyone" || perm === "$public") {
+          return true;
+        }
+        // 检查动态权限（如果有数据值）
+        if (perm.startsWith("$dynamic:") && dataValue !== undefined) {
+          if (checkDynamicPermission(perm, fieldPath, dataValue, userId)) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // 2. 检查默认权限中的公开权限（所有模式都适用）
+  const defaultConfig = permConfig.default || {};
+  const defaultActionPerms = defaultConfig[action];
+  if (Array.isArray(defaultActionPerms)) {
+    for (const perm of defaultActionPerms) {
+      if (perm === "$all" || perm === "$anyone" || perm === "$public") {
+        return true;
+      }
+    }
+  }
+
+  // 限制授权模式下，只能访问自己的数据或公开数据
+  // 但动态权限在 restricted 模式下也应该被检查
+  if (authType === "restricted") {
+    // 再次检查动态权限（如果有数据值）
+    if (fieldConfig && typeof fieldConfig === "object" && dataValue !== undefined) {
+      const actionPerms = fieldConfig[action];
+      if (Array.isArray(actionPerms)) {
+        for (const perm of actionPerms) {
+          if (perm.startsWith("$dynamic:")) {
+            if (checkDynamicPermission(perm, fieldPath, dataValue, userId)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // 完整授权模式下，检查系统管理员权限
+  const systemAdmin = await isSystemAdmin(userId);
+  if (systemAdmin) {
+    return true;
+  }
+
+  // 完整授权模式下，检查应用管理员权限
+  const appAdmin = await isAppAdmin(appId, userId);
+  if (appAdmin) {
+    return true;
+  }
+
   const context = {
     userId,
     ownerId,
@@ -331,27 +572,22 @@ export async function checkFieldPermission(
     systemAdmin
   };
 
-  // 1. 检查字段特定权限
-  const fieldsConfig = permConfig.fields || {};
-  const fieldConfig = fieldsConfig[fieldPath];
-
+  // 3. 完整授权模式下，检查字段特定权限（使用异步版本以支持 $role）
   if (fieldConfig && typeof fieldConfig === "object") {
     const actionPerms = fieldConfig[action];
     if (Array.isArray(actionPerms)) {
       for (const perm of actionPerms) {
-        if (resolvePermissionVariable(perm, context)) {
+        if (await resolvePermissionVariableAsync(perm, context)) {
           return true;
         }
       }
     }
   }
 
-  // 2. 检查默认权限
-  const defaultConfig = permConfig.default || {};
-  const defaultActionPerms = defaultConfig[action];
+  // 4. 完整授权模式下，检查默认权限（使用异步版本以支持 $role）
   if (Array.isArray(defaultActionPerms)) {
     for (const perm of defaultActionPerms) {
-      if (resolvePermissionVariable(perm, context)) {
+      if (await resolvePermissionVariableAsync(perm, context)) {
         return true;
       }
     }
@@ -449,7 +685,7 @@ export async function filterReadableFields(
 
     if (fieldConfig && Array.isArray(fieldConfig.read)) {
       for (const perm of fieldConfig.read) {
-        if (resolvePermissionVariable(perm, context)) {
+        if (await resolvePermissionVariableAsync(perm, context)) {
           hasReadPermission = true;
           break;
         }
@@ -462,7 +698,7 @@ export async function filterReadableFields(
       const defaultReadPerms = defaultConfig.read;
       if (Array.isArray(defaultReadPerms)) {
         for (const perm of defaultReadPerms) {
-          if (resolvePermissionVariable(perm, context)) {
+          if (await resolvePermissionVariableAsync(perm, context)) {
             hasReadPermission = true;
             break;
           }

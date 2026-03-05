@@ -98,14 +98,46 @@ export const PATCH = withDataCors(async function handler(
   context: { params: { recordId: string } }
 ): Promise<NextResponse> {
   const { recordId } = context.params;
-  const validation = await validateRequest(req, recordId, "write");
 
-  if (!validation.valid) {
-    return validation.response;
+  // 获取记录
+  const record = await prisma.record.findUnique({
+    where: { id: recordId }
+  });
+
+  if (!record || record.deleted === 1) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   }
 
-  const { record, userId } = validation;
+  // 验证 Origin
+  const validation = await validateAppIdOriginMatch(req, record.appId);
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.error || "FORBIDDEN" },
+      { status: 403 }
+    );
+  }
 
+  // 验证 Token
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "MISSING_TOKEN" }, { status: 401 });
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+
+  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, record.appId);
+  if (!tokenValidation.valid) {
+    return NextResponse.json(
+      { error: tokenValidation.error || "INVALID_TOKEN" },
+      { status: 401 }
+    );
+  }
+
+  const userId = tokenValidation.payload!.sub;
+  const authType = tokenValidation.payload!.auth_type ?? "restricted";
+
+  // 解析请求体
   const body = (await req.json().catch(() => null)) as
     | {
         data?: Record<string, any>;
@@ -124,7 +156,11 @@ export const PATCH = withDataCors(async function handler(
   let newData = currentData;
   let newPermissions = currentPermissions;
 
+  // 检查是否需要记录级 write 权限（修改非字段数据或权限配置）
+  const isOwner = record.ownerId === userId;
+
   if (body.data) {
+    // 检查每个要更新的字段的权限
     for (const [fieldPath, value] of Object.entries(body.data)) {
       const hasFieldPermission = await checkFieldPermission(
         record.permissions,
@@ -132,7 +168,9 @@ export const PATCH = withDataCors(async function handler(
         record.appId,
         record.ownerId,
         fieldPath,
-        "write"
+        "write",
+        authType,
+        value  // 传入要写入的数据值，用于动态权限检查
       );
 
       if (!hasFieldPermission) {
@@ -147,11 +185,17 @@ export const PATCH = withDataCors(async function handler(
   }
 
   if (body.permissions) {
-    const isOwner = record.ownerId === userId;
-    const { isAppAdmin } = await import("@/lib/permissions");
-    const appAdmin = await isAppAdmin(record.appId, userId);
+    // 修改权限配置需要记录级 write 权限或管理员权限
+    const hasRecordWritePermission = await checkRecordPermission(
+      record.permissions,
+      userId,
+      record.appId,
+      record.ownerId,
+      "write",
+      authType
+    );
 
-    if (!isOwner && !appAdmin) {
+    if (!hasRecordWritePermission) {
       return NextResponse.json({ error: "PERMISSION_UPDATE_FORBIDDEN" }, { status: 403 });
     }
 

@@ -100,7 +100,8 @@ export const DELETE = withDataCors(async function handler(
     record.appId,
     record.ownerId,
     decodedFieldPath,
-    "delete"
+    "delete",
+    authType
   );
 
   if (!hasPermission) {
