@@ -170,7 +170,8 @@ export const PATCH = withDataCors(async function handler(
         fieldPath,
         "write",
         authType,
-        value  // 传入要写入的数据值，用于动态权限检查
+        value,  // 传入要写入的数据值，用于动态权限检查
+        currentData[fieldPath]  // 传入当前值，用于比较变更
       );
 
       if (!hasFieldPermission) {

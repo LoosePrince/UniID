@@ -740,7 +740,13 @@
           const data = post.data || {};
           const isOwner = state.user && post.owner_id === state.user.id;
           const comments = data.comments || {};
-          const commentCount = Object.keys(comments).length;
+          // 计算嵌套结构的评论数量
+          let commentCount = 0;
+          for (const userComments of Object.values(comments)) {
+            if (userComments && typeof userComments === "object") {
+              commentCount += Object.keys(userComments).length;
+            }
+          }
           const likes = data.likes || {};
           const likeCount = Object.keys(likes).length;
           const userLiked = state.user && likes[state.user.id];
@@ -788,14 +794,33 @@
       }
 
       function renderComments(comments) {
-        const commentList = Object.entries(comments);
-        if (commentList.length === 0) {
+        // 处理嵌套结构：comments[userId][commentId] = commentData
+        const flatComments = [];
+        for (const [userId, userComments] of Object.entries(comments)) {
+          if (userComments && typeof userComments === "object") {
+            for (const [commentId, comment] of Object.entries(userComments)) {
+              if (comment && typeof comment === "object") {
+                flatComments.push({
+                  ...comment,
+                  _userId: userId,
+                  _commentId: commentId
+                });
+              }
+            }
+          }
+        }
+
+        // 按时间排序
+        flatComments.sort((a, b) => (a.time || 0) - (b.time || 0));
+
+        if (flatComments.length === 0) {
           return `<div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">暂无评论</div>`;
         }
-        return commentList.map(([userId, comment]) => `
+
+        return flatComments.map(comment => `
           <div class="comment">
             <div class="comment-header">
-              <span class="comment-author">@${escapeHtml(comment.username || userId)}</span>
+              <span class="comment-author">@${escapeHtml(comment.username || comment._userId)}</span>
               <span class="comment-time">${formatTime(comment.time)}</span>
             </div>
             <div class="comment-content">${escapeHtml(comment.content)}</div>

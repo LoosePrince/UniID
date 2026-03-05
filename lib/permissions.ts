@@ -396,13 +396,15 @@ export async function removeAppAdmin(appId: string, userId: string): Promise<boo
  * @param fieldPath 字段路径，如 "likes"
  * @param dataValue 要写入的数据
  * @param userId 当前用户ID
+ * @param currentValue 当前数据（用于比较变更）
  * @returns 是否有权限
  */
 function checkDynamicPermission(
   perm: string,
   fieldPath: string,
   dataValue: any,
-  userId: string
+  userId: string,
+  currentValue?: any
 ): boolean {
   if (!perm.startsWith("$dynamic:")) {
     return false;
@@ -417,12 +419,77 @@ function checkDynamicPermission(
     return false;
   }
 
-  // 递归检查数据路径
-  return checkDynamicPath(dataValue, pathParts, 1, userId);
+  // 如果数据不是对象，无法检查
+  if (dataValue == null || typeof dataValue !== "object") {
+    return false;
+  }
+
+  // 只检查新增、变更或删除的键
+  // 对于 $dynamic:likes.$user，检查 dataValue 中相对于 currentValue 新增、变更或删除的键
+  const secondPart = pathParts[1];
+  const currentKeys = currentValue && typeof currentValue === "object" ? Object.keys(currentValue) : [];
+  const newKeys = Object.keys(dataValue);
+
+  // 检查新增或变更的键
+  for (const key of newKeys) {
+    // 跳过未变更的键（值相同）
+    if (currentKeys.includes(key) && JSON.stringify(currentValue[key]) === JSON.stringify(dataValue[key])) {
+      continue;
+    }
+
+    let matches = false;
+
+    if (secondPart === "$user") {
+      // 键必须等于当前用户ID
+      matches = key === userId;
+    } else if (secondPart === "*") {
+      // 通配符，匹配任意值
+      matches = true;
+    } else {
+      // 固定值匹配
+      matches = key === secondPart;
+    }
+
+    if (!matches) {
+      return false;
+    }
+
+    // 如果有第三层（如 comments.$user.*），递归检查
+    if (pathParts.length > 2) {
+      const hasPermission = checkDynamicPath(dataValue[key], pathParts, 2, userId);
+      if (!hasPermission) {
+        return false;
+      }
+    }
+  }
+
+  // 检查删除的键（在当前值中存在但在新值中不存在）
+  for (const key of currentKeys) {
+    if (!newKeys.includes(key)) {
+      let matches = false;
+
+      if (secondPart === "$user") {
+        // 键必须等于当前用户ID
+        matches = key === userId;
+      } else if (secondPart === "*") {
+        // 通配符，匹配任意值
+        matches = true;
+      } else {
+        // 固定值匹配
+        matches = key === secondPart;
+      }
+
+      if (!matches) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 /**
- * 递归检查动态路径
+ * 递归检查动态路径（用于嵌套结构）
  * @param data 当前数据
  * @param pathParts 路径部分数组
  * @param index 当前检查的路径索引
@@ -462,14 +529,13 @@ function checkDynamicPath(
       matches = key === part;
     }
 
-    if (matches) {
-      // 递归检查下一层
-      const hasPermission = checkDynamicPath(data[key], pathParts, index + 1, userId);
-      if (!hasPermission) {
-        return false;
-      }
-    } else {
-      // 当前键不匹配权限规则
+    if (!matches) {
+      return false;
+    }
+
+    // 递归检查下一层
+    const hasPermission = checkDynamicPath(data[key], pathParts, index + 1, userId);
+    if (!hasPermission) {
       return false;
     }
   }
@@ -485,7 +551,8 @@ export async function checkFieldPermission(
   fieldPath: string,
   action: "read" | "write" | "delete",
   authType: "full" | "restricted" = "restricted",
-  dataValue?: any
+  dataValue?: any,
+  currentValue?: any
 ): Promise<boolean> {
   // 记录所有者有所有字段权限
   if (ownerId === userId) {
@@ -514,7 +581,7 @@ export async function checkFieldPermission(
         }
         // 检查动态权限（如果有数据值）
         if (perm.startsWith("$dynamic:") && dataValue !== undefined) {
-          if (checkDynamicPermission(perm, fieldPath, dataValue, userId)) {
+          if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
             return true;
           }
         }
@@ -542,7 +609,7 @@ export async function checkFieldPermission(
       if (Array.isArray(actionPerms)) {
         for (const perm of actionPerms) {
           if (perm.startsWith("$dynamic:")) {
-            if (checkDynamicPermission(perm, fieldPath, dataValue, userId)) {
+            if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
               return true;
             }
           }
