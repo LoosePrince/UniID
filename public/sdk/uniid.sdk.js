@@ -34,6 +34,11 @@
     document.cookie = cookie;
   };
 
+  AuthSDK.prototype._clearToken = function () {
+    this.token = null;
+    this._setCookie("uniid_sdk_token", "", 0);
+  };
+
   AuthSDK.prototype._restoreTokenFromCookie = function () {
     var token = this._getCookie("uniid_sdk_token");
     if (token) {
@@ -122,6 +127,7 @@
   };
 
   AuthSDK.prototype._fetch = function (method, path, body, options) {
+    var self = this;
     options = options || {};
     if (!this.token) {
       this._restoreTokenFromCookie();
@@ -147,9 +153,30 @@
     }
     return fetch(url, init).then(function (res) {
       if (!res.ok) {
-        var err = new Error("Request failed with status " + res.status);
-        err.status = res.status;
-        throw err;
+        return res
+          .json()
+          .catch(function () {
+            return {};
+          })
+          .then(function (data) {
+            // 遇到鉴权相关错误时，自动清理本地 token
+            if (
+              res.status === 401 &&
+              data &&
+              (data.error === "INVALID_TOKEN" ||
+                data.error === "AUTHORIZATION_REVOKED" ||
+                data.error === "AUTHORIZATION_EXPIRED" ||
+                data.error === "AUTHORIZATION_NOT_FOUND")
+            ) {
+              self._clearToken();
+            }
+            var err = new Error("Request failed with status " + res.status);
+            err.status = res.status;
+            if (data && data.error) {
+              err.code = data.error;
+            }
+            throw err;
+          });
       }
       return res.json();
     });
@@ -228,8 +255,7 @@
         })
         .then(function (data) {
           // 清除本地 token
-          self.token = null;
-          self._setCookie("uniid_sdk_token", "", 0);
+          self._clearToken();
           resolve(data);
         })
         .catch(function (err) {
@@ -251,6 +277,26 @@
   AuthSDK.prototype.isAuthenticated = function () {
     if (!this.token) {
       this._restoreTokenFromCookie();
+    }
+    if (!this.token) return false;
+    // 本地校验 JWT 是否过期
+    try {
+      var parts = this.token.split('.');
+      if (parts.length !== 3) {
+        this._clearToken();
+        return false;
+      }
+      var payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && typeof payload.exp === 'number') {
+        var now = Math.floor(Date.now() / 1000);
+        if (payload.exp <= now) {
+          this._clearToken();
+          return false;
+        }
+      }
+    } catch (e) {
+      this._clearToken();
+      return false;
     }
     return !!this.token;
   };
@@ -279,6 +325,14 @@
       var parts = this.token.split('.');
       if (parts.length !== 3) return null;
       var payload = JSON.parse(atob(parts[1]));
+      // 如果本地发现 token 已过期，则视为未登录并清理
+      if (payload.exp && typeof payload.exp === 'number') {
+        var now = Math.floor(Date.now() / 1000);
+        if (payload.exp <= now) {
+          this._clearToken();
+          return null;
+        }
+      }
       return {
         id: payload.sub,
         username: payload.username,

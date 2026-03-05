@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isSameOriginAuthRequest } from "@/lib/origin";
 import { getAuthContextFromRequest } from "@/lib/auth-context";
+import { isSameOriginAuthRequest } from "@/lib/origin";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   if (!isSameOriginAuthRequest(req)) {

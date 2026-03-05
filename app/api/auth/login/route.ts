@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { compare } from "bcryptjs";
-import { signAccessToken, signRefreshToken } from "@/lib/jwt";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+  signAccessToken,
+  signRefreshToken
+} from "@/lib/jwt";
 import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     const refreshToken = await signRefreshToken({ sub: user.id });
 
-    const expiresIn = 60 * 60;
+    const expiresIn = ACCESS_TOKEN_TTL_SECONDS;
 
     await prisma.session.create({
       data: {
@@ -94,7 +99,7 @@ export async function POST(req: NextRequest) {
       sameSite: "lax",
       secure: isProd,
       path: "/",
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: REFRESH_TOKEN_TTL_SECONDS
     });
 
     return res;

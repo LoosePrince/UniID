@@ -1,8 +1,10 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { prisma } from "./prisma";
 
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+// 登录有效期：7 天（Access Token）
+export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+// Refresh Token 默认有效期：7 天（保持不变，主要用于换发）
+export const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 function getSecret() {
   const secret = process.env.AUTH_JWT_SECRET;
@@ -30,7 +32,7 @@ export async function signAccessToken(payload: Omit<AccessTokenPayload, "iat" | 
     exp: now + ACCESS_TOKEN_TTL_SECONDS
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setSubject(payload.sub)
+    .setSubject(String(payload.sub))
     .sign(secret);
 }
 
@@ -44,7 +46,7 @@ export async function signRefreshToken(payload: { sub: string }) {
     exp: now + REFRESH_TOKEN_TTL_SECONDS
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setSubject(payload.sub)
+    .setSubject(String(payload.sub))
     .sign(secret);
 }
 
@@ -64,7 +66,7 @@ export async function verifyTokenWithAppIdCheck(
   providedAppId?: string
 ): Promise<{ valid: boolean; payload?: AccessTokenPayload; error?: string }> {
   let payload: AccessTokenPayload;
-  
+
   try {
     payload = await verifyToken(token);
   } catch (err) {
@@ -75,59 +77,80 @@ export async function verifyTokenWithAppIdCheck(
     return { valid: false, error: "NO_SUBJECT" };
   }
 
-  // 如果没有 origin（如同域请求或非浏览器请求），跳过 domain 验证
-  if (!origin) {
-    return { valid: true, payload };
-  }
-
-  // 开发环境本地请求跳过验证
-  const isDev = process.env.NODE_ENV !== "production";
-  if (isDev) {
-    try {
-      const url = new URL(origin);
-      const hostname = url.hostname;
-      if (
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1"
-      ) {
-        return { valid: true, payload };
-      }
-    } catch {
-      // 解析失败继续验证
-    }
-  }
-
   // 获取 Token 中的 app_id
   const tokenAppId = payload.app_id;
-  
+
   // 如果提供了 app_id 参数，优先使用提供的 app_id 进行验证
   // 否则使用 Token 中的 app_id
   const appIdToValidate = providedAppId || tokenAppId;
-  
+
   if (!appIdToValidate) {
     return { valid: false, error: "APP_ID_REQUIRED" };
   }
 
   try {
-    const originUrl = new URL(origin);
-    const originHost = originUrl.host;
+    // 1. 校验 app 配置与 Origin 是否匹配（如果提供了 Origin，且不是本地开发）
+    if (origin) {
+      const isDev = process.env.NODE_ENV !== "production";
+      let skipDomainCheck = false;
 
-    // 查询 app_id 对应的域名
-    const app = await prisma.app.findUnique({
-      where: { id: appIdToValidate }
-    });
+      // 简单解析 origin 中的 hostname（例如 https://example.com:3000/path）
+      const strippedOrigin = origin.replace(/^[a-zA-Z]+:\/\//, "");
+      const originHost = strippedOrigin.split("/")[0]; // host[:port]
+      const originHostname = originHost.split(":")[0];
 
-    if (!app) {
-      return { valid: false, error: "APP_NOT_FOUND" };
+      if (isDev) {
+        if (
+          originHostname === "localhost" ||
+          originHostname === "127.0.0.1" ||
+          originHostname === "::1"
+        ) {
+          skipDomainCheck = true;
+        }
+      }
+
+      if (!skipDomainCheck) {
+        // 查询 app_id 对应的域名
+        const app = await prisma.app.findUnique({
+          where: { id: appIdToValidate }
+        });
+
+        if (!app) {
+          return { valid: false, error: "APP_NOT_FOUND" };
+        }
+
+        if (app.domain !== originHost) {
+          return {
+            valid: false,
+            error: `APP_ID_ORIGIN_MISMATCH: app_id ${appIdToValidate} is registered to domain ${app.domain}, but request comes from ${originHost}`
+          };
+        }
+      }
     }
 
-    // 比较域名是否匹配
-    if (app.domain !== originHost) {
-      return {
-        valid: false,
-        error: `APP_ID_ORIGIN_MISMATCH: app_id ${appIdToValidate} is registered to domain ${app.domain}, but request comes from ${originHost}`
-      };
+    // 2. 校验授权记录是否仍然有效（实现“真取消”）
+    const now = Math.floor(Date.now() / 1000);
+    const userId = payload.sub;
+
+    const authorization = await prisma.authorization.findUnique({
+      where: {
+        userId_appId: {
+          userId,
+          appId: appIdToValidate
+        }
+      }
+    });
+
+    if (!authorization) {
+      return { valid: false, error: "AUTHORIZATION_NOT_FOUND" };
+    }
+
+    if (authorization.revoked === 1) {
+      return { valid: false, error: "AUTHORIZATION_REVOKED" };
+    }
+
+    if (authorization.expiresAt != null && authorization.expiresAt <= now) {
+      return { valid: false, error: "AUTHORIZATION_EXPIRED" };
     }
 
     return { valid: true, payload };

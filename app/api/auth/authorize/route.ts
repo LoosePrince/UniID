@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken, signAccessToken, signRefreshToken } from "@/lib/jwt";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+  verifyToken,
+  signAccessToken,
+  signRefreshToken
+} from "@/lib/jwt";
 import { isSameOriginAuthRequest, validateAppIdOriginMatch } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
@@ -112,6 +118,7 @@ export async function POST(req: NextRequest) {
     update: {
       authType,
       grantedAt: now,
+      expiresAt: now + 60 * 60 * 24 * 30, // 应用授权有效期：30 天
       revoked: 0
     },
     create: {
@@ -119,6 +126,7 @@ export async function POST(req: NextRequest) {
       appId: app.id,
       authType,
       grantedAt: now,
+      expiresAt: now + 60 * 60 * 24 * 30,
       revoked: 0,
       permissions: null
     }
@@ -133,7 +141,7 @@ export async function POST(req: NextRequest) {
   });
 
   const refreshToken = await signRefreshToken({ sub: user.id });
-  const expiresIn = 60 * 60;
+  const expiresIn = ACCESS_TOKEN_TTL_SECONDS;
 
   await prisma.session.create({
     data: {
@@ -175,7 +183,7 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     secure: isProd,
     path: "/",
-    maxAge: 60 * 60 * 24 * 7
+    maxAge: REFRESH_TOKEN_TTL_SECONDS
   });
 
   return res;

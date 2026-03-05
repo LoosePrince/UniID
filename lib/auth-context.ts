@@ -79,6 +79,19 @@ export async function getAuthContextFromRequest(
       };
     }
 
+    const now = Math.floor(Date.now() / 1000);
+    const session = await prisma.session.findUnique({
+      where: { token }
+    });
+
+    if (!session || session.userId !== user.id || session.expiresAt <= now) {
+      return {
+        ok: false,
+        status: 401,
+        error: "SESSION_EXPIRED"
+      };
+    }
+
     return {
       ok: true,
       user,

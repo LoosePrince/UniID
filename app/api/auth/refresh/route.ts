@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { signAccessToken, signRefreshToken, verifyToken } from "@/lib/jwt";
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  REFRESH_TOKEN_TTL_SECONDS,
+  signAccessToken,
+  signRefreshToken,
+  verifyToken
+} from "@/lib/jwt";
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
@@ -46,7 +52,7 @@ export async function POST(req: NextRequest) {
     });
 
     const newRefreshToken = await signRefreshToken({ sub: user.id });
-    const expiresIn = 60 * 60;
+    const expiresIn = ACCESS_TOKEN_TTL_SECONDS;
 
     await prisma.session.update({
       where: { id: session.id },
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       token: accessToken,
       refresh_token: newRefreshToken,
       expires_in: expiresIn,
@@ -68,6 +74,26 @@ export async function POST(req: NextRequest) {
         role: user.role
       }
     });
+
+    const isProd = process.env.NODE_ENV === "production";
+
+    res.cookies.set("uniid_token", accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      path: "/",
+      maxAge: ACCESS_TOKEN_TTL_SECONDS
+    });
+
+    res.cookies.set("uniid_refresh_token", newRefreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProd,
+      path: "/",
+      maxAge: REFRESH_TOKEN_TTL_SECONDS
+    });
+
+    return res;
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "INVALID_REFRESH_TOKEN" }, { status: 401 });
