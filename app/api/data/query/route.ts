@@ -36,23 +36,22 @@ export const POST = withDataCors(async function handler(
   const authHeader =
     req.headers.get("authorization") ?? req.headers.get("Authorization");
 
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "MISSING_TOKEN" }, { status: 401 });
+  let userId: string | null = null;
+  let authType: "full" | "restricted" = "restricted";
+  let isAuthenticated = false;
+
+  // 验证 Token（如果有）
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+
+    const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, body.app_id);
+    if (tokenValidation.valid) {
+      userId = tokenValidation.payload!.sub;
+      authType = tokenValidation.payload!.auth_type ?? "restricted";
+      isAuthenticated = true;
+    }
   }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
-
-  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, body.app_id);
-  if (!tokenValidation.valid) {
-    return NextResponse.json(
-      { error: tokenValidation.error || "INVALID_TOKEN" },
-      { status: 401 }
-    );
-  }
-
-  const userId = tokenValidation.payload!.sub;
-  const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
   const where: {
     appId: string;
@@ -74,21 +73,27 @@ export const POST = withDataCors(async function handler(
     }
   });
 
-  // 过滤出有读取权限的记录
-  const accessibleRecords = [];
-  for (const record of records) {
-    const hasPermission = await checkRecordPermission(
-      record.permissions,
-      userId,
-      record.appId,
-      record.ownerId,
-      "read",
-      authType
-    );
-    if (hasPermission) {
-      accessibleRecords.push(record);
+  // 过滤记录
+  let accessibleRecords = records;
+  
+  if (isAuthenticated && userId) {
+    // 已登录：进行权限验证
+    accessibleRecords = [];
+    for (const record of records) {
+      const hasPermission = await checkRecordPermission(
+        record.permissions,
+        userId,
+        record.appId,
+        record.ownerId,
+        "read",
+        authType
+      );
+      if (hasPermission) {
+        accessibleRecords.push(record);
+      }
     }
   }
+  // 未登录：返回所有记录（公开接口）
 
   // 获取所有者的用户信息
   const ownerIds = [...new Set(accessibleRecords.map(r => r.ownerId).filter(Boolean))];
@@ -118,4 +123,3 @@ export const POST = withDataCors(async function handler(
     }))
   });
 });
-

@@ -694,12 +694,23 @@
       // 加载帖子列表
       async function loadPosts() {
         try {
-          const result = await auth.query({
-            data_type: "post",
-            sort: { created_at: "desc" },
-            limit: 50
+          // 统一使用 /api/data/query 接口，根据有无 Token 返回不同数据
+          const headers = { "Content-Type": "application/json" };
+          if (auth.token) {
+            headers["Authorization"] = "Bearer " + auth.token;
+          }
+
+          const res = await fetch(auth.authServer + "/api/data/query", {
+            method: "POST",
+            headers,
+            credentials: "include",
+            body: JSON.stringify({
+              app_id: "demo-blog",
+              data_type: "post"
+            })
           });
 
+          const result = await res.json();
           state.posts = result.items || [];
           renderPosts();
         } catch (err) {
