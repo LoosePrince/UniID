@@ -455,20 +455,20 @@
     },
 
     /**
-     * 社交互动权限（点赞、评论等）
-     * @param {array} publicFields - 公开字段列表
+     * 嵌套对象权限（支持通配符）
+     * @param {object} options - 配置选项
+     * @param {string} options.pathPattern - 路径模式，如 "settings.*.value"
+     * @param {object} options.permissions - 权限配置 { read: [], write: [], delete: [] }
      * @returns {object}
      */
-    social: function (publicFields) {
-      publicFields = publicFields || ["title", "content"];
+    nested: function (options) {
+      options = options || {};
+      var pattern = options.pathPattern || "*";
+      var perms = options.permissions || { read: ["$owner"], write: ["$owner"] };
       var fields = {};
-      publicFields.forEach(function (field) {
-        fields[field] = { read: ["$public"], write: ["$owner"] };
-      });
-      fields.likes = { read: ["$public"], write: ["$dynamic:likes.$user"] };
-      fields.comments = { read: ["$public"], write: ["$dynamic:comments.$user"] };
+      fields[pattern] = perms;
       return {
-        default: { read: ["$public"], write: ["$owner"], delete: ["$owner"] },
+        default: { read: ["$owner"], write: ["$owner"], delete: ["$owner"] },
         fields: fields
       };
     }

@@ -382,6 +382,89 @@ export async function removeAppAdmin(appId: string, userId: string): Promise<boo
 }
 
 /**
+ * 匹配字段路径（支持通配符 *）
+ * @param pattern 权限配置中的路径模式，如 "likes.*.time"
+ * @param fieldPath 实际的字段路径，如 "likes.user123.time"
+ * @returns 是否匹配
+ */
+function matchFieldPath(pattern: string, fieldPath: string): boolean {
+  const patternParts = pattern.split('.');
+  const pathParts = fieldPath.split('.');
+  
+  // 如果模式以 * 结尾，匹配任意后缀
+  if (patternParts[patternParts.length - 1] === '*') {
+    // 去掉 * 后比较前缀
+    const prefixPattern = patternParts.slice(0, -1);
+    const prefixPath = pathParts.slice(0, prefixPattern.length);
+    
+    if (prefixPattern.length > pathParts.length) {
+      return false;
+    }
+    
+    for (let i = 0; i < prefixPattern.length; i++) {
+      if (prefixPattern[i] !== '*' && prefixPattern[i] !== prefixPath[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  
+  // 精确匹配长度
+  if (patternParts.length !== pathParts.length) {
+    return false;
+  }
+  
+  // 逐部分匹配，* 匹配任意值
+  for (let i = 0; i < patternParts.length; i++) {
+    if (patternParts[i] !== '*' && patternParts[i] !== pathParts[i]) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * 查找字段权限（支持继承和覆盖）
+ * 子级覆盖父级，最长匹配优先
+ * @param fieldsConfig 字段权限配置
+ * @param fieldPath 字段路径
+ * @param action 操作类型
+ * @returns 权限列表或 null
+ */
+function findFieldPermission(
+  fieldsConfig: Record<string, any>,
+  fieldPath: string,
+  action: string
+): string[] | null {
+  // 收集所有匹配的模式
+  const matches: { pattern: string; depth: number; perms: string[] }[] = [];
+  
+  for (const [pattern, config] of Object.entries(fieldsConfig)) {
+    if (matchFieldPath(pattern, fieldPath)) {
+      const actionPerms = config?.[action];
+      if (Array.isArray(actionPerms)) {
+        matches.push({
+          pattern,
+          depth: pattern.split('.').length,
+          perms: actionPerms
+        });
+      }
+    }
+  }
+  
+  if (matches.length === 0) {
+    return null;
+  }
+  
+  // 按深度降序排序，最深的（最具体的）优先
+  matches.sort((a, b) => b.depth - a.depth);
+  
+  // 返回最具体的匹配
+  return matches[0].perms;
+}
+
+/**
  * 检查用户对特定字段是否有指定权限
  * @param permissions 记录的权限配置 JSON 字符串
  * @param userId 当前用户 ID
@@ -568,22 +651,21 @@ export async function checkFieldPermission(
     return false;
   }
 
-  // 1. 检查字段特定权限中的公开权限（所有模式都适用）
+  // 1. 使用新的权限查找逻辑（支持通配符和继承）
   const fieldsConfig = permConfig.fields || {};
-  const fieldConfig = fieldsConfig[fieldPath];
-
-  if (fieldConfig && typeof fieldConfig === "object") {
-    const actionPerms = fieldConfig[action];
-    if (Array.isArray(actionPerms)) {
-      for (const perm of actionPerms) {
-        if (perm === "$all" || perm === "$anyone" || perm === "$public") {
+  
+  // 查找字段特定权限（支持通配符匹配，子级覆盖父级）
+  const fieldActionPerms = findFieldPermission(fieldsConfig, fieldPath, action);
+  
+  if (fieldActionPerms) {
+    for (const perm of fieldActionPerms) {
+      if (perm === "$all" || perm === "$anyone" || perm === "$public") {
+        return true;
+      }
+      // 检查动态权限（如果有数据值）
+      if (perm.startsWith("$dynamic:") && dataValue !== undefined) {
+        if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
           return true;
-        }
-        // 检查动态权限（如果有数据值）
-        if (perm.startsWith("$dynamic:") && dataValue !== undefined) {
-          if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
-            return true;
-          }
         }
       }
     }
@@ -604,14 +686,11 @@ export async function checkFieldPermission(
   // 但动态权限在 restricted 模式下也应该被检查
   if (authType === "restricted") {
     // 再次检查动态权限（如果有数据值）
-    if (fieldConfig && typeof fieldConfig === "object" && dataValue !== undefined) {
-      const actionPerms = fieldConfig[action];
-      if (Array.isArray(actionPerms)) {
-        for (const perm of actionPerms) {
-          if (perm.startsWith("$dynamic:")) {
-            if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
-              return true;
-            }
+    if (fieldActionPerms && dataValue !== undefined) {
+      for (const perm of fieldActionPerms) {
+        if (perm.startsWith("$dynamic:")) {
+          if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
+            return true;
           }
         }
       }
@@ -640,13 +719,11 @@ export async function checkFieldPermission(
   };
 
   // 3. 完整授权模式下，检查字段特定权限（使用异步版本以支持 $role）
-  if (fieldConfig && typeof fieldConfig === "object") {
-    const actionPerms = fieldConfig[action];
-    if (Array.isArray(actionPerms)) {
-      for (const perm of actionPerms) {
-        if (await resolvePermissionVariableAsync(perm, context)) {
-          return true;
-        }
+  // 使用新的权限查找逻辑（支持通配符和继承）
+  if (fieldActionPerms) {
+    for (const perm of fieldActionPerms) {
+      if (await resolvePermissionVariableAsync(perm, context)) {
+        return true;
       }
     }
   }

@@ -199,6 +199,14 @@ CREATE TABLE verification_tokens (
 -- $user:{id}: 指定用户
 -- $role:{role}: 指定角色
 -- $dynamic:{path}: 动态路径，{path}中的$user会被替换为当前用户ID
+
+-- 通配符权限支持
+-- 使用 * 匹配任意路径段，支持子级覆盖父级
+-- 示例：
+--   "likes.*.time" 匹配 "likes.user123.time"
+--   "likes.*" 匹配 "likes.user123"
+--   "*" 匹配任意单层路径
+-- 权限继承规则：子级配置覆盖父级配置，最长匹配优先
 ```
 
 ## 四、授权流程
@@ -550,15 +558,21 @@ class AuthSDK {
         return this.revoke();
     }
 
-    _fetch(method, path, body) {
-        if (!this.token) {
-            this._restoreTokenFromCookie();
-        }
-        if (!this.token) {
-            return Promise.reject(new Error("NO_TOKEN"));
+    _fetch(method, path, body, requireAuth) {
+        requireAuth = requireAuth !== false; // 默认需要认证
+        if (requireAuth) {
+            if (!this.token) {
+                this._restoreTokenFromCookie();
+            }
+            if (!this.token) {
+                return Promise.reject(new Error("NO_TOKEN"));
+            }
         }
         var url = this.authServer + path;
-        var headers = { Authorization: "Bearer " + this.token };
+        var headers = {};
+        if (this.token) {
+            headers.Authorization = "Bearer " + this.token;
+        }
         var init = { method: method, headers: headers, credentials: "include" };
         if (body != null) {
             headers["Content-Type"] = "application/json";
@@ -570,6 +584,23 @@ class AuthSDK {
         });
     }
 }
+
+// ==================== 权限配置工具 ====================
+// AuthSDK.Permissions 提供常用权限配置的快速生成方法：
+// - private()     : 仅所有者可见
+// - public()      : 所有人可见
+// - appOnly()     : 仅同应用用户可见
+// - custom(opt)   : 自定义权限
+// - withFields()  : 带字段级权限（支持通配符 *）
+// - nested(opt)   : 嵌套对象权限
+// 详见 SDK 源码注释
+
+// ==================== 数据处理工具 ====================
+// AuthSDK.Utils 提供数据操作辅助方法：
+// - deepMerge(target, source) : 深合并对象
+// - getByPath(obj, path)      : 根据路径获取值
+// - setByPath(obj, path, val) : 根据路径设置值
+// 详见 SDK 源码注释
 ```
 
 ### 6.2 使用示例
@@ -594,39 +625,23 @@ async function handleLogin() {
     console.log('登录成功:', result.user);
 }
 
-// 创建帖子
+// 创建帖子（使用通用权限配置）
 async function createPost() {
     const post = await auth.create('post', {
         title: 'Hello World',
-        content: 'This is my first post',
-        metadata: {
-            tags: ['test'],
-            comments: {}
-        }
-    }, {
-        fields: {
-            'data.title': {
-                read: ['$all'],
-                write: ['$owner']
-            },
-            'data.metadata.comments': {
-                read: ['$all'],
-                write: ['$dynamic:comments.$user']
-            }
-        }
-    });
+        content: 'This is my first post'
+    }, AuthSDK.Permissions.public());
     return post;
 }
 
-// 用户评论
-async function addComment(postId, userId, comment) {
-    await auth.update(postId, {
-        metadata: {
-            comments: {
-                [userId]: comment
-            }
-        }
+// 使用通配符权限（详见 demo/index.html 完整示例）
+async function createWithWildcardPermissions() {
+    const permissions = AuthSDK.Permissions.withFields({
+        'likes': { read: ['$public'], write: ['$dynamic:likes.$user'] },
+        'likes.*.time': { read: ['$public'], write: ['$dynamic:likes.$user'], delete: ['$app'] }
     });
+    const post = await auth.create('post', data, permissions);
+    return post;
 }
 
 // 查询帖子
@@ -676,51 +691,7 @@ async function handleLogout() {
 - 跨应用数据访问需额外授权
 - 敏感字段加密存储
 
-## 八、Demo 示例站点
+## 八、Demo 示例
 
-### 8.1 访问方式
-
-- 在开发环境启动 Next.js 服务后，可直接访问：
-  - `http://localhost:3000/demo/index.html`
 - 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/uniid.sdk.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
 - 源码位于项目根目录的 `demo/index.html`
-
-### 8.2 示例流程
-
-- 初始化 SDK（在 `demo/index.html` 中）：
-
-```html
-<script src="/sdk/uniid.sdk.js"></script>
-<script>
-  const auth = new window.AuthSDK({
-    authServer: window.location.origin,
-    appId: "demo-blog"
-  });
-</script>
-```
-
-- 登录 / 授权：
-  - 点击页面右上角“登录 / 授权”按钮。
-  - SDK 会通过隐藏 iframe 打开 UniID 的登录与授权流程，并在授权完成后通过 `postMessage` 返回 token 与用户信息。
-  - Demo 页面根据返回的 `user` 更新登录状态显示。
-
-- 发表帖子：
-  - 在“发表新帖子”表单中填写标题与内容，点击“发布帖子”。
-  - Demo 会调用：
-
-```js
-await auth.create("post", data, permissions);
-```
-
-  - 后端将数据写入 `records` 表，并返回记录 ID 与权限配置；Demo 会在页面右侧列表中展示本次会话创建的帖子。
-
-### 8.3 与 CORS / 应用白名单的关系
-
-- Demo 默认与 UniID 服务同域部署（如 `http://localhost:3000/demo`），请求的 `Origin` 为当前站点地址。
-- 数据 API `/api/data/*` 仍受 CORS 白名单控制：
-  - 通过 `apps` 表中的 `domain` 字段判断是否允许该 Origin。
-  - 推荐在 `apps` 表中创建一个应用：
-    - `id`: `demo-blog`
-    - `domain`: `localhost:3000`（或实际部署域名）
-- 示例站点只是一个使用 SDK 的参考实现，真实外部网站可以拷贝 `public/demo/index.html` 的结构，并将 `authServer` 与 `appId` 替换为自己的配置。
-
