@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withDataCors, handleDataApiOptions } from "@/lib/cors";
-import { verifyToken } from "@/lib/jwt";
+import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 
@@ -31,15 +31,17 @@ export const POST = withDataCors(async function handler(
   }
 
   const token = authHeader.slice("Bearer ".length).trim();
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
 
-  let userId: string;
-  try {
-    const payload = await verifyToken(token);
-    userId = payload.sub as string;
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
+  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, appId);
+  if (!tokenValidation.valid) {
+    return NextResponse.json(
+      { error: tokenValidation.error || "INVALID_TOKEN" },
+      { status: 401 }
+    );
   }
+
+  const userId = tokenValidation.payload!.sub;
 
   const body = (await req.json().catch(() => null)) as
     | {

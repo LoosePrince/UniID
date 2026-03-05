@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withDataCors, handleDataApiOptions } from "@/lib/cors";
-import { verifyToken } from "@/lib/jwt";
+import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
+import { checkRecordPermission } from "@/lib/permissions";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -40,13 +41,17 @@ export const POST = withDataCors(async function handler(
   }
 
   const token = authHeader.slice("Bearer ".length).trim();
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
 
-  try {
-    await verifyToken(token);
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
+  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, body.app_id);
+  if (!tokenValidation.valid) {
+    return NextResponse.json(
+      { error: tokenValidation.error || "INVALID_TOKEN" },
+      { status: 401 }
+    );
   }
+
+  const userId = tokenValidation.payload!.sub;
 
   const where: {
     appId: string;
@@ -68,9 +73,24 @@ export const POST = withDataCors(async function handler(
     }
   });
 
+  // 过滤出有读取权限的记录
+  const accessibleRecords = [];
+  for (const record of records) {
+    const hasPermission = await checkRecordPermission(
+      record.permissions,
+      userId,
+      record.appId,
+      record.ownerId,
+      "read"
+    );
+    if (hasPermission) {
+      accessibleRecords.push(record);
+    }
+  }
+
   return NextResponse.json({
-    total: records.length,
-    items: records.map((record) => ({
+    total: accessibleRecords.length,
+    items: accessibleRecords.map((record) => ({
       id: record.id,
       app_id: record.appId,
       owner_id: record.ownerId,

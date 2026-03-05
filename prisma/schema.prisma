@@ -50,6 +50,7 @@ model App {
   status      String   @default("active")
   apiKey      String?  @unique
   settings    String? // JSON string
+  adminIds    String?  // JSON array of user IDs who are app admins
 
   owner          User            @relation("UserApps", fields: [ownerId], references: [id])
   authorizations Authorization[]

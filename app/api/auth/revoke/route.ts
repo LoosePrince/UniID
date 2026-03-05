@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/lib/jwt";
+import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 import { handleDataApiOptions } from "@/lib/cors";
 
@@ -81,16 +81,12 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  let userId: string;
-  try {
-    const payload = await verifyToken(token);
-    if (!payload.sub) {
-      throw new Error("NO_SUBJECT");
-    }
-    userId = payload.sub as string;
-  } catch (err) {
-    console.error(err);
-    const res = NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
+  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, appId);
+  if (!tokenValidation.valid) {
+    const res = NextResponse.json(
+      { error: tokenValidation.error || "INVALID_TOKEN" },
+      { status: 401 }
+    );
     if (allowedOrigin) {
       res.headers.set("Access-Control-Allow-Origin", allowedOrigin);
       res.headers.set("Vary", "Origin");
@@ -98,6 +94,8 @@ export async function POST(req: NextRequest) {
     }
     return res;
   }
+
+  const userId = tokenValidation.payload!.sub;
 
   const now = Math.floor(Date.now() / 1000);
 
