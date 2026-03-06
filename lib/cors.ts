@@ -2,9 +2,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type DataApiHandler = (
+type DataApiHandler<TParams extends Record<string, string> = Record<string, string>> = (
   req: NextRequest,
-  context: { params: Record<string, string> }
+  context: { params: TParams }
 ) => Promise<NextResponse>;
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -76,10 +76,12 @@ export async function handleDataApiOptions(
   return res;
 }
 
-export function withDataCors(handler: DataApiHandler) {
+export function withDataCors<TParams extends Record<string, string> = Record<string, string>>(
+  handler: DataApiHandler<TParams>
+) {
   return async function wrapped(
     req: NextRequest,
-    context: { params: Record<string, string> }
+    context: { params: TParams }
   ): Promise<NextResponse> {
     if (req.method === "OPTIONS") {
       return handleDataApiOptions(req);

@@ -1,9 +1,9 @@
-"use client";
+ "use client";
 
+import { Suspense, useEffect, useState } from "react";
 import { PrimaryButton, SecondaryButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 
 type Step = "idle" | "checking" | "authorize" | "done";
 
@@ -13,7 +13,7 @@ interface EmbedUser {
   role: string;
 }
 
-export default function EmbedPage() {
+function EmbedPageContent() {
   const searchParams = useSearchParams();
   const appId = searchParams.get("app_id") ?? "";
   // 从 URL 参数中恢复 parentOrigin（登录后返回时使用）
@@ -292,6 +292,27 @@ export default function EmbedPage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function EmbedPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-50">
+          <main className="w-full max-w-md">
+            <Card className="space-y-2 text-sm">
+              <h1 className="text-base font-semibold text-slate-50">
+                UniID 授权中心
+              </h1>
+              <p className="text-xs text-slate-400">正在加载授权页面...</p>
+            </Card>
+          </main>
+        </div>
+      }
+    >
+      <EmbedPageContent />
+    </Suspense>
   );
 }
 

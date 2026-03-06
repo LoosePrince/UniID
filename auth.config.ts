@@ -18,7 +18,11 @@ export const authConfig = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.username || !credentials.password) {
+        if (
+          !credentials ||
+          typeof credentials.username !== "string" ||
+          typeof credentials.password !== "string"
+        ) {
           return null;
         }
 
@@ -30,10 +34,7 @@ export const authConfig = {
           return null;
         }
 
-        const isValid = await compare(
-          credentials.password,
-          user.passwordHash
-        );
+        const isValid = await compare(credentials.password, user.passwordHash);
 
         if (!isValid) {
           return null;

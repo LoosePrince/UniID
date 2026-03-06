@@ -89,8 +89,14 @@ export const POST = withDataCors(async function handler(
     }
   }
 
-  // 获取所有者的用户信息
-  const ownerIds = [...new Set(accessibleRecords.map(r => r.ownerId).filter(Boolean))];
+  // 获取所有者的用户信息（过滤掉 null，保证是 string[]）
+  const ownerIds = Array.from(
+    new Set(
+      accessibleRecords
+        .map((r) => r.ownerId)
+        .filter((id): id is string => !!id)
+    )
+  );
   const users = await prisma.user.findMany({
     where: {
       id: { in: ownerIds }

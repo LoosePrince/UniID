@@ -71,11 +71,11 @@ async function resolvePermissionVariableAsync(
 }
 
 /**
- * 解析权限配置中的变量
+ * 解析权限配置中的变量（同步接口的异步实现，当前未对外使用）
  * @param perm 权限字符串
  * @param context 上下文信息
  */
-function resolvePermissionVariable(
+async function resolvePermissionVariable(
   perm: string,
   context: {
     userId: string;
@@ -84,7 +84,7 @@ function resolvePermissionVariable(
     appAdmin: boolean;
     systemAdmin: boolean;
   }
-): boolean {
+): Promise<boolean> {
   // 系统管理员拥有所有权限
   if (context.systemAdmin) {
     return true;
@@ -118,7 +118,7 @@ function resolvePermissionVariable(
       // 检查特定角色权限: $role:{role}
       if (perm.startsWith("$role:")) {
         const targetRole = perm.slice(6);
-        return checkUserRole(context.userId, targetRole);
+        return await checkUserRole(context.userId, targetRole);
       }
       // 直接匹配用户ID
       return perm === context.userId;
@@ -749,23 +749,32 @@ export function mergeFieldPermissions(
   current: Record<string, any>,
   updates: Record<string, any>
 ): Record<string, any> {
-  const merged = { ...current };
+  const merged: Record<string, any> = { ...current };
 
   // 合并 default 配置
   if (updates.default) {
-    merged.default = { ...merged.default, ...updates.default };
+    const currentDefault = (merged.default ?? {}) as Record<string, any>;
+    const updatesDefault = updates.default as Record<string, any>;
+    merged.default = { ...currentDefault, ...updatesDefault };
   }
 
   // 合并 fields 配置
   if (updates.fields) {
-    merged.fields = { ...merged.fields };
-    for (const [fieldPath, fieldConfig] of Object.entries(updates.fields)) {
-      if (merged.fields[fieldPath]) {
-        merged.fields[fieldPath] = { ...merged.fields[fieldPath], ...fieldConfig };
+    const currentFields = (merged.fields ?? {}) as Record<string, Record<string, any>>;
+    const updatesFields = updates.fields as Record<string, Record<string, any>>;
+
+    const newFields: Record<string, Record<string, any>> = { ...currentFields };
+
+    for (const [fieldPath, fieldConfig] of Object.entries(updatesFields)) {
+      const existingConfig = newFields[fieldPath] ?? {};
+      if (newFields[fieldPath]) {
+        newFields[fieldPath] = { ...existingConfig, ...fieldConfig };
       } else {
-        merged.fields[fieldPath] = fieldConfig;
+        newFields[fieldPath] = { ...fieldConfig };
       }
     }
+
+    merged.fields = newFields;
   }
 
   return merged;

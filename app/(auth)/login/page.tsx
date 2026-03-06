@@ -1,12 +1,12 @@
-"use client";
+ "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { PrimaryButton } from "@/components/ui/button";
 import { PasswordInput, TextInput } from "@/components/ui/input";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo");
@@ -105,6 +105,14 @@ export default function LoginPage() {
         </div>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="w-full max-w-md text-sm text-slate-300">加载中...</main>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
 
