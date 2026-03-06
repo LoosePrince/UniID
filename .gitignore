@@ -23,8 +23,9 @@ Thumbs.db
 !.vscode/extensions.json
 
 ### Prisma / Databases
-prisma/dev.db
-prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations
 
 ### Testing / Coverage
 coverage
