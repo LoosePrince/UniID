@@ -7,8 +7,15 @@ import {
   signAccessToken,
   signRefreshToken
 } from "@/lib/jwt";
+import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginAuthRequest(req)) {
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
   try {
     const body = await req.json().catch(() => null);
     const { username, password, email } = (body ?? {}) as {

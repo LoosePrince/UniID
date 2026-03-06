@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContextFromRequest } from "@/lib/auth-context";
 import { verifyToken } from "@/lib/jwt";
+import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function GET(req: NextRequest) {
+  if (!isSameOriginAuthRequest(req)) {
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
   const auth = await getAuthContextFromRequest(req);
 
   if (!auth.ok) {
@@ -39,6 +46,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  if (!isSameOriginAuthRequest(req)) {
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
   const auth = await getAuthContextFromRequest(req);
 
   if (!auth.ok) {

@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { compare, hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getAuthContextFromRequest } from "@/lib/auth-context";
+import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginAuthRequest(req)) {
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
   const auth = await getAuthContextFromRequest(req);
 
   if (!auth.ok) {

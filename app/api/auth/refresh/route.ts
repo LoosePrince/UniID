@@ -7,8 +7,15 @@ import {
   signRefreshToken,
   verifyToken
 } from "@/lib/jwt";
+import { isSameOriginAuthRequest } from "@/lib/origin";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginAuthRequest(req)) {
+    return NextResponse.json(
+      { error: "CROSS_ORIGIN_AUTH_FORBIDDEN" },
+      { status: 403 }
+    );
+  }
   const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
 
   if (!authHeader?.startsWith("Bearer ")) {

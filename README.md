@@ -236,6 +236,37 @@ CREATE TABLE verification_tokens (
 6. 网站保存token，后续API调用携带token
 ```
 
+### 4.3 可信授权链路
+
+授权流程**全程只信任浏览器生成的 Origin**，不信任任何可自定义内容（URL 参数、`event.data` 等），确保父页面身份不可伪造。
+
+#### 可信来源
+
+| 环节 | 可信来源 | 说明 |
+|------|----------|------|
+| 请求来自 UniID | HTTP `Origin` 头 | 由 `isSameOriginAuthRequest` 校验，确保请求发自 UniID 自身 |
+| 父页面身份 | `postMessage` 的 `event.origin` | 浏览器在 `postMessage` 时自动设置，父页面无法伪造 |
+| 应用域名匹配 | `parent_origin`（来自 `event.origin`） | Embed 仅从 `event.origin` 读取并传给后端，与 `app.domain` 比对 |
+
+#### 流程说明
+
+1. **父页面发起**：父页面（如 `http://example.com`）加载 SDK，创建 iframe `src="/embed?app_id=xxx"`（不传 `parent_origin`，传了也没用）
+2. **iframe 加载**：SDK 的 `iframe.onload` 向 iframe 发送 `postMessage({ type: "uniid_init" })`
+3. **获取父页面 Origin**：Embed 收到消息时，**仅从 `event.origin` 读取**父页面 Origin，存入状态
+4. **登录检查**：若未登录，重定向到 `/login?redirectTo=/embed?app_id=xxx`（不携带 `parent_origin`）
+5. **登录返回**：返回 Embed 后，SDK 再次发送 `uniid_init`，Embed 再次从 `event.origin` 获取父页面 Origin
+6. **授权请求**：用户点击「同意并授权」时，Embed 将 `parent_origin`（来自 `event.origin`）随请求体发送给 `/api/auth/authorize`
+7. **后端校验**：
+   - 请求 `Origin` 必须在 `AUTH_ALLOWED_ORIGINS` 内（请求来自 UniID）
+   - 必须提供 `parent_origin`，否则 400
+   - `parent_origin` 的 host 必须与 `app.domain` 一致，否则 403
+
+#### 不可信来源（已排除）
+
+- URL 参数 `parent_origin`：父页面可篡改
+- `event.data` 中的任何字段：父页面可伪造
+- 自定义请求头（如 `X-Parent-Origin`）：客户端可伪造
+
 ## 五、API设计
 
 ### 5.1 认证相关
