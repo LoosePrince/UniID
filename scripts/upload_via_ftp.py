@@ -52,6 +52,18 @@ def parse_args() -> argparse.Namespace:
         help="Local project root to upload (default: current directory).",
     )
 
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Always upload files even if remote size is the same. Can also be enabled via FTP_OVERWRITE.",
+    )
+
+    parser.add_argument(
+        "--only-next",
+        action="store_true",
+        help="Only upload the .next build directory and delete remote .next before upload. Can also be enabled via FTP_ONLY_NEXT.",
+    )
+
     return parser.parse_args()
 
 
@@ -70,7 +82,7 @@ def parse_ftp_url(url: str) -> Tuple[Optional[str], Optional[int], Optional[str]
     return host, port, user, password, remote_dir
 
 
-def resolve_config(args: argparse.Namespace) -> Tuple[str, int, str, str, str, Path, Optional[Path]]:
+def resolve_config(args: argparse.Namespace) -> Tuple[str, int, str, str, str, Path, Optional[Path], bool, bool]:
     url_host = url_port = url_user = url_password = url_remote_dir = None
     if args.url:
         url_host, url_port, url_user, url_password, url_remote_dir = parse_ftp_url(args.url)
@@ -80,12 +92,32 @@ def resolve_config(args: argparse.Namespace) -> Tuple[str, int, str, str, str, P
     env_user = os.getenv("FTP_USER")
     env_password = os.getenv("FTP_PASS")
     env_remote_dir = os.getenv("FTP_TARGET_DIR")
+    env_overwrite = os.getenv("FTP_OVERWRITE")
+    env_only_next = os.getenv("FTP_ONLY_NEXT")
 
     host = args.host or env_host or url_host or "47.107.172.203"
     port = args.port or (int(env_port) if env_port else None) or url_port or 21
     user = args.user or env_user or url_user or "UniID"
     password = args.password or env_password or url_password or "aHmcRxMhcXFe"
     remote_dir = args.remote_dir or env_remote_dir or url_remote_dir or "/"
+
+    # 覆盖模式：命令行优先，其次环境变量（FTP_OVERWRITE=1/true/yes/on）
+    overwrite = bool(
+        getattr(args, "overwrite", False)
+        or (
+            env_overwrite
+            and env_overwrite.strip().lower() in ("1", "true", "yes", "on")
+        )
+    )
+
+    # 仅推送构建（.next）模式：命令行优先，其次环境变量（FTP_ONLY_NEXT=1/true/yes/on）
+    only_next = bool(
+        getattr(args, "only_next", False)
+        or (
+            env_only_next
+            and env_only_next.strip().lower() in ("1", "true", "yes", "on")
+        )
+    )
 
     if not host:
         raise SystemExit("FTP host is required but not provided.")
@@ -105,7 +137,7 @@ def resolve_config(args: argparse.Namespace) -> Tuple[str, int, str, str, str, P
     elif gitignore_parent.is_file():
         gitignore_path = gitignore_parent
 
-    return host, int(port), user, password, remote_dir, project_root, gitignore_path
+    return host, int(port), user, password, remote_dir, project_root, gitignore_path, overwrite, only_next
 
 
 def load_gitignore_spec(gitignore_path: Optional[Path], project_root: Path):
@@ -178,6 +210,63 @@ def ensure_remote_dir(ftp: ftplib.FTP, remote_dir: str) -> None:
                 raise
 
 
+def delete_remote_dir_recursive(ftp: ftplib.FTP, remote_dir: str) -> None:
+    """
+    递归删除远端目录及其所有子文件/子目录。
+    如果目录不存在，则静默返回。
+    """
+    # 优先使用 MLSD（如果服务器支持），否则回退到 NLST + 探测目录/文件
+    try:
+        entries = list(ftp.mlsd(remote_dir))
+    except (ftplib.error_perm, AttributeError):
+        # MLSD 不可用或目录不存在时的回退逻辑
+        try:
+            names = ftp.nlst(remote_dir)
+        except ftplib.error_perm as e:
+            # 目录不存在时直接返回
+            if not str(e).startswith("550"):
+                raise
+            return
+
+        for name in names:
+            # 某些服务器会返回完整路径，某些只返回名称，两者都直接当成路径使用
+            full_path = name
+            if full_path in (".", ".."):
+                continue
+            try:
+                ftp.delete(full_path)
+            except ftplib.error_perm:
+                # 不是文件，当作目录递归删除
+                delete_remote_dir_recursive(ftp, full_path)
+
+        try:
+            ftp.rmd(remote_dir)
+        except ftplib.error_perm as e:
+            if not str(e).startswith("550"):
+                raise
+        return
+
+    # 使用 MLSD 时，可以通过 facts 判断类型
+    for name, facts in entries:
+        if name in (".", ".."):
+            continue
+        full_path = f"{remote_dir.rstrip('/')}/{name}"
+        if facts.get("type") == "dir":
+            delete_remote_dir_recursive(ftp, full_path)
+        else:
+            try:
+                ftp.delete(full_path)
+            except ftplib.error_perm as e:
+                if not str(e).startswith("550"):
+                    raise
+
+    try:
+        ftp.rmd(remote_dir)
+    except ftplib.error_perm as e:
+        if not str(e).startswith("550"):
+            raise
+
+
 def upload_project(
     host: str,
     port: int,
@@ -186,6 +275,8 @@ def upload_project(
     remote_dir: str,
     project_root: Path,
     gitignore_path: Optional[Path],
+    overwrite: bool,
+    only_next: bool,
 ) -> int:
     logger.info("Connecting to FTP %s:%s as %s", host, port, user)
     ftp = ftplib.FTP()
@@ -207,14 +298,46 @@ def upload_project(
         ensure_remote_dir(ftp, remote_dir)
         ftp.cwd(remote_dir)
 
+        logger.info("Overwrite mode: %s", "ON" if overwrite else "OFF")
+        logger.info("Only .next mode: %s", "ON" if only_next else "OFF")
+
         is_ignored_func = load_gitignore_spec(gitignore_path, project_root)
+
+        # 根据模式确定本地上传根目录与远端根目录
+        local_root = project_root
+        remote_upload_root = remote_dir
+
+        if only_next:
+            local_root = project_root / ".next"
+            if not local_root.is_dir():
+                logger.error("Only-next mode is enabled but local .next directory does not exist: %s", local_root)
+                return 1
+
+            remote_upload_root = str((Path(remote_dir) / ".next").as_posix())
+            logger.info("Uploading only build directory '.next'")
+            logger.info("Remote build root: %s", remote_upload_root)
+
+            # 删除远端 .next 目录后再上传
+            try:
+                logger.info("Deleting remote build directory before upload: %s", remote_upload_root)
+                delete_remote_dir_recursive(ftp, remote_upload_root)
+            except Exception as e:
+                logger.error("Failed to delete remote build directory %s: %s", remote_upload_root, e)
+                return 1
+
+            # 在仅 .next 模式下，不再应用 .gitignore 过滤规则（通常 .gitignore 会忽略 .next）
+            # 否则会导致 .next 下所有内容都被排除，只创建空目录
+            is_ignored_func = None
+
+        # 确保上传根目录存在
+        ensure_remote_dir(ftp, remote_upload_root)
 
         script_path = Path(__file__).resolve()
         extra_excludes = [script_path]
 
         # 先收集所有待处理文件，用于进度统计
         all_files: List[Tuple[Path, Path]] = list(
-            iter_files(project_root, extra_excludes, is_ignored_func)
+            iter_files(local_root, extra_excludes, is_ignored_func)
         )
         total_files = len(all_files)
 
@@ -235,10 +358,10 @@ def upload_project(
             percent = (index / total_files * 100) if total_files else 100.0
             progress_prefix = f"[{index}/{total_files} {percent:5.1f}%]"
 
-            remote_file_dir = str((Path(remote_dir) / rel_path.parent).as_posix())
-            if remote_file_dir != remote_dir:
+            remote_file_dir = str((Path(remote_upload_root) / rel_path.parent).as_posix())
+            if remote_file_dir != remote_upload_root:
                 ensure_remote_dir(ftp, remote_file_dir)
-            remote_path = str((Path(remote_dir) / rel_path).as_posix())
+            remote_path = str((Path(remote_upload_root) / rel_path).as_posix())
 
             # 更新模式：如果远端已有同名文件且大小与本地一致，则跳过
             try:
@@ -265,7 +388,7 @@ def upload_project(
                 )
                 remote_size = None
 
-            if remote_size is not None and int(remote_size) == int(local_size):
+            if (not overwrite) and remote_size is not None and int(remote_size) == int(local_size):
                 # 相同大小，视为已同步，更新进度条但不额外打印日志
                 print_progress(
                     f"{progress_prefix} Skipping {rel_path.as_posix()} (same size, {local_size} bytes)",
@@ -303,7 +426,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     args = parse_args()
     try:
-        host, port, user, password, remote_dir, project_root, gitignore_path = resolve_config(args)
+        host, port, user, password, remote_dir, project_root, gitignore_path, overwrite, only_next = resolve_config(args)
     except SystemExit as e:
         logger.error(str(e))
         raise
@@ -322,6 +445,8 @@ def main() -> None:
         remote_dir=remote_dir,
         project_root=project_root,
         gitignore_path=gitignore_path,
+        overwrite=overwrite,
+        only_next=only_next,
     )
     raise SystemExit(exit_code)
 

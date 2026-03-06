@@ -1,13 +1,16 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
-  verifyToken,
   signAccessToken,
-  signRefreshToken
+  signRefreshToken,
+  verifyToken
 } from "@/lib/jwt";
-import { isSameOriginAuthRequest, validateAppIdOriginMatch } from "@/lib/origin";
+import {
+  isSameOriginAuthRequest,
+  validateAppIdOriginMatchWithOrigin
+} from "@/lib/origin";
+import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   if (!isSameOriginAuthRequest(req)) {
@@ -18,11 +21,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { app_id?: string; auth_type?: string }
+    | { app_id?: string; auth_type?: string; parent_origin?: string | null }
     | null;
 
   const appId = body?.app_id;
   const authType = body?.auth_type;
+  const parentOrigin = body?.parent_origin ?? null;
 
   if (!appId || (authType !== "full" && authType !== "restricted")) {
     return NextResponse.json(
@@ -31,8 +35,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 验证 app_id 与 Origin 是否匹配
-  const validation = await validateAppIdOriginMatch(req, appId);
+  // embed 流程必须提供 parent_origin（iframe 从 postMessage 的 event.origin 获取，浏览器生成）
+  // 请求 Origin 已由 isSameOriginAuthRequest 验证为 uniid 自身
+  if (!parentOrigin) {
+    return NextResponse.json(
+      { error: "MISSING_PARENT_ORIGIN" },
+      { status: 400 }
+    );
+  }
+
+  const validation = await validateAppIdOriginMatchWithOrigin(appId, parentOrigin);
   if (!validation.valid) {
     return NextResponse.json(
       { error: validation.error || "FORBIDDEN" },
@@ -172,7 +184,7 @@ export async function POST(req: NextRequest) {
 
   res.cookies.set("uniid_token", appAccessToken, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: isProd ? "none" : "lax",
     secure: isProd,
     path: "/",
     maxAge: expiresIn
@@ -180,7 +192,7 @@ export async function POST(req: NextRequest) {
 
   res.cookies.set("uniid_refresh_token", refreshToken, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: isProd ? "none" : "lax",
     secure: isProd,
     path: "/",
     maxAge: REFRESH_TOKEN_TTL_SECONDS

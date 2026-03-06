@@ -55,9 +55,8 @@
       );
     }
     var iframe = document.createElement("iframe");
-    // 传递 parent_origin，以便授权页面在登录后返回时能正确恢复
-    var parentOrigin = window.location.origin;
-    iframe.src = this.authServer + "/embed?app_id=" + encodeURIComponent(this.appId) + "&parent_origin=" + encodeURIComponent(parentOrigin);
+    // 不传递 parent_origin：embed 仅从 postMessage 的 event.origin 获取（浏览器生成，可信）
+    iframe.src = this.authServer + "/embed?app_id=" + encodeURIComponent(this.appId);
     iframe.id = mount.id;
     iframe.className = mount.className;
     iframe.title = "UniID 授权窗口";
@@ -66,6 +65,15 @@
     this.iframe = iframe;
 
     var self = this;
+    iframe.onload = function () {
+      if (self.iframe && self.iframe.contentWindow) {
+        self.iframe.contentWindow.postMessage(
+          { type: "uniid_init" },
+          self.authServer
+        );
+      }
+    };
+
     window.addEventListener("message", function (event) {
       if (!event.data || typeof event.data !== "object") return;
       if (event.data.type === "uniid_login_success") {

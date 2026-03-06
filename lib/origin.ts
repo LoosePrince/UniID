@@ -47,21 +47,10 @@ export function setDataApiCorsHeaders(res: NextResponse, origin: string) {
   res.headers.set("Access-Control-Allow-Credentials", "true");
 }
 
-/**
- * 验证请求的 app_id 与 Origin 是否匹配
- * 防止不同域名使用同一个 app_id 进行非法请求
- */
-export async function validateAppIdOriginMatch(
-  req: NextRequest,
-  appId: string
+export async function validateAppIdOriginMatchWithOrigin(
+  appId: string,
+  origin: string
 ): Promise<{ valid: boolean; error?: string }> {
-  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
-
-  // 如果没有 Origin 头（如同域请求或非浏览器请求），跳过验证
-  if (!origin) {
-    return { valid: true };
-  }
-
   // 开发环境本地请求跳过验证
   const isDev = process.env.NODE_ENV !== "production";
   if (isDev) {
@@ -103,8 +92,26 @@ export async function validateAppIdOriginMatch(
 
     return { valid: true };
   } catch (err) {
-    console.error("[validateAppIdOriginMatch] Error:", err);
+    console.error("[validateAppIdOriginMatchWithOrigin] Error:", err);
     return { valid: false, error: "VALIDATION_ERROR" };
   }
+}
+
+/**
+ * 验证请求的 app_id 与 Origin 是否匹配
+ * 防止不同域名使用同一个 app_id 进行非法请求
+ */
+export async function validateAppIdOriginMatch(
+  req: NextRequest,
+  appId: string
+): Promise<{ valid: boolean; error?: string }> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+
+  // 如果没有 Origin 头（如同域请求或非浏览器请求），跳过验证
+  if (!origin) {
+    return { valid: true };
+  }
+
+  return validateAppIdOriginMatchWithOrigin(appId, origin);
 }
 

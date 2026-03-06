@@ -16,26 +16,20 @@ interface EmbedUser {
 function EmbedPageContent() {
   const searchParams = useSearchParams();
   const appId = searchParams.get("app_id") ?? "";
-  // 从 URL 参数中恢复 parentOrigin（登录后返回时使用）
-  const parentOriginFromUrl = searchParams.get("parent_origin");
+  // parentOrigin 仅从 postMessage 的 event.origin 获取（浏览器生成，可信），不使用 URL 或 event.data
+  const [parentOrigin, setParentOrigin] = useState<string | null>(null);
 
   const [step, setStep] = useState<Step>("idle");
   const [user, setUser] = useState<EmbedUser | null>(null);
   const [isAppAdmin, setIsAppAdmin] = useState<boolean>(false);
-  const [parentOrigin, setParentOrigin] = useState<string | null>(parentOriginFromUrl);
   const [authType, setAuthType] = useState<"full" | "restricted">("restricted");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
-    // 如果从登录页面返回（URL中有parent_origin参数），自动开始检查登录状态
-    if (parentOriginFromUrl && appId) {
-      void checkLoginAndMaybeRedirect();
-    }
-
-    async function checkLoginAndMaybeRedirect() {
-      if (!appId) return;
+    async function checkLoginAndMaybeRedirect(verifiedParentOrigin: string) {
+      if (!appId || !verifiedParentOrigin) return;
       setStep("checking");
       setError(null);
       try {
@@ -51,7 +45,6 @@ function EmbedPageContent() {
               username: data.user.username,
               role: data.user.role
             });
-            // 查询用户是否是该应用的管理员
             const adminRes = await fetch(`/api/app/${appId}/admin-check`, {
               method: "GET",
               credentials: "include"
@@ -59,7 +52,6 @@ function EmbedPageContent() {
             if (adminRes.ok) {
               const adminData = await adminRes.json();
               setIsAppAdmin(adminData.isAdmin || false);
-              // 如果是应用管理员，默认使用 restricted 授权
               if (adminData.isAdmin || data.user.role === "admin") {
                 setAuthType("restricted");
               }
@@ -72,38 +64,32 @@ function EmbedPageContent() {
         console.error(err);
       }
 
-      // 将 parentOrigin 传递给登录页面，以便登录后返回时能恢复
-      const redirectTo = `/embed?app_id=${encodeURIComponent(appId)}&parent_origin=${encodeURIComponent(parentOrigin || '')}`;
-      window.location.href = `/login?redirectTo=${encodeURIComponent(
-        redirectTo
-      )}`;
+      // 重定向到登录（返回时由 SDK 的 uniid_init 再次提供 event.origin）
+      const redirectTo = `/embed?app_id=${encodeURIComponent(appId)}`;
+      window.location.href = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
     }
 
     function handleMessage(event: MessageEvent) {
       if (!event.data || typeof event.data !== "object") return;
+      const msgType = event.data.type;
+      if (msgType !== "uniid_init" && msgType !== "uniid_open_login") return;
 
-      // 如果没有从 URL 获取到 parentOrigin，则从 message 中获取
-      if (!parentOrigin && !parentOriginFromUrl) {
-        setParentOrigin(event.origin);
-      } else if (event.origin !== (parentOrigin || parentOriginFromUrl)) {
-        return;
-      }
+      // parentOrigin 仅从 event.origin 获取（浏览器生成，不可伪造）
+      const originFromBrowser = event.origin;
+      if (!originFromBrowser) return;
 
-      if (event.data.type === "uniid_open_login") {
-        void checkLoginAndMaybeRedirect();
-      }
+      setParentOrigin(originFromBrowser);
+      void checkLoginAndMaybeRedirect(originFromBrowser);
     }
 
     window.addEventListener("message", handleMessage);
-    return () => {
-      window.removeEventListener("message", handleMessage);
-    };
-  }, [appId, parentOrigin, parentOriginFromUrl]);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [appId, parentOrigin]);
 
   async function handleAuthorize(e: React.FormEvent) {
     e.preventDefault();
-    if (!appId) {
-      setError("缺少 app_id 参数");
+    if (!appId || !parentOrigin) {
+      setError(!parentOrigin ? "未获取到父页面来源，请刷新后重试" : "缺少 app_id 参数");
       return;
     }
     setLoading(true);
@@ -111,12 +97,11 @@ function EmbedPageContent() {
     try {
       const res = await fetch("/api/auth/authorize", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           app_id: appId,
-          auth_type: authType
+          auth_type: authType,
+          parent_origin: parentOrigin
         })
       });
       if (!res.ok) {
@@ -284,6 +269,8 @@ function EmbedPageContent() {
             <div className="space-y-2 text-xs text-slate-300">
               {cancelled ? (
                 <p>你已取消本次授权请求，可以回到原站点继续浏览。</p>
+              ) : !parentOrigin ? (
+                <p>正在等待父页面连接…</p>
               ) : (
                 <p>请在集成了 UniID 的站点中点击“使用 UniID 登录 / 授权”按钮以继续。</p>
               )}

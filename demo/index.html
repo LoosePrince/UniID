@@ -26,7 +26,9 @@
       --danger: #ef4444;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -225,7 +227,8 @@
       color: #cbd5f5;
     }
 
-    input, textarea {
+    input,
+    textarea {
       width: 100%;
       border-radius: var(--radius-md);
       border: 1px solid #1e293b;
@@ -238,11 +241,13 @@
       font-family: inherit;
     }
 
-    input::placeholder, textarea::placeholder {
+    input::placeholder,
+    textarea::placeholder {
       color: rgba(148, 163, 184, 0.75);
     }
 
-    input:focus, textarea:focus {
+    input:focus,
+    textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 1px var(--accent-soft);
       background: #020617;
@@ -509,17 +514,46 @@
       gap: 0.75rem;
     }
 
-    .hidden { display: none !important; }
+    .hidden {
+      display: none !important;
+    }
 
     @media (max-width: 768px) {
-      .page { padding: 1rem; }
-      .card { padding: 1.25rem; }
-      .header { flex-direction: column; align-items: flex-start; }
-      .user-info { width: 100%; justify-content: space-between; }
-      .user-details { text-align: left; }
-      .post-header { flex-direction: column; }
-      .post-actions { flex-wrap: wrap; }
-      .post-stats { width: 100%; margin-left: 0; margin-top: 0.5rem; }
+      .page {
+        padding: 1rem;
+      }
+
+      .card {
+        padding: 1.25rem;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .user-info {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .user-details {
+        text-align: left;
+      }
+
+      .post-header {
+        flex-direction: column;
+      }
+
+      .post-actions {
+        flex-wrap: wrap;
+      }
+
+      .post-stats {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 0.5rem;
+      }
     }
   </style>
 </head>
@@ -1055,12 +1089,12 @@
       function init() {
         // 从 SDK 恢复用户状态（与 token 同步）
         state.user = auth.getUser();
-        
+
         // 调试信息
         console.log("SDK Token:", auth.getToken());
         console.log("SDK User:", auth.getUser());
         console.log("Is Authenticated:", auth.isAuthenticated());
-        
+
         // 如果 SDK 没有用户，清除 localStorage
         if (!state.user) {
           localStorage.removeItem("demo_user");

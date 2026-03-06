@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     res.cookies.set("uniid_token", accessToken, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
       secure: isProd,
       path: "/",
       maxAge: expiresIn
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     res.cookies.set("uniid_refresh_token", refreshToken, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProd ? "none" : "lax",
       secure: isProd,
       path: "/",
       maxAge: REFRESH_TOKEN_TTL_SECONDS
