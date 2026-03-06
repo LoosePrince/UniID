@@ -3,11 +3,22 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+function generateRandomPassword(length: number = 16): string {
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    const idx = Math.floor(Math.random() * chars.length);
+    password += chars[idx];
+  }
+  return password;
+}
+
 async function main() {
   const now = Math.floor(Date.now() / 1000);
 
   const adminUsername = "admin";
-  const adminPassword = "admin123";
+  const adminPassword = generateRandomPassword();
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 

@@ -3,7 +3,7 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
-
+import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 type DashboardUser = {
@@ -131,8 +131,8 @@ export default async function DashboardPage() {
           <section className="space-y-3 text-sm text-slate-300">
             <p>当前未检测到有效登录状态。</p>
             <p>
-              请先在 <span className="font-mono text-sky-300">/login</span>{" "}
-              页面完成登录，浏览器会保存访问令牌后再访问此页面。
+              请先在<Link href="/login" className="text-sky-300"> 登录页面 </Link>
+              完成登录，浏览器会保存访问令牌后再访问此页面。
             </p>
           </section>
         ) : (

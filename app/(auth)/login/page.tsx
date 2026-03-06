@@ -1,10 +1,10 @@
- "use client";
+"use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Card } from "@/components/ui/card";
 import { PrimaryButton } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { PasswordInput, TextInput } from "@/components/ui/input";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -91,7 +91,6 @@ function LoginPageContent() {
           </PrimaryButton>
         </form>
         <div className="space-y-1 text-xs text-slate-500">
-          <p>初始管理员：用户名 admin，密码 admin123。</p>
           <p>
             还没有账号？{" "}
             <button
