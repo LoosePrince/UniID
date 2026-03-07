@@ -136,6 +136,7 @@ export const PATCH = withDataCors(async function handler(
   }
 
   const userId = tokenValidation.payload!.sub;
+  const username = (tokenValidation.payload as any)!.username;
   const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
   // 解析请求体
@@ -157,7 +158,7 @@ export const PATCH = withDataCors(async function handler(
 
   let newData = currentData;
   let newPermissions = currentPermissions;
-  let schemaVersion = record.schemaVersion;
+  let schemaVersion = (record as any).schemaVersion;
 
   // 检查是否需要记录级 write 权限（修改非字段数据或权限配置）
   const isOwner = record.ownerId === userId;
@@ -165,13 +166,17 @@ export const PATCH = withDataCors(async function handler(
   if (body.data) {
     // 1. 权限检查：检查每个要更新的字段的权限
     for (const [fieldPath, value] of Object.entries(body.data)) {
+      // 识别细分操作：是 create 还是 update
+      const isNewField = currentData[fieldPath] === undefined;
+      const action = isNewField ? "create" : "update";
+
       const hasFieldPermission = await checkFieldPermission(
         record.permissions,
         userId,
         record.appId,
         record.ownerId,
         fieldPath,
-        "write",
+        action,
         authType,
         value,  // 传入要写入的数据值，用于动态权限检查
         currentData[fieldPath]  // 传入当前值，用于比较变更
@@ -179,7 +184,7 @@ export const PATCH = withDataCors(async function handler(
 
       if (!hasFieldPermission) {
         return NextResponse.json(
-          { error: "FIELD_PERMISSION_DENIED", field: fieldPath },
+          { error: "FIELD_PERMISSION_DENIED", field: fieldPath, action },
           { status: 403 }
         );
       }
@@ -189,7 +194,11 @@ export const PATCH = withDataCors(async function handler(
 
     // 2. 数据验证：执行数据验证
     if (body.skipValidation !== true) {
-      const dataValidation = await validateData(record.appId, record.dataType, newData);
+      const dataValidation = await validateData(record.appId, record.dataType, newData, { 
+        userId, 
+        username,
+        prevData: currentData 
+      });
       if (!dataValidation.valid) {
         return NextResponse.json(
           { 
@@ -200,6 +209,7 @@ export const PATCH = withDataCors(async function handler(
           { status: 400 }
         );
       }
+      newData = dataValidation.data ?? newData;
       schemaVersion = dataValidation.schemaVersion ?? null;
     }
   }
@@ -230,7 +240,7 @@ export const PATCH = withDataCors(async function handler(
       updatedAt: now,
       updatedById: userId,
       schemaVersion: schemaVersion as any
-    }
+    } as any
   });
 
   return NextResponse.json({

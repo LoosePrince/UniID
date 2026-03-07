@@ -43,6 +43,7 @@ export const POST = withDataCors(async function handler(
   }
 
   const userId = tokenValidation.payload!.sub;
+  const username = (tokenValidation.payload as any)!.username;
 
   const body = (await req.json().catch(() => null)) as
     | {
@@ -57,10 +58,11 @@ export const POST = withDataCors(async function handler(
   }
 
   let schemaVersion: number | null = null;
+  let finalData = body.data;
 
   // 核心：执行数据验证
   if (body.skipValidation !== true) {
-    const dataValidation = await validateData(appId, dataType, body.data);
+    const dataValidation = await validateData(appId, dataType, body.data, { userId, username });
     if (!dataValidation.valid) {
       return NextResponse.json(
         { 
@@ -71,8 +73,9 @@ export const POST = withDataCors(async function handler(
         { status: 400 }
       );
     }
-    // 记录验证通过的 schema 版本
+    // 记录验证通过的 schema 版本和处理后的数据（包含自动填充）
     schemaVersion = dataValidation.schemaVersion ?? null;
+    finalData = dataValidation.data ?? body.data;
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -82,7 +85,7 @@ export const POST = withDataCors(async function handler(
       appId,
       ownerId: userId,
       dataType,
-      data: JSON.stringify(body.data),
+      data: JSON.stringify(finalData),
       permissions: JSON.stringify(
         body.permissions ?? {
           default: {
@@ -98,7 +101,7 @@ export const POST = withDataCors(async function handler(
       updatedById: userId,
       deleted: 0,
       schemaVersion: schemaVersion as any
-    }
+    } as any
   });
 
   return NextResponse.json({

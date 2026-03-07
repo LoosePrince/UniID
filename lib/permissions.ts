@@ -493,7 +493,7 @@ function checkDynamicPermission(
     return false;
   }
 
-  // 解析动态路径，如 "likes.$user" 或 "comments.$user"
+  // 解析动态路径，如 "likes.$user" 或 "comments.$user" 或 "comments.$user.userId"
   const dynamicPath = perm.slice(9); // 去掉 "$dynamic:" 前缀
   const pathParts = dynamicPath.split(".");
 
@@ -508,7 +508,6 @@ function checkDynamicPermission(
   }
 
   // 只检查新增、变更或删除的键
-  // 对于 $dynamic:likes.$user，检查 dataValue 中相对于 currentValue 新增、变更或删除的键
   const secondPart = pathParts[1];
   const currentKeys = currentValue && typeof currentValue === "object" ? Object.keys(currentValue) : [];
   const newKeys = Object.keys(dataValue);
@@ -537,10 +536,11 @@ function checkDynamicPermission(
       return false;
     }
 
-    // 如果有第三层（如 comments.$user.*），递归检查
+    // 增强安全性：如果路径包含第三层（如 comments.$user.userId），
+    // 强制要求 dataValue[key].userId === userId
     if (pathParts.length > 2) {
-      const hasPermission = checkDynamicPath(dataValue[key], pathParts, 2, userId);
-      if (!hasPermission) {
+      const remainingPath = pathParts.slice(2);
+      if (!checkValueAgainstPath(dataValue[key], remainingPath, userId)) {
         return false;
       }
     }
@@ -569,6 +569,40 @@ function checkDynamicPermission(
   }
 
   return true;
+}
+
+/**
+ * 检查值是否符合路径约束（增强安全性）
+ * 例如：path=["userId"], expectedValue="user123" -> 检查 data.userId === "user123"
+ */
+function checkValueAgainstPath(data: any, path: string[], expectedValue: string): boolean {
+  if (path.length === 0) {
+    return data === expectedValue;
+  }
+
+  if (data == null || typeof data !== "object") {
+    return false;
+  }
+
+  const part = path[0];
+  const remaining = path.slice(1);
+
+  if (part === "*") {
+    // 如果是通配符，检查所有键
+    for (const key of Object.keys(data)) {
+      if (!checkValueAgainstPath(data[key], remaining, expectedValue)) {
+        return false;
+      }
+    }
+    return true;
+  } else if (part === "$user") {
+    // 如果是 $user，检查该键的值是否等于 expectedValue
+    // 注意：这里的逻辑取决于具体需求，通常 $user 在值路径中表示该字段必须等于当前用户ID
+    return checkValueAgainstPath(data, remaining, expectedValue); 
+  } else {
+    // 固定键匹配
+    return checkValueAgainstPath(data[part], remaining, expectedValue);
+  }
 }
 
 /**
@@ -632,7 +666,7 @@ export async function checkFieldPermission(
   appId: string,
   ownerId: string | null,
   fieldPath: string,
-  action: "read" | "write" | "delete",
+  action: "read" | "write" | "delete" | "create" | "update" | "increment" | "push",
   authType: "full" | "restricted" = "restricted",
   dataValue?: any,
   currentValue?: any
@@ -657,8 +691,14 @@ export async function checkFieldPermission(
   // 查找字段特定权限（支持通配符匹配，子级覆盖父级）
   const fieldActionPerms = findFieldPermission(fieldsConfig, fieldPath, action);
   
-  if (fieldActionPerms) {
-    for (const perm of fieldActionPerms) {
+  // 兼容旧的 write 权限：如果请求的是细分权限但配置中只有 write，则允许
+  let effectiveActionPerms = fieldActionPerms;
+  if (!effectiveActionPerms && ["create", "update", "increment", "push"].includes(action)) {
+    effectiveActionPerms = findFieldPermission(fieldsConfig, fieldPath, "write");
+  }
+  
+  if (effectiveActionPerms) {
+    for (const perm of effectiveActionPerms) {
       if (perm === "$all" || perm === "$anyone" || perm === "$public") {
         return true;
       }
@@ -673,7 +713,13 @@ export async function checkFieldPermission(
 
   // 2. 检查默认权限中的公开权限（所有模式都适用）
   const defaultConfig = permConfig.default || {};
-  const defaultActionPerms = defaultConfig[action];
+  let defaultActionPerms = defaultConfig[action];
+  
+  // 兼容旧的 write 权限
+  if (!Array.isArray(defaultActionPerms) && ["create", "update", "increment", "push"].includes(action)) {
+    defaultActionPerms = defaultConfig["write"];
+  }
+
   if (Array.isArray(defaultActionPerms)) {
     for (const perm of defaultActionPerms) {
       if (perm === "$all" || perm === "$anyone" || perm === "$public") {
@@ -720,8 +766,8 @@ export async function checkFieldPermission(
 
   // 3. 完整授权模式下，检查字段特定权限（使用异步版本以支持 $role）
   // 使用新的权限查找逻辑（支持通配符和继承）
-  if (fieldActionPerms) {
-    for (const perm of fieldActionPerms) {
+  if (effectiveActionPerms) {
+    for (const perm of effectiveActionPerms) {
       if (await resolvePermissionVariableAsync(perm, context)) {
         return true;
       }

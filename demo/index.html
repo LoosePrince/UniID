@@ -886,14 +886,19 @@
           const permissions = {
             default: {
               read: ["$public"],
-              write: ["$owner"],
+              create: ["$public"],
+              update: ["$owner"],
               delete: ["$owner"]
             },
             fields: {
-              "title": { read: ["$public"], write: ["$owner"] },
-              "content": { read: ["$public"], write: ["$owner"] },
-              "likes": { read: ["$public"], write: ["$dynamic:likes.$user"] },
-              "comments": { read: ["$public"], write: ["$dynamic:comments.$user"] }
+              "title": { read: ["$public"], update: ["$owner"] },
+              "content": { read: ["$public"], update: ["$owner"] },
+              "likes": { read: ["$public"], create: ["$dynamic:likes.$user"], delete: ["$dynamic:likes.$user"] },
+              "comments": { 
+                read: ["$public"], 
+                create: ["$dynamic:comments.$user"],
+                update: ["$dynamic:comments.$user.userId"] 
+              }
             }
           };
 
@@ -981,9 +986,11 @@
           const userId = state.user.id;
 
           if (likes[userId]) {
+            // 注意：这里删除字段也需要权限校验
             delete likes[userId];
           } else {
-            likes[userId] = { time: Math.floor(Date.now() / 1000) };
+            // time 将由后端 autoFill 自动填充，前端传 0 即可
+            likes[userId] = { time: 0 };
           }
 
           await auth.update(postId, { likes });
@@ -1027,11 +1034,12 @@
           }
           const commentId = `${Date.now()}`;
 
+          // userId, username, time 将由后端 autoFill 自动填充，前端传占位符即可
           comments[state.user.id][commentId] = {
             userId: state.user.id,
             username: state.user.username,
             content,
-            time: Math.floor(Date.now() / 1000)
+            time: 0
           };
 
           await auth.update(postId, { comments });
@@ -1103,6 +1111,12 @@
           const expectedSchema = {
             type: "object",
             required: ["title", "content"],
+            autoFill: {
+              "likes.$user.time": "$serverTime",
+              "comments.$user.*.time": "$serverTime",
+              "comments.$user.*.userId": "$userId",
+              "comments.$user.*.username": "$username"
+            },
             properties: {
               title: { type: "string", minLength: 1, maxLength: 100 },
               content: { type: "string", minLength: 1, maxLength: 5000 },

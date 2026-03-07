@@ -13,6 +13,8 @@
 - **双模式授权**：完整授权（账户级）和限制授权（数据级）
 - **字段级权限**：支持对JSON数据的每个字段单独设置权限
 - **动态权限变量**：支持用户ID等变量作为权限路径
+- **权限细分**：支持 `create` (新增)、`update` (修改)、`increment` (增量)、`push` (追加) 等细粒度操作
+- **后端自动填充**：支持在存储前自动设置服务器时间、用户ID、UUID等，防止伪造
 
 ### 1.3 技术选型
 
@@ -168,28 +170,34 @@ CREATE TABLE verification_tokens (
 
 ```sql
 -- records表的permissions字段JSON结构示例
-{
     "default": {
-        "read": ["$owner", "$app_admin"],           -- 默认读权限
-        "write": ["$owner"],                          -- 默认写权限
-        "delete": ["$owner"]                           -- 默认删权限
+        "read": ["$public"],           -- 默认读权限
+        "create": ["$owner"],          -- 默认新增权限
+        "update": ["$owner"],          -- 默认更新权限
+        "delete": ["$owner"]           -- 默认删权限
     },
     "fields": {
         "data.title": {
-            "read": ["$all"],                           -- 所有人可读
-            "write": ["$owner", "user:123"]              -- 所有者和指定用户可写
-        },
-        "data.content": {
-            "read": ["$all"],   
-            "write": ["$owner", "$user:456"]  
+            "read": ["$all"],
+            "update": ["$owner"]
         },
         "data.metadata.comments": {
             "read": ["$all"],
-            "write": ["$dynamic:comments.$user"],        -- 动态路径权限
+            "create": ["$dynamic:comments.$user"],       -- 仅允许在该路径下新增属于自己的内容
+            "update": ["$dynamic:comments.$user.userId"], -- 强制校验内容内部的 userId 字段必须匹配
             "delete": ["$owner"]
         }
     }
 }
+
+-- 权限操作说明
+-- read: 读取数据
+-- write: 综合写权限（兼容旧版，包含 create/update/increment/push）
+-- create: 在对象或数组中新增键值对
+-- update: 修改已存在的键值对
+-- increment: 对数值字段进行增量操作
+-- push: 对数组进行追加操作
+-- delete: 删除记录或字段
 
 -- 动态变量说明
 -- $owner: 记录所有者
@@ -485,7 +493,29 @@ Response:
 }
 ```
 
-#### 5.3.5 自定义验证规则示例
+#### 5.3.5 后端自动填充 (Auto-fill)
+
+支持在数据存入数据库前由后端强制填充变量，用户无法通过 API 修改这些字段。在 Schema 中通过 `autoFill` 对象配置：
+
+```json
+{
+  "autoFill": {
+    "data.createdAt": "$serverTime",
+    "data.authorId": "$userId",
+    "data.id": "$uuid"
+  }
+}
+```
+
+**支持的变量：**
+- `$serverTime`: 当前 Unix 时间戳（秒）
+- `$serverTimeMs`: 当前 Unix 时间戳（毫秒）
+- `$userId`: 当前操作者的用户 ID
+- `$username`: 当前操作者的用户名
+- `$uuid`: 自动生成的唯一标识符（仅在字段为空时生成）
+- `$prevValue`: 该字段修改前的值
+
+#### 5.3.6 自定义验证规则示例
 
 `validationRules` 为可选的 JavaScript 代码字符串，在沙箱中执行，返回 `true` 表示通过，返回字符串表示错误信息：
 

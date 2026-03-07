@@ -10,6 +10,76 @@ export interface ValidationResult {
   valid: boolean;
   errors?: ErrorObject[] | string[];
   schemaVersion?: number;
+  data?: any; // 返回处理后（如自动填充）的数据
+}
+
+/**
+ * 后端自动填充变量
+ * @param data 当前数据
+ * @param schemaObj Schema 对象（包含 autoFill 配置）
+ * @param context 上下文信息 (userId, username, prevData)
+ */
+export function applyAutoFill(
+  data: any,
+  schemaObj: any,
+  context: { userId: string; username?: string; prevData?: any }
+): any {
+  if (!schemaObj.autoFill || typeof schemaObj.autoFill !== "object") {
+    return data;
+  }
+
+  const newData = JSON.parse(JSON.stringify(data)); // 深拷贝
+
+  for (const [fieldPath, fillType] of Object.entries(schemaObj.autoFill)) {
+    const pathParts = fieldPath.split(".");
+    let current = newData;
+
+    // 导航到目标字段的父级
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const part = pathParts[i];
+      if (current[part] === undefined) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+
+    const lastPart = pathParts[pathParts.length - 1];
+    const now = Math.floor(Date.now() / 1000);
+
+    // 根据填充类型设置值
+    switch (fillType) {
+      case "$serverTime":
+        current[lastPart] = now;
+        break;
+      case "$serverTimeMs":
+        current[lastPart] = Date.now();
+        break;
+      case "$userId":
+        current[lastPart] = context.userId;
+        break;
+      case "$username":
+        current[lastPart] = context.username || "unknown";
+        break;
+      case "$uuid":
+        // 如果是新增（原值不存在），则生成 UUID
+        if (!current[lastPart]) {
+          current[lastPart] = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+        break;
+      case "$prevValue":
+        // 从旧数据中获取值
+        if (context.prevData) {
+          let prev = context.prevData;
+          for (const part of pathParts) {
+            prev = prev?.[part];
+          }
+          current[lastPart] = prev;
+        }
+        break;
+    }
+  }
+
+  return newData;
 }
 
 /**
@@ -75,15 +145,17 @@ async function runCustomValidation(data: any, rules: string): Promise<true | str
  * @param appId 应用 ID
  * @param dataType 数据类型
  * @param data 要验证的数据
+ * @param context 可选上下文（用于自动填充）
  * @returns 验证结果
  */
 export async function validateData(
   appId: string,
   dataType: string,
-  data: any
+  data: any,
+  context?: { userId: string; username?: string; prevData?: any }
 ): Promise<ValidationResult> {
   // 1. 获取最新的活跃 Schema
-  const activeSchema = await prisma.dataSchema.findFirst({
+  const activeSchema = await (prisma as any).dataSchema.findFirst({
     where: {
       appId,
       dataType,
@@ -105,33 +177,43 @@ export async function validateData(
   // 3. 执行 JSON Schema 验证
   try {
     const schemaObj = JSON.parse(activeSchema.schema);
+    
+    // 3.1 应用自动填充 (如果提供了上下文)
+    let processedData = data;
+    if (context) {
+      processedData = applyAutoFill(data, schemaObj, context);
+    }
+
     const validate = ajv.compile(schemaObj);
-    const valid = validate(data);
+    const valid = validate(processedData);
 
     if (!valid) {
       return {
         valid: false,
         errors: validate.errors || ["Unknown validation error"],
-        schemaVersion: activeSchema.version
+        schemaVersion: activeSchema.version,
+        data: processedData
       };
     }
 
     // 4. 执行自定义验证规则 (如果存在)
     if (activeSchema.validationRules) {
-      const customResult = await runCustomValidation(data, activeSchema.validationRules);
+      const customResult = await runCustomValidation(processedData, activeSchema.validationRules);
       
       if (customResult !== true) {
         return {
           valid: false,
           errors: [customResult],
-          schemaVersion: activeSchema.version
+          schemaVersion: activeSchema.version,
+          data: processedData
         };
       }
     }
 
     return {
       valid: true,
-      schemaVersion: activeSchema.version
+      schemaVersion: activeSchema.version,
+      data: processedData
     };
   } catch (e: any) {
     return {
