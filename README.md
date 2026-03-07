@@ -314,14 +314,15 @@ Response:
 ### 5.2 数据操作API
 
 ```
-// 创建记录
+// 创建记录（写入前会按 Schema 校验 data，未配置 Schema 则拒绝）
 POST /api/data/{app_id}/{data_type}
 Headers:
     Authorization: Bearer {token}
 Request:
 {
-    "data": {...},           // 任意JSON数据
-    "permissions": {...}      // 权限配置(可选)
+    "data": {...},              // 任意JSON数据，须符合该 data_type 的 Schema
+    "permissions": {...},       // 权限配置(可选)
+    "skipValidation": false     // 可选，设为 true 可跳过 Schema 校验
 }
 Response:
 {
@@ -339,14 +340,15 @@ Query Params:
     fields: "field1,field2"   // 指定字段(可选)
 Response: 记录对象
 
-// 更新记录(部分更新)
+// 更新记录(部分更新，合并后的 data 会按 Schema 重新校验)
 PATCH /api/data/record/{record_id}
 Headers:
     Authorization: Bearer {token}
 Request:
 {
-    "data": {...},           // 要更新的字段
-    "permissions": {...}      // 要更新的权限
+    "data": {...},              // 要更新的字段，合并后须符合 Schema
+    "permissions": {...},       // 要更新的权限
+    "skipValidation": false     // 可选，跳过 Schema 校验
 }
 Response: 更新后的记录
 
@@ -386,36 +388,113 @@ Response:
 }
 ```
 
-### 5.3 权限管理API
+### 5.3 数据模式 (Schema) 管理
+
+#### 5.3.1 说明
+
+UniID 支持为每个应用的每种数据类型 (`dataType`) 定义 **JSON Schema**，用于在写入或更新数据时进行校验。只有符合 Schema 的数据才能存入，否则请求会被拒绝。
+
+- **强制校验**：未配置 Schema 的数据类型无法写入数据，需先注册 Schema
+- **版本管理**：支持 Schema 版本演进，每次更新会创建新版本
+- **权限控制**：仅应用所有者或管理员可注册/更新 Schema
+
+#### 5.3.2 JSON Schema 规范要点
+
+| 关键字 | 含义 | 示例 |
+|--------|------|------|
+| `type` | 数据类型 | `"string"`, `"number"`, `"integer"`, `"boolean"`, `"object"`, `"array"` |
+| `required` | 必填字段 | `["title", "content"]` |
+| `properties` | 字段定义 | `{ "title": { "type": "string", "maxLength": 100 } }` |
+| `additionalProperties` | 动态键的值的 schema | 用于 `likes[userId]`、`comments[userId][commentId]` 等 |
+| `minLength` / `maxLength` | 字符串长度 | `minLength: 1`, `maxLength: 500` |
+| `minimum` / `maximum` | 数值范围 | `minimum: 0` |
+| `items` | 数组元素 schema | `{ "type": "string" }` |
+| `enum` | 枚举值 | `["draft", "published"]` |
+
+**嵌套对象示例**（如 `likes`、`comments`）：
+
+```json
+{
+  "likes": {
+    "type": "object",
+    "additionalProperties": {
+      "type": "object",
+      "required": ["time"],
+      "properties": {
+        "time": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
+```
+
+#### 5.3.3 API 用法
 
 ```
-// 获取用户对自己数据的权限
-GET /api/permissions/{record_id}
+// 注册 Schema（仅应用所有者或管理员）
+POST /api/schema/{app_id}/{data_type}
 Headers:
     Authorization: Bearer {token}
+Request:
+{
+    "schema": { ... },           // JSON Schema 对象
+    "description": "string",     // 可选
+    "validationRules": "string", // 可选，自定义 JS 验证规则
+    "isActive": true             // 可选，默认 true，设为活跃版本
+}
 Response:
 {
-    "record_id": "string",
-    "overall": 3,              // 整体权限级别
-    "fields": {
-        "data.title": 2,
-        "data.content": 1
-    }
+    "id": "string",
+    "version": 1,
+    "isActive": true,
+    "dataType": "string",
+    "createdAt": 1234567890
 }
 
-// 检查特定字段权限
-GET /api/permissions/check
+// 获取 Schema
+GET /api/schema/{app_id}/{data_type}
 Headers:
     Authorization: Bearer {token}
 Query Params:
-    record_id: "string",
-    field_path: "string",
-    operation: "read/write/delete"
+    version: 1   // 可选，不传则返回当前活跃版本
 Response:
 {
-    "allowed": true/false,
-    "reason": "string"
+    "id": "string",
+    "version": 1,
+    "isActive": true,
+    "schema": { ... },
+    "description": "string",
+    "validationRules": "string",
+    "createdAt": 1234567890
 }
+```
+
+#### 5.3.4 数据写入时的验证
+
+- **创建记录**：`POST /api/data/{app_id}/{data_type}` 在写入前会校验 `data` 是否符合 Schema
+- **更新记录**：`PATCH /api/data/record/{record_id}` 在更新时会对合并后的完整 `data` 重新校验
+- **跳过验证**：请求体可传 `skipValidation: true`（需确保有相应权限）
+
+验证失败时返回 400：
+
+```json
+{
+  "error": "VALIDATION_FAILED",
+  "details": ["...", "..."],
+  "schemaVersion": 1
+}
+```
+
+#### 5.3.5 自定义验证规则示例
+
+`validationRules` 为可选的 JavaScript 代码字符串，在沙箱中执行，返回 `true` 表示通过，返回字符串表示错误信息：
+
+```javascript
+// 示例：价格必须非负
+if (data.price != null && data.price < 0) {
+  return "价格不能为负数";
+}
+return true;
 ```
 
 ## 六、客户端SDK设计
@@ -726,3 +805,4 @@ async function handleLogout() {
 
 - 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/uniid.sdk.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
 - 源码位于项目根目录的 `demo/index.html`
+- **数据验证**：以应用管理员身份登录后，Demo 会自动比对并同步 `post` 类型的 Schema，确保发帖、点赞、评论等操作符合验证规则

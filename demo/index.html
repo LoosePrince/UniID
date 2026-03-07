@@ -1060,6 +1060,10 @@
             state.user = result.user;
             localStorage.setItem("demo_user", JSON.stringify(result.user));
             updateUserUI();
+            
+            // 登录后检查并同步 Schema
+            await syncSchemaIfNeeded();
+            
             await loadPosts();
           }
         } catch (err) {
@@ -1071,9 +1075,113 @@
         }
       };
 
+      // 同步 Schema 逻辑
+      async function syncSchemaIfNeeded() {
+        if (!state.user) return;
+
+        try {
+          // 1. 检查是否是应用管理员
+          const authServer = auth.authServer;
+          const appId = auth.appId;
+          
+          if (!authServer || !appId) {
+            console.error("无法获取 SDK 配置信息", { authServer, appId });
+            return;
+          }
+
+          const adminCheck = await fetch(`${authServer}/api/app/${appId}/admin-check`, {
+            headers: {
+              'Authorization': `Bearer ${auth.getToken()}`
+            }
+          }).then(res => res.json());
+
+          if (!adminCheck.isAdmin) return;
+
+          console.log("检测到应用管理员身份，正在同步数据验证规则...");
+
+          // 2. 定义 demo 帖子的预期 Schema
+          const expectedSchema = {
+            type: "object",
+            required: ["title", "content"],
+            properties: {
+              title: { type: "string", minLength: 1, maxLength: 100 },
+              content: { type: "string", minLength: 1, maxLength: 5000 },
+              likes: {
+                type: "object",
+                additionalProperties: {
+                  type: "object",
+                  required: ["time"],
+                  properties: {
+                    time: { type: "integer", minimum: 0 }
+                  }
+                }
+              },
+              comments: {
+                type: "object",
+                additionalProperties: {
+                  type: "object",
+                  additionalProperties: {
+                    type: "object",
+                    required: ["userId", "username", "content", "time"],
+                    properties: {
+                      userId: { type: "string" },
+                      username: { type: "string" },
+                      content: { type: "string", minLength: 1, maxLength: 500 },
+                      time: { type: "integer", minimum: 0 }
+                    }
+                  }
+                }
+              }
+            }
+          };
+
+          // 3. 获取当前 Schema 进行比对
+          let currentSchema = null;
+          try {
+            const res = await fetch(`${authServer}/api/schema/${appId}/post`, {
+              headers: {
+                'Authorization': `Bearer ${auth.getToken()}`
+              }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              currentSchema = data.schema;
+            }
+          } catch (e) {
+            // 可能尚未定义 Schema
+          }
+
+          // 4. 如果不一致或不存在，则更新
+          if (JSON.stringify(currentSchema) !== JSON.stringify(expectedSchema)) {
+            const updateRes = await fetch(`${authServer}/api/schema/${appId}/post`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${auth.getToken()}`
+              },
+              body: JSON.stringify({
+                schema: expectedSchema,
+                description: "Demo Blog 帖子的标准验证规则 (自动同步)",
+                isActive: true
+              })
+            });
+
+            if (updateRes.ok) {
+              console.log("数据验证规则同步成功");
+              showMessage("已自动同步最新的数据验证规则", "success");
+            } else {
+              const errData = await updateRes.json();
+              console.error("数据验证规则同步失败:", errData);
+            }
+          }
+        } catch (err) {
+          console.error("同步 Schema 出错:", err);
+        }
+      }
+
       elements.logoutButton.onclick = async () => {
         try {
-          await auth.logout();
+          await auth.revoke();
           state.user = null;
           localStorage.removeItem("demo_user");
           updateUserUI();

@@ -1,6 +1,6 @@
+import { prisma } from "@/lib/prisma";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 
 type DataApiHandler<TParams extends Record<string, string> = Record<string, string>> = (
   req: NextRequest,

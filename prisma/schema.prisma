@@ -25,6 +25,7 @@ model User {
   recordsOwned  Record[]    @relation("RecordOwner")
   recordsCreated Record[]   @relation("RecordCreatedBy")
   recordsUpdated Record[]   @relation("RecordUpdatedBy")
+  schemasCreated DataSchema[] @relation("SchemaCreatedBy")
 }
 
 model Session {
@@ -55,6 +56,7 @@ model App {
   owner          User            @relation("UserApps", fields: [ownerId], references: [id])
   authorizations Authorization[]
   records        Record[]
+  dataSchemas    DataSchema[]
 }
 
 model Authorization {
@@ -85,6 +87,7 @@ model Record {
   createdById String?
   updatedById String?
   deleted     Int     @default(0)
+  schemaVersion Int?
 
   app        App   @relation(fields: [appId], references: [id])
   owner      User? @relation("RecordOwner", fields: [ownerId], references: [id])
@@ -109,6 +112,25 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+}
+
+model DataSchema {
+  id              String   @id @default(cuid())
+  appId           String
+  dataType        String
+  schema          String   // JSON Schema 字符串
+  version         Int      @default(1)
+  isActive        Int      @default(1) // 1 为活跃，0 为禁用
+  createdAt       Int
+  updatedAt       Int
+  createdById     String?
+  description     String?
+  validationRules String?  // 预留：自定义验证规则（JS函数字符串）
+
+  app       App   @relation(fields: [appId], references: [id])
+  createdBy User? @relation("SchemaCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, dataType, version])
 }
 
 model VerificationToken {

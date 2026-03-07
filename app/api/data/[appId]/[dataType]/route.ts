@@ -3,6 +3,7 @@ import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
+import { validateData } from "@/lib/validation";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -47,11 +48,31 @@ export const POST = withDataCors(async function handler(
     | {
         data?: unknown;
         permissions?: unknown;
+        skipValidation?: boolean;
       }
     | null;
 
   if (!body?.data) {
     return NextResponse.json({ error: "DATA_REQUIRED" }, { status: 400 });
+  }
+
+  let schemaVersion: number | null = null;
+
+  // 核心：执行数据验证
+  if (body.skipValidation !== true) {
+    const dataValidation = await validateData(appId, dataType, body.data);
+    if (!dataValidation.valid) {
+      return NextResponse.json(
+        { 
+          error: "VALIDATION_FAILED", 
+          details: dataValidation.errors,
+          schemaVersion: dataValidation.schemaVersion
+        },
+        { status: 400 }
+      );
+    }
+    // 记录验证通过的 schema 版本
+    schemaVersion = dataValidation.schemaVersion ?? null;
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -75,7 +96,8 @@ export const POST = withDataCors(async function handler(
       updatedAt: now,
       createdById: userId,
       updatedById: userId,
-      deleted: 0
+      deleted: 0,
+      schemaVersion: schemaVersion as any
     }
   });
 

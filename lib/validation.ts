@@ -1,0 +1,143 @@
+import Ajv, { ErrorObject } from "ajv";
+import addFormats from "ajv-formats";
+import { prisma } from "./prisma";
+import vm from "node:vm";
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+addFormats(ajv);
+
+export interface ValidationResult {
+  valid: boolean;
+  errors?: ErrorObject[] | string[];
+  schemaVersion?: number;
+}
+
+/**
+ * 在沙箱环境中执行自定义验证规则
+ * @param data 要验证的数据
+ * @param rules 自定义验证规则 (JS 代码字符串)
+ * @returns 验证结果: true 或 错误消息字符串
+ */
+async function runCustomValidation(data: any, rules: string): Promise<true | string> {
+  // 创建一个隔离的上下文
+  const context = {
+    data: JSON.parse(JSON.stringify(data)), // 深拷贝以防止副作用
+    result: null as any,
+    error: null as any,
+    console: {
+      log: (...args: any[]) => console.log("[Sandbox Log]:", ...args),
+      error: (...args: any[]) => console.error("[Sandbox Error]:", ...args)
+    }
+  };
+
+  vm.createContext(context);
+
+  // 包装代码以支持 return 语句并捕获结果
+  // 使用同步包装以确保可靠性，并设置执行超时时间以防止死循环
+  const wrappedCode = `
+    try {
+      const validate = (data) => {
+        ${rules}
+      };
+      result = validate(data);
+    } catch (e) {
+      error = e.message;
+    }
+  `;
+
+  try {
+    const script = new vm.Script(wrappedCode);
+    // 设置执行超时时间为 100ms
+    script.runInContext(context, { timeout: 100 });
+
+    if (context.error) {
+      return `Custom validation runtime error: ${context.error}`;
+    }
+
+    // 验证逻辑：返回 true 表示通过，返回字符串表示错误消息，其他值表示失败
+    if (context.result === true) {
+      return true;
+    } else if (typeof context.result === "string") {
+      return context.result;
+    } else {
+      return "Custom validation failed (rule did not return true)";
+    }
+  } catch (e: any) {
+    if (e.code === "ERR_SCRIPT_EXECUTION_TIMEOUT") {
+      return "Custom validation timeout (max 100ms)";
+    }
+    return `Custom validation script error: ${e.message}`;
+  }
+}
+
+/**
+ * 验证数据是否符合指定的 Schema
+ * @param appId 应用 ID
+ * @param dataType 数据类型
+ * @param data 要验证的数据
+ * @returns 验证结果
+ */
+export async function validateData(
+  appId: string,
+  dataType: string,
+  data: any
+): Promise<ValidationResult> {
+  // 1. 获取最新的活跃 Schema
+  const activeSchema = await prisma.dataSchema.findFirst({
+    where: {
+      appId,
+      dataType,
+      isActive: 1
+    },
+    orderBy: {
+      version: "desc"
+    }
+  });
+
+  // 2. 如果没有定义 Schema，视为不符合规则，拒绝存入
+  if (!activeSchema) {
+    return {
+      valid: false,
+      errors: [`No active schema defined for data type: ${dataType}. Please register a schema first via POST /api/schema/${appId}/${dataType}`]
+    };
+  }
+
+  // 3. 执行 JSON Schema 验证
+  try {
+    const schemaObj = JSON.parse(activeSchema.schema);
+    const validate = ajv.compile(schemaObj);
+    const valid = validate(data);
+
+    if (!valid) {
+      return {
+        valid: false,
+        errors: validate.errors || ["Unknown validation error"],
+        schemaVersion: activeSchema.version
+      };
+    }
+
+    // 4. 执行自定义验证规则 (如果存在)
+    if (activeSchema.validationRules) {
+      const customResult = await runCustomValidation(data, activeSchema.validationRules);
+      
+      if (customResult !== true) {
+        return {
+          valid: false,
+          errors: [customResult],
+          schemaVersion: activeSchema.version
+        };
+      }
+    }
+
+    return {
+      valid: true,
+      schemaVersion: activeSchema.version
+    };
+  } catch (e: any) {
+    return {
+      valid: false,
+      errors: [`Schema compilation or execution error: ${e.message}`],
+      schemaVersion: activeSchema.version
+    };
+  }
+}

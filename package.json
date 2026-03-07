@@ -6,6 +6,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
+    "start:prod": "next build && next start --port 3000",
     "lint": "next lint",
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
@@ -14,6 +15,8 @@
   "dependencies": {
     "@auth/prisma-adapter": "^1.5.0",
     "@prisma/client": "^5.14.0",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
     "bcryptjs": "^3.0.3",
     "jose": "^5.2.3",
     "next": "14.2.3",

@@ -4,6 +4,7 @@ import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 import { checkRecordPermission, checkFieldPermission, mergeFieldPermissions } from "@/lib/permissions";
+import { validateData } from "@/lib/validation";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -142,6 +143,7 @@ export const PATCH = withDataCors(async function handler(
     | {
         data?: Record<string, any>;
         permissions?: Record<string, any>;
+        skipValidation?: boolean;
       }
     | null;
 
@@ -155,12 +157,13 @@ export const PATCH = withDataCors(async function handler(
 
   let newData = currentData;
   let newPermissions = currentPermissions;
+  let schemaVersion = record.schemaVersion;
 
   // 检查是否需要记录级 write 权限（修改非字段数据或权限配置）
   const isOwner = record.ownerId === userId;
 
   if (body.data) {
-    // 检查每个要更新的字段的权限
+    // 1. 权限检查：检查每个要更新的字段的权限
     for (const [fieldPath, value] of Object.entries(body.data)) {
       const hasFieldPermission = await checkFieldPermission(
         record.permissions,
@@ -183,6 +186,22 @@ export const PATCH = withDataCors(async function handler(
     }
 
     newData = { ...currentData, ...body.data };
+
+    // 2. 数据验证：执行数据验证
+    if (body.skipValidation !== true) {
+      const dataValidation = await validateData(record.appId, record.dataType, newData);
+      if (!dataValidation.valid) {
+        return NextResponse.json(
+          { 
+            error: "VALIDATION_FAILED", 
+            details: dataValidation.errors,
+            schemaVersion: dataValidation.schemaVersion
+          },
+          { status: 400 }
+        );
+      }
+      schemaVersion = dataValidation.schemaVersion ?? null;
+    }
   }
 
   if (body.permissions) {
@@ -209,7 +228,8 @@ export const PATCH = withDataCors(async function handler(
       data: JSON.stringify(newData),
       permissions: JSON.stringify(newPermissions),
       updatedAt: now,
-      updatedById: userId
+      updatedById: userId,
+      schemaVersion: schemaVersion as any
     }
   });
 
