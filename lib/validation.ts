@@ -13,40 +13,26 @@ export interface ValidationResult {
   data?: any; // 返回处理后（如自动填充）的数据
 }
 
+const WILDCARD_PARTS = ["$user", "*"];
+
+function isWildcardPart(part: string): boolean {
+  return WILDCARD_PARTS.includes(part);
+}
+
 /**
- * 后端自动填充变量
- * @param data 当前数据
- * @param schemaObj Schema 对象（包含 autoFill 配置）
- * @param context 上下文信息 (userId, username, prevData)
+ * 对单个路径递归应用自动填充（支持 $user / * 通配：只对已存在的键填充，不创建字面量键）
  */
-export function applyAutoFill(
-  data: any,
-  schemaObj: any,
-  context: { userId: string; username?: string; prevData?: any }
-): any {
-  if (!schemaObj.autoFill || typeof schemaObj.autoFill !== "object") {
-    return data;
-  }
+function applyAutoFillAt(
+  current: any,
+  pathParts: string[],
+  fillType: string,
+  context: { userId: string; username?: string; prevData?: any },
+  now: number
+): void {
+  if (pathParts.length === 0) return;
 
-  const newData = JSON.parse(JSON.stringify(data)); // 深拷贝
-
-  for (const [fieldPath, fillType] of Object.entries(schemaObj.autoFill)) {
-    const pathParts = fieldPath.split(".");
-    let current = newData;
-
-    // 导航到目标字段的父级
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      const part = pathParts[i];
-      if (current[part] === undefined) {
-        current[part] = {};
-      }
-      current = current[part];
-    }
-
-    const lastPart = pathParts[pathParts.length - 1];
-    const now = Math.floor(Date.now() / 1000);
-
-    // 根据填充类型设置值
+  if (pathParts.length === 1) {
+    const lastPart = pathParts[0];
     switch (fillType) {
       case "$serverTime":
         current[lastPart] = now;
@@ -61,13 +47,13 @@ export function applyAutoFill(
         current[lastPart] = context.username || "unknown";
         break;
       case "$uuid":
-        // 如果是新增（原值不存在），则生成 UUID
         if (!current[lastPart]) {
-          current[lastPart] = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          current[lastPart] =
+            Math.random().toString(36).substring(2, 15) +
+            Math.random().toString(36).substring(2, 15);
         }
         break;
       case "$prevValue":
-        // 从旧数据中获取值
         if (context.prevData) {
           let prev = context.prevData;
           for (const part of pathParts) {
@@ -77,6 +63,51 @@ export function applyAutoFill(
         }
         break;
     }
+    return;
+  }
+
+  const part = pathParts[0];
+  const rest = pathParts.slice(1);
+
+  if (isWildcardPart(part)) {
+    // 通配符：只对已存在的键遍历，不创建 $user / * 字面量
+    if (current != null && typeof current === "object" && !Array.isArray(current)) {
+      for (const key of Object.keys(current)) {
+        applyAutoFillAt(current[key], rest, fillType, context, now);
+      }
+    }
+    return;
+  }
+
+  // 普通路径：导航并创建中间对象（仅非通配段）
+  if (current[part] === undefined) {
+    current[part] = {};
+  }
+  applyAutoFillAt(current[part], rest, fillType, context, now);
+}
+
+/**
+ * 后端自动填充变量
+ * 路径中的 $user、* 视为通配符：只对已有键应用填充，不创建 comments["$user"]["*"] 等无效结构。
+ * @param data 当前数据
+ * @param schemaObj Schema 对象（包含 autoFill 配置）
+ * @param context 上下文信息 (userId, username, prevData)
+ */
+export function applyAutoFill(
+  data: any,
+  schemaObj: any,
+  context: { userId: string; username?: string; prevData?: any }
+): any {
+  if (!schemaObj.autoFill || typeof schemaObj.autoFill !== "object") {
+    return data;
+  }
+
+  const newData = JSON.parse(JSON.stringify(data));
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const [fieldPath, fillType] of Object.entries(schemaObj.autoFill)) {
+    const pathParts = fieldPath.split(".");
+    applyAutoFillAt(newData, pathParts, fillType as string, context, now);
   }
 
   return newData;

@@ -71,61 +71,6 @@ async function resolvePermissionVariableAsync(
 }
 
 /**
- * 解析权限配置中的变量（同步接口的异步实现，当前未对外使用）
- * @param perm 权限字符串
- * @param context 上下文信息
- */
-async function resolvePermissionVariable(
-  perm: string,
-  context: {
-    userId: string;
-    ownerId: string | null;
-    appId: string;
-    appAdmin: boolean;
-    systemAdmin: boolean;
-  }
-): Promise<boolean> {
-  // 系统管理员拥有所有权限
-  if (context.systemAdmin) {
-    return true;
-  }
-
-  // 记录所有者拥有所有权限
-  if (context.ownerId === context.userId) {
-    return true;
-  }
-
-  switch (perm) {
-    case "$owner":
-      return context.ownerId === context.userId;
-    case "$app_admin":
-      return context.appAdmin;
-    case "$all":
-    case "$anyone":
-      return true;
-    case "$public":
-      // 公开权限，所有人可访问
-      return true;
-    case "$app":
-      // 应用管理员权限
-      return context.appAdmin;
-    default:
-      // 检查特定用户权限: $user:{id}
-      if (perm.startsWith("$user:")) {
-        const targetUserId = perm.slice(6);
-        return targetUserId === context.userId;
-      }
-      // 检查特定角色权限: $role:{role}
-      if (perm.startsWith("$role:")) {
-        const targetRole = perm.slice(6);
-        return await checkUserRole(context.userId, targetRole);
-      }
-      // 直接匹配用户ID
-      return perm === context.userId;
-  }
-}
-
-/**
  * 检查用户是否是系统管理员 (role=admin)
  * 系统管理员拥有所有权限
  */
@@ -143,7 +88,8 @@ export async function isSystemAdmin(userId: string): Promise<boolean> {
  */
 export async function isAppAdmin(appId: string, userId: string): Promise<boolean> {
   const app = await prisma.app.findUnique({
-    where: { id: appId }
+    where: { id: appId },
+    select: { ownerId: true }
   });
 
   if (!app) {
@@ -155,17 +101,17 @@ export async function isAppAdmin(appId: string, userId: string): Promise<boolean
     return true;
   }
 
-  // 检查是否在 adminIds 列表中
-  if (app.adminIds) {
-    try {
-      const adminIds: string[] = JSON.parse(app.adminIds);
-      return adminIds.includes(userId);
-    } catch {
-      return false;
+  // 检查是否在 AppAdmin 表中
+  const admin = await prisma.appAdmin.findUnique({
+    where: {
+      appId_userId: {
+        appId,
+        userId
+      }
     }
-  }
+  });
 
-  return false;
+  return !!admin;
 }
 
 /**
@@ -173,7 +119,12 @@ export async function isAppAdmin(appId: string, userId: string): Promise<boolean
  */
 export async function getAppAdminIds(appId: string): Promise<string[]> {
   const app = await prisma.app.findUnique({
-    where: { id: appId }
+    where: { id: appId },
+    include: {
+      admins: {
+        select: { userId: true }
+      }
+    }
   });
 
   if (!app) {
@@ -188,13 +139,8 @@ export async function getAppAdminIds(appId: string): Promise<string[]> {
   }
 
   // 添加其他管理员
-  if (app.adminIds) {
-    try {
-      const parsedIds: string[] = JSON.parse(app.adminIds);
-      adminIds.push(...parsedIds);
-    } catch {
-      // 解析失败，忽略
-    }
+  if (app.admins) {
+    adminIds.push(...app.admins.map(a => a.userId));
   }
 
   return [...new Set(adminIds)]; // 去重
@@ -316,30 +262,24 @@ export async function addAppAdmin(appId: string, userId: string): Promise<boolea
     return false;
   }
 
-  let adminIds: string[] = [];
-  if (app.adminIds) {
-    try {
-      adminIds = JSON.parse(app.adminIds);
-    } catch {
-      adminIds = [];
-    }
-  }
-
-  // 避免重复添加
-  if (adminIds.includes(userId)) {
-    return true;
-  }
-
   // 不能添加 owner 为 admin（owner 已经是最高权限）
   if (app.ownerId === userId) {
     return true;
   }
 
-  adminIds.push(userId);
-
-  await prisma.app.update({
-    where: { id: appId },
-    data: { adminIds: JSON.stringify(adminIds) }
+  await prisma.appAdmin.upsert({
+    where: {
+      appId_userId: {
+        appId,
+        userId
+      }
+    },
+    update: {},
+    create: {
+      appId,
+      userId,
+      createdAt: Math.floor(Date.now() / 1000)
+    }
   });
 
   return true;
@@ -349,36 +289,19 @@ export async function addAppAdmin(appId: string, userId: string): Promise<boolea
  * 移除应用管理员
  */
 export async function removeAppAdmin(appId: string, userId: string): Promise<boolean> {
-  const app = await prisma.app.findUnique({
-    where: { id: appId }
-  });
-
-  if (!app || !app.adminIds) {
-    return false;
-  }
-
-  let adminIds: string[] = [];
   try {
-    adminIds = JSON.parse(app.adminIds);
+    await prisma.appAdmin.delete({
+      where: {
+        appId_userId: {
+          appId,
+          userId
+        }
+      }
+    });
+    return true;
   } catch {
     return false;
   }
-
-  const newAdminIds = adminIds.filter(id => id !== userId);
-
-  if (newAdminIds.length === adminIds.length) {
-    // 用户不在管理员列表中
-    return false;
-  }
-
-  await prisma.app.update({
-    where: { id: appId },
-    data: {
-      adminIds: newAdminIds.length > 0 ? JSON.stringify(newAdminIds) : null
-    }
-  });
-
-  return true;
 }
 
 /**
@@ -465,22 +388,7 @@ function findFieldPermission(
 }
 
 /**
- * 检查用户对特定字段是否有指定权限
- * @param permissions 记录的权限配置 JSON 字符串
- * @param userId 当前用户 ID
- * @param appId 应用 ID
- * @param ownerId 记录所有者 ID
- * @param fieldPath 字段路径，如 "data.title" 或 "data.metadata.comments"
- * @param action 操作类型: read, write, delete
- */
-/**
  * 检查动态路径权限
- * @param perm 权限字符串，如 "$dynamic:likes.$user"
- * @param fieldPath 字段路径，如 "likes"
- * @param dataValue 要写入的数据
- * @param userId 当前用户ID
- * @param currentValue 当前数据（用于比较变更）
- * @returns 是否有权限
  */
 function checkDynamicPermission(
   perm: string,
@@ -573,7 +481,6 @@ function checkDynamicPermission(
 
 /**
  * 检查值是否符合路径约束（增强安全性）
- * 例如：path=["userId"], expectedValue="user123" -> 检查 data.userId === "user123"
  */
 function checkValueAgainstPath(data: any, path: string[], expectedValue: string): boolean {
   if (path.length === 0) {
@@ -596,68 +503,11 @@ function checkValueAgainstPath(data: any, path: string[], expectedValue: string)
     }
     return true;
   } else if (part === "$user") {
-    // 如果是 $user，检查该键的值是否等于 expectedValue
-    // 注意：这里的逻辑取决于具体需求，通常 $user 在值路径中表示该字段必须等于当前用户ID
     return checkValueAgainstPath(data, remaining, expectedValue); 
   } else {
     // 固定键匹配
     return checkValueAgainstPath(data[part], remaining, expectedValue);
   }
-}
-
-/**
- * 递归检查动态路径（用于嵌套结构）
- * @param data 当前数据
- * @param pathParts 路径部分数组
- * @param index 当前检查的路径索引
- * @param userId 当前用户ID
- * @returns 是否有权限
- */
-function checkDynamicPath(
-  data: any,
-  pathParts: string[],
-  index: number,
-  userId: string
-): boolean {
-  // 如果已经检查完所有路径部分，说明有权限
-  if (index >= pathParts.length) {
-    return true;
-  }
-
-  // 如果数据不是对象，无法继续检查
-  if (data == null || typeof data !== "object") {
-    return false;
-  }
-
-  const part = pathParts[index];
-
-  // 检查数据中的每个键
-  for (const key of Object.keys(data)) {
-    let matches = false;
-
-    if (part === "$user") {
-      // 键必须等于当前用户ID
-      matches = key === userId;
-    } else if (part === "*") {
-      // 通配符，匹配任意值
-      matches = true;
-    } else {
-      // 固定值匹配
-      matches = key === part;
-    }
-
-    if (!matches) {
-      return false;
-    }
-
-    // 递归检查下一层
-    const hasPermission = checkDynamicPath(data[key], pathParts, index + 1, userId);
-    if (!hasPermission) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export async function checkFieldPermission(
@@ -691,7 +541,7 @@ export async function checkFieldPermission(
   // 查找字段特定权限（支持通配符匹配，子级覆盖父级）
   const fieldActionPerms = findFieldPermission(fieldsConfig, fieldPath, action);
   
-  // 兼容旧的 write 权限：如果请求的是细分权限但配置中只有 write，则允许
+  // 兼容旧的 write 权限
   let effectiveActionPerms = fieldActionPerms;
   if (!effectiveActionPerms && ["create", "update", "increment", "push"].includes(action)) {
     effectiveActionPerms = findFieldPermission(fieldsConfig, fieldPath, "write");
@@ -702,7 +552,7 @@ export async function checkFieldPermission(
       if (perm === "$all" || perm === "$anyone" || perm === "$public") {
         return true;
       }
-      // 检查动态权限（如果有数据值）
+      // 检查动态权限
       if (perm.startsWith("$dynamic:") && dataValue !== undefined) {
         if (checkDynamicPermission(perm, fieldPath, dataValue, userId, currentValue)) {
           return true;
@@ -711,11 +561,10 @@ export async function checkFieldPermission(
     }
   }
 
-  // 2. 检查默认权限中的公开权限（所有模式都适用）
+  // 2. 检查默认权限中的公开权限
   const defaultConfig = permConfig.default || {};
   let defaultActionPerms = defaultConfig[action];
   
-  // 兼容旧的 write 权限
   if (!Array.isArray(defaultActionPerms) && ["create", "update", "increment", "push"].includes(action)) {
     defaultActionPerms = defaultConfig["write"];
   }
@@ -728,10 +577,8 @@ export async function checkFieldPermission(
     }
   }
 
-  // 限制授权模式下，只能访问自己的数据或公开数据
-  // 但动态权限在 restricted 模式下也应该被检查
+  // 限制授权模式
   if (authType === "restricted") {
-    // 再次检查动态权限（如果有数据值）
     if (fieldActionPerms && dataValue !== undefined) {
       for (const perm of fieldActionPerms) {
         if (perm.startsWith("$dynamic:")) {
@@ -744,28 +591,16 @@ export async function checkFieldPermission(
     return false;
   }
 
-  // 完整授权模式下，检查系统管理员权限
+  // 完整授权模式
   const systemAdmin = await isSystemAdmin(userId);
-  if (systemAdmin) {
-    return true;
-  }
+  if (systemAdmin) return true;
 
-  // 完整授权模式下，检查应用管理员权限
   const appAdmin = await isAppAdmin(appId, userId);
-  if (appAdmin) {
-    return true;
-  }
+  if (appAdmin) return true;
 
-  const context = {
-    userId,
-    ownerId,
-    appId,
-    appAdmin,
-    systemAdmin
-  };
+  const context = { userId, ownerId, appId, appAdmin, systemAdmin };
 
-  // 3. 完整授权模式下，检查字段特定权限（使用异步版本以支持 $role）
-  // 使用新的权限查找逻辑（支持通配符和继承）
+  // 3. 完整授权模式下，检查字段特定权限
   if (effectiveActionPerms) {
     for (const perm of effectiveActionPerms) {
       if (await resolvePermissionVariableAsync(perm, context)) {
@@ -774,7 +609,7 @@ export async function checkFieldPermission(
     }
   }
 
-  // 4. 完整授权模式下，检查默认权限（使用异步版本以支持 $role）
+  // 4. 完整授权模式下，检查默认权限
   if (Array.isArray(defaultActionPerms)) {
     for (const perm of defaultActionPerms) {
       if (await resolvePermissionVariableAsync(perm, context)) {
@@ -788,8 +623,6 @@ export async function checkFieldPermission(
 
 /**
  * 合并权限配置
- * @param current 当前权限配置
- * @param updates 更新的权限配置
  */
 export function mergeFieldPermissions(
   current: Record<string, any>,
@@ -797,14 +630,12 @@ export function mergeFieldPermissions(
 ): Record<string, any> {
   const merged: Record<string, any> = { ...current };
 
-  // 合并 default 配置
   if (updates.default) {
     const currentDefault = (merged.default ?? {}) as Record<string, any>;
     const updatesDefault = updates.default as Record<string, any>;
     merged.default = { ...currentDefault, ...updatesDefault };
   }
 
-  // 合并 fields 配置
   if (updates.fields) {
     const currentFields = (merged.fields ?? {}) as Record<string, Record<string, any>>;
     const updatesFields = updates.fields as Record<string, Record<string, any>>;
@@ -813,11 +644,7 @@ export function mergeFieldPermissions(
 
     for (const [fieldPath, fieldConfig] of Object.entries(updatesFields)) {
       const existingConfig = newFields[fieldPath] ?? {};
-      if (newFields[fieldPath]) {
-        newFields[fieldPath] = { ...existingConfig, ...fieldConfig };
-      } else {
-        newFields[fieldPath] = { ...fieldConfig };
-      }
+      newFields[fieldPath] = { ...existingConfig, ...fieldConfig };
     }
 
     merged.fields = newFields;
@@ -828,42 +655,33 @@ export function mergeFieldPermissions(
 
 /**
  * 过滤数据，只返回用户有权限读取的字段
- * @param data 原始数据
- * @param permissions 权限配置
- * @param userId 当前用户 ID
- * @param appId 应用 ID
- * @param ownerId 记录所有者 ID
  */
 export async function filterReadableFields(
   data: Record<string, any>,
   permissions: string,
-  userId: string,
+  userId: string | null,
   appId: string,
   ownerId: string | null
 ): Promise<Record<string, any>> {
-  // 所有者有所有权限
-  if (ownerId === userId) {
+  if (ownerId === userId && userId !== null) {
     return data;
   }
 
-  // 系统管理员或应用管理员有所有权限
-  const systemAdmin = await isSystemAdmin(userId);
+  const systemAdmin = userId ? await isSystemAdmin(userId) : false;
   if (systemAdmin) return data;
 
-  const appAdmin = await isAppAdmin(appId, userId);
+  const appAdmin = userId ? await isAppAdmin(appId, userId) : false;
   if (appAdmin) return data;
 
-  // 解析权限配置
   let permConfig: Record<string, any>;
   try {
     permConfig = JSON.parse(permissions);
   } catch {
-    // 默认权限：只有所有者可读
     return {};
   }
 
   const context = {
-    userId,
+    userId: userId || "",
     ownerId,
     appId,
     appAdmin,
@@ -872,32 +690,40 @@ export async function filterReadableFields(
 
   const result: Record<string, any> = {};
 
-  // 检查每个顶层字段
   for (const [key, value] of Object.entries(data)) {
     const fieldPath = `data.${key}`;
-
-    // 检查字段特定读权限
     const fieldsConfig = permConfig.fields || {};
-    const fieldConfig = fieldsConfig[fieldPath];
+    
+    // 使用 findFieldPermission 支持通配符
+    const fieldReadPerms = findFieldPermission(fieldsConfig, fieldPath, "read");
 
     let hasReadPermission = false;
 
-    if (fieldConfig && Array.isArray(fieldConfig.read)) {
-      for (const perm of fieldConfig.read) {
-        if (await resolvePermissionVariableAsync(perm, context)) {
+    if (Array.isArray(fieldReadPerms)) {
+      for (const perm of fieldReadPerms) {
+        if (userId === null) {
+          if (perm === "$public") {
+            hasReadPermission = true;
+            break;
+          }
+        } else if (await resolvePermissionVariableAsync(perm, context)) {
           hasReadPermission = true;
           break;
         }
       }
     }
 
-    // 如果没有字段特定权限，检查默认权限
     if (!hasReadPermission) {
       const defaultConfig = permConfig.default || {};
       const defaultReadPerms = defaultConfig.read;
       if (Array.isArray(defaultReadPerms)) {
         for (const perm of defaultReadPerms) {
-          if (await resolvePermissionVariableAsync(perm, context)) {
+          if (userId === null) {
+            if (perm === "$public") {
+              hasReadPermission = true;
+              break;
+            }
+          } else if (await resolvePermissionVariableAsync(perm, context)) {
             hasReadPermission = true;
             break;
           }
@@ -911,4 +737,44 @@ export async function filterReadableFields(
   }
 
   return result;
+}
+
+/**
+ * 获取合并后的有效权限
+ */
+export function getEffectivePermissions(
+  defaultPermissions: string | null,
+  permissionOverride: string | null
+): string {
+  const base = defaultPermissions 
+    ? JSON.parse(defaultPermissions) 
+    : { default: { read: ["$owner", "$app_admin"], write: ["$owner"], delete: ["$owner"] } };
+    
+  if (!permissionOverride) return JSON.stringify(base);
+  
+  try {
+    return JSON.stringify(mergeFieldPermissions(base, JSON.parse(permissionOverride)));
+  } catch {
+    return JSON.stringify(base);
+  }
+}
+
+/**
+ * 检查授权作用域
+ */
+export function checkAuthorizationScope(
+  scope: string | null,
+  action: "read" | "write" | "delete",
+  dataType: string
+): boolean {
+  if (!scope) return true; 
+  
+  try {
+    const { actions, dataTypes } = JSON.parse(scope);
+    if (actions && Array.isArray(actions) && !actions.includes(action)) return false;
+    if (dataTypes && Array.isArray(dataTypes) && !dataTypes.includes(dataType)) return false;
+    return true;
+  } catch {
+    return true; // 解析失败默认允许
+  }
 }

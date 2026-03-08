@@ -45,7 +45,7 @@ function EmbedPageContent() {
               username: data.user.username,
               role: data.user.role
             });
-            const adminRes = await fetch(`/api/app/${appId}/admin-check`, {
+            const adminRes = await fetch(`/api/app/${appId}`, {
               method: "GET",
               credentials: "include"
             });

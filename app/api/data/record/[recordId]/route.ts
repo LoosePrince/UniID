@@ -3,7 +3,14 @@ import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
-import { checkRecordPermission, checkFieldPermission, mergeFieldPermissions } from "@/lib/permissions";
+import { 
+  checkRecordPermission, 
+  checkFieldPermission, 
+  mergeFieldPermissions, 
+  getEffectivePermissions, 
+  filterReadableFields,
+  checkAuthorizationScope
+} from "@/lib/permissions";
 import { validateData } from "@/lib/validation";
 
 export async function OPTIONS(req: NextRequest) {
@@ -16,7 +23,7 @@ async function validateRequest(
   action: "read" | "write" | "delete"
 ): Promise<
   | { valid: false; response: NextResponse }
-  | { valid: true; record: any; userId: string; authType: "full" | "restricted" }
+  | { valid: true; record: any; userId: string; authType: "full" | "restricted"; effectivePermissions: string }
 > {
   const record = await prisma.record.findUnique({
     where: { id: recordId }
@@ -53,8 +60,24 @@ async function validateRequest(
   const userId = tokenValidation.payload!.sub;
   const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
+  // 1. 检查授权作用域
+  const authorization = await prisma.authorization.findUnique({
+    where: { userId_appId: { userId, appId: record.appId } }
+  });
+  if (!checkAuthorizationScope(authorization?.permissions ?? null, action, record.dataType)) {
+    return { valid: false, response: NextResponse.json({ error: "SCOPE_INSUFFICIENT" }, { status: 403 }) };
+  }
+
+  // 2. 获取有效权限
+  const schema = await prisma.dataSchema.findFirst({
+    where: { appId: record.appId, dataType: record.dataType, isActive: 1 },
+    orderBy: { version: "desc" }
+  });
+  const effectivePermissions = getEffectivePermissions(schema?.defaultPermissions ?? null, record.permissionOverride);
+
+  // 3. 检查记录级权限
   const hasPermission = await checkRecordPermission(
-    record.permissions,
+    effectivePermissions,
     userId,
     record.appId,
     record.ownerId,
@@ -66,7 +89,7 @@ async function validateRequest(
     return { valid: false, response: NextResponse.json({ error: "FORBIDDEN" }, { status: 403 }) };
   }
 
-  return { valid: true, record, userId, authType };
+  return { valid: true, record, userId, authType, effectivePermissions };
 }
 
 export const GET = withDataCors(async function handler(
@@ -80,15 +103,24 @@ export const GET = withDataCors(async function handler(
     return validation.response;
   }
 
-  const { record } = validation;
+  const { record, userId, effectivePermissions } = validation;
+
+  // 4. 执行字段级读过滤
+  const filteredData = await filterReadableFields(
+    JSON.parse(record.data),
+    effectivePermissions,
+    userId,
+    record.appId,
+    record.ownerId
+  );
 
   return NextResponse.json({
     id: record.id,
     app_id: record.appId,
     owner_id: record.ownerId,
     data_type: record.dataType,
-    data: JSON.parse(record.data),
-    permissions: JSON.parse(record.permissions),
+    data: filteredData,
+    permissions: JSON.parse(effectivePermissions),
     created_at: record.createdAt,
     updated_at: record.updatedAt
   });
@@ -99,45 +131,15 @@ export const PATCH = withDataCors(async function handler(
   context: { params: { recordId: string } }
 ): Promise<NextResponse> {
   const { recordId } = context.params;
-
-  // 获取记录
-  const record = await prisma.record.findUnique({
-    where: { id: recordId }
-  });
-
-  if (!record || record.deleted === 1) {
-    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
-  }
-
-  // 验证 Origin
-  const validation = await validateAppIdOriginMatch(req, record.appId);
+  
+  // 使用 validateRequest 进行基础验证和权限检查
+  const validation = await validateRequest(req, recordId, "write");
   if (!validation.valid) {
-    return NextResponse.json(
-      { error: validation.error || "FORBIDDEN" },
-      { status: 403 }
-    );
+    return validation.response;
   }
 
-  // 验证 Token
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "MISSING_TOKEN" }, { status: 401 });
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
-
-  const tokenValidation = await verifyTokenWithAppIdCheck(token, origin, record.appId);
-  if (!tokenValidation.valid) {
-    return NextResponse.json(
-      { error: tokenValidation.error || "INVALID_TOKEN" },
-      { status: 401 }
-    );
-  }
-
-  const userId = tokenValidation.payload!.sub;
-  const username = (tokenValidation.payload as any)!.username;
-  const authType = tokenValidation.payload!.auth_type ?? "restricted";
+  const { record, userId, authType, effectivePermissions } = validation;
+  const username = (await prisma.user.findUnique({ where: { id: userId }, select: { username: true } }))?.username || "";
 
   // 解析请求体
   const body = (await req.json().catch(() => null)) as
@@ -154,32 +156,27 @@ export const PATCH = withDataCors(async function handler(
 
   const now = Math.floor(Date.now() / 1000);
   const currentData = JSON.parse(record.data);
-  const currentPermissions = JSON.parse(record.permissions);
-
+  
   let newData = currentData;
-  let newPermissions = currentPermissions;
-  let schemaVersion = (record as any).schemaVersion;
-
-  // 检查是否需要记录级 write 权限（修改非字段数据或权限配置）
-  const isOwner = record.ownerId === userId;
+  let newPermissionOverride = record.permissionOverride;
+  let schemaVersion = record.schemaVersion;
 
   if (body.data) {
-    // 1. 权限检查：检查每个要更新的字段的权限
+    // 5. 字段级写权限检查
     for (const [fieldPath, value] of Object.entries(body.data)) {
-      // 识别细分操作：是 create 还是 update
       const isNewField = currentData[fieldPath] === undefined;
       const action = isNewField ? "create" : "update";
 
       const hasFieldPermission = await checkFieldPermission(
-        record.permissions,
+        effectivePermissions,
         userId,
         record.appId,
         record.ownerId,
         fieldPath,
         action,
         authType,
-        value,  // 传入要写入的数据值，用于动态权限检查
-        currentData[fieldPath]  // 传入当前值，用于比较变更
+        value,
+        currentData[fieldPath]
       );
 
       if (!hasFieldPermission) {
@@ -192,7 +189,7 @@ export const PATCH = withDataCors(async function handler(
 
     newData = { ...currentData, ...body.data };
 
-    // 2. 数据验证：执行数据验证
+    // 6. 数据验证
     if (body.skipValidation !== true) {
       const dataValidation = await validateData(record.appId, record.dataType, newData, { 
         userId, 
@@ -215,41 +212,38 @@ export const PATCH = withDataCors(async function handler(
   }
 
   if (body.permissions) {
-    // 修改权限配置需要记录级 write 权限或管理员权限
-    const hasRecordWritePermission = await checkRecordPermission(
-      record.permissions,
-      userId,
-      record.appId,
-      record.ownerId,
-      "write",
-      authType
-    );
-
-    if (!hasRecordWritePermission) {
-      return NextResponse.json({ error: "PERMISSION_UPDATE_FORBIDDEN" }, { status: 403 });
-    }
-
-    newPermissions = mergeFieldPermissions(currentPermissions, body.permissions);
+    // 修改权限配置需要记录级 write 权限，validateRequest 已经检查过了
+    // 我们将更新后的权限存入 permissionOverride
+    const currentOverrideObj = record.permissionOverride ? JSON.parse(record.permissionOverride) : {};
+    const updatedOverrideObj = mergeFieldPermissions(currentOverrideObj, body.permissions);
+    newPermissionOverride = JSON.stringify(updatedOverrideObj);
   }
 
   const updatedRecord = await prisma.record.update({
     where: { id: recordId },
     data: {
       data: JSON.stringify(newData),
-      permissions: JSON.stringify(newPermissions),
+      permissionOverride: newPermissionOverride,
       updatedAt: now,
       updatedById: userId,
       schemaVersion: schemaVersion as any
     } as any
   });
 
+  // 重新计算有效权限用于返回
+  const schema = await prisma.dataSchema.findFirst({
+    where: { appId: record.appId, dataType: record.dataType, isActive: 1 },
+    orderBy: { version: "desc" }
+  });
+  const finalEffectivePermissions = getEffectivePermissions(schema?.defaultPermissions ?? null, updatedRecord.permissionOverride);
+
   return NextResponse.json({
     id: updatedRecord.id,
     app_id: updatedRecord.appId,
     owner_id: updatedRecord.ownerId,
     data_type: updatedRecord.dataType,
-    data: JSON.parse(updatedRecord.data),
-    permissions: JSON.parse(updatedRecord.permissions),
+    data: newData, // 这里可以考虑是否也需要 filterReadableFields
+    permissions: JSON.parse(finalEffectivePermissions),
     created_at: updatedRecord.createdAt,
     updated_at: updatedRecord.updatedAt
   });
@@ -280,4 +274,3 @@ export const DELETE = withDataCors(async function handler(
 
   return NextResponse.json({ success: true, deleted: recordId });
 });
-

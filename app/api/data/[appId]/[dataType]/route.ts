@@ -4,6 +4,7 @@ import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 import { validateData } from "@/lib/validation";
+import { checkAuthorizationScope } from "@/lib/permissions";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -44,6 +45,15 @@ export const POST = withDataCors(async function handler(
 
   const userId = tokenValidation.payload!.sub;
   const username = (tokenValidation.payload as any)!.username;
+  const authType = (tokenValidation.payload as any)!.auth_type ?? "restricted";
+
+  // 1. 检查授权作用域
+  const authorization = await prisma.authorization.findUnique({
+    where: { userId_appId: { userId, appId } }
+  });
+  if (!checkAuthorizationScope(authorization?.permissions ?? null, "write", dataType)) {
+    return NextResponse.json({ error: "SCOPE_INSUFFICIENT" }, { status: 403 });
+  }
 
   const body = (await req.json().catch(() => null)) as
     | {
@@ -59,26 +69,40 @@ export const POST = withDataCors(async function handler(
 
   let schemaVersion: number | null = null;
   let finalData = body.data;
+  let defaultPermissions: string | null = null;
 
-  // 核心：执行数据验证
-  if (body.skipValidation !== true) {
-    const dataValidation = await validateData(appId, dataType, body.data, { userId, username });
-    if (!dataValidation.valid) {
-      return NextResponse.json(
-        { 
-          error: "VALIDATION_FAILED", 
-          details: dataValidation.errors,
-          schemaVersion: dataValidation.schemaVersion
-        },
-        { status: 400 }
-      );
+  // 2. 获取 Schema 并执行数据验证
+  const schema = await prisma.dataSchema.findFirst({
+    where: { appId, dataType, isActive: 1 },
+    orderBy: { version: "desc" }
+  });
+
+  if (schema) {
+    defaultPermissions = schema.defaultPermissions;
+    if (body.skipValidation !== true) {
+      const dataValidation = await validateData(appId, dataType, body.data, { userId, username });
+      if (!dataValidation.valid) {
+        return NextResponse.json(
+          { 
+            error: "VALIDATION_FAILED", 
+            details: dataValidation.errors,
+            schemaVersion: dataValidation.schemaVersion
+          },
+          { status: 400 }
+        );
+      }
+      schemaVersion = dataValidation.schemaVersion ?? null;
+      finalData = dataValidation.data ?? body.data;
     }
-    // 记录验证通过的 schema 版本和处理后的数据（包含自动填充）
-    schemaVersion = dataValidation.schemaVersion ?? null;
-    finalData = dataValidation.data ?? body.data;
   }
 
   const now = Math.floor(Date.now() / 1000);
+
+  // 3. 处理权限覆盖
+  // 如果客户端传入了权限，我们将其存为 permissionOverride
+  // 注意：目前我们简单地存储整个传入的权限对象，
+  // 理想情况下应该只存储与默认权限不同的部分，但为了保持简单，我们先存储整个对象
+  const permissionOverride = body.permissions ? JSON.stringify(body.permissions) : null;
 
   const record = await prisma.record.create({
     data: {
@@ -86,15 +110,7 @@ export const POST = withDataCors(async function handler(
       ownerId: userId,
       dataType,
       data: JSON.stringify(finalData),
-      permissions: JSON.stringify(
-        body.permissions ?? {
-          default: {
-            read: ["$owner", "$app_admin"],
-            write: ["$owner"],
-            delete: ["$owner"]
-          }
-        }
-      ),
+      permissionOverride,
       createdAt: now,
       updatedAt: now,
       createdById: userId,
@@ -104,11 +120,14 @@ export const POST = withDataCors(async function handler(
     } as any
   });
 
+  // 返回时解析有效权限
+  const { getEffectivePermissions } = await import("@/lib/permissions");
+  const effectivePermissions = getEffectivePermissions(defaultPermissions, permissionOverride);
+
   return NextResponse.json({
     id: record.id,
     created_at: record.createdAt,
     data: JSON.parse(record.data),
-    permissions: JSON.parse(record.permissions)
+    permissions: JSON.parse(effectivePermissions)
   });
 });
-

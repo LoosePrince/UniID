@@ -2,6 +2,7 @@ import { handleDataApiOptions, withDataCors } from "@/lib/cors";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { validateAppIdOriginMatch } from "@/lib/origin";
 import { prisma } from "@/lib/prisma";
+import { isAppAdmin } from "@/lib/permissions";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function OPTIONS(req: NextRequest) {
@@ -47,17 +48,7 @@ export const POST = withDataCors(async function handler(
   const userId = tokenValidation.payload!.sub;
 
   // 3. 权限检查：只有应用所有者或管理员可以定义 Schema
-  const app = await prisma.app.findUnique({
-    where: { id: appId },
-    select: { ownerId: true, adminIds: true }
-  });
-
-  if (!app) {
-    return NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
-  }
-
-  const isAdmin = app.ownerId === userId ||
-    (app.adminIds && JSON.parse(app.adminIds).includes(userId));
+  const isAdmin = await isAppAdmin(appId, userId);
 
   if (!isAdmin) {
     return NextResponse.json({ error: "UNAUTHORIZED_SCHEMA_ADMIN" }, { status: 403 });
@@ -66,6 +57,7 @@ export const POST = withDataCors(async function handler(
   // 4. 解析请求体
   const body = (await req.json().catch(() => null)) as {
     schema?: any;
+    defaultPermissions?: any;
     description?: string;
     validationRules?: string;
     isActive?: boolean;
@@ -84,6 +76,19 @@ export const POST = withDataCors(async function handler(
     }
   } catch (e) {
     return NextResponse.json({ error: "INVALID_JSON_SCHEMA" }, { status: 400 });
+  }
+
+  // 验证 defaultPermissions 是否为有效的 JSON
+  if (body.defaultPermissions) {
+    try {
+      if (typeof body.defaultPermissions === "string") {
+        JSON.parse(body.defaultPermissions);
+      } else {
+        JSON.stringify(body.defaultPermissions);
+      }
+    } catch (e) {
+      return NextResponse.json({ error: "INVALID_DEFAULT_PERMISSIONS" }, { status: 400 });
+    }
   }
 
   const now = Math.floor(Date.now() / 1000);
@@ -111,6 +116,7 @@ export const POST = withDataCors(async function handler(
       appId,
       dataType,
       schema: typeof body.schema === "string" ? body.schema : JSON.stringify(body.schema),
+      defaultPermissions: body.defaultPermissions ? (typeof body.defaultPermissions === "string" ? body.defaultPermissions : JSON.stringify(body.defaultPermissions)) : null,
       version: nextVersion,
       isActive: body.isActive !== false ? 1 : 0,
       createdAt: now,
@@ -163,6 +169,7 @@ export const GET = withDataCors(async function handler(
     version: schema.version,
     isActive: schema.isActive === 1,
     schema: JSON.parse(schema.schema),
+    defaultPermissions: schema.defaultPermissions ? JSON.parse(schema.defaultPermissions) : null,
     description: schema.description,
     validationRules: schema.validationRules,
     createdAt: schema.createdAt

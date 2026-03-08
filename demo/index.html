@@ -883,17 +883,18 @@
             comments: {}
           };
 
+          // 注意：在新的架构下，permissions 字段现在是可选的覆盖项 (permissionOverride)
+          // 如果不传，将自动使用 DataSchema 中定义的默认权限。
+          // 这里我们传入覆盖项以演示字段级控制。
           const permissions = {
-            default: {
-              read: ["$public"],
-              create: ["$public"],
-              update: ["$owner"],
-              delete: ["$owner"]
-            },
             fields: {
               "title": { read: ["$public"], update: ["$owner"] },
               "content": { read: ["$public"], update: ["$owner"] },
-              "likes": { read: ["$public"], create: ["$dynamic:likes.$user"], delete: ["$dynamic:likes.$user"] },
+              "likes": { 
+                read: ["$public"], 
+                create: ["$dynamic:likes.$user"], 
+                delete: ["$dynamic:likes.$user"] 
+              },
               "comments": { 
                 read: ["$public"], 
                 create: ["$dynamic:comments.$user"],
@@ -1097,7 +1098,7 @@
             return;
           }
 
-          const adminCheck = await fetch(`${authServer}/api/app/${appId}/admin-check`, {
+          const adminCheck = await fetch(`${authServer}/api/app/${appId}`, {
             headers: {
               'Authorization': `Bearer ${auth.getToken()}`
             }
@@ -1149,8 +1150,19 @@
             }
           };
 
+          // 定义默认权限配置 (新架构：类型级权限)
+          const defaultPermissions = {
+            default: {
+              read: ["$public"],
+              create: ["$public"],
+              update: ["$owner"],
+              delete: ["$owner"]
+            }
+          };
+
           // 3. 获取当前 Schema 进行比对
           let currentSchema = null;
+          let currentDefaultPermissions = null;
           try {
             const res = await fetch(`${authServer}/api/schema/${appId}/post`, {
               headers: {
@@ -1160,13 +1172,17 @@
             if (res.ok) {
               const data = await res.json();
               currentSchema = data.schema;
+              currentDefaultPermissions = data.defaultPermissions;
             }
           } catch (e) {
             // 可能尚未定义 Schema
           }
 
           // 4. 如果不一致或不存在，则更新
-          if (JSON.stringify(currentSchema) !== JSON.stringify(expectedSchema)) {
+          const schemaChanged = JSON.stringify(currentSchema) !== JSON.stringify(expectedSchema);
+          const permsChanged = JSON.stringify(currentDefaultPermissions) !== JSON.stringify(defaultPermissions);
+
+          if (schemaChanged || permsChanged) {
             const updateRes = await fetch(`${authServer}/api/schema/${appId}/post`, {
               method: 'POST',
               headers: {
@@ -1175,7 +1191,8 @@
               },
               body: JSON.stringify({
                 schema: expectedSchema,
-                description: "Demo Blog 帖子的标准验证规则 (自动同步)",
+                defaultPermissions: defaultPermissions,
+                description: "Demo Blog 帖子的标准验证规则与默认权限 (自动同步)",
                 isActive: true
               })
             });

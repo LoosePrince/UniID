@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken, verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { isSameOriginAuthRequest } from "@/lib/origin";
 import { handleDataApiOptions } from "@/lib/cors";
+import { isAppAdmin } from "@/lib/permissions";
 
 export async function OPTIONS(req: NextRequest): Promise<NextResponse> {
   return handleDataApiOptions(req);
@@ -44,27 +45,12 @@ export async function GET(
       });
 
       if (!app) {
-        return NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
+        // 应用不存在时也返回 200，统一由前端按“非管理员 / 未配置应用”处理
+        return NextResponse.json({ isAdmin: false, appExists: false });
       }
 
-      // 检查是否是应用所有者
-      if (app.ownerId === userId) {
-        return NextResponse.json({ isAdmin: true });
-      }
-
-      // 检查是否在 adminIds 列表中
-      if (app.adminIds) {
-        try {
-          const adminIds: string[] = JSON.parse(app.adminIds);
-          if (adminIds.includes(userId)) {
-            return NextResponse.json({ isAdmin: true });
-          }
-        } catch {
-          // 解析失败，忽略
-        }
-      }
-
-      return NextResponse.json({ isAdmin: false });
+      const isAdmin = await isAppAdmin(appId, userId);
+      return NextResponse.json({ isAdmin, appExists: true });
     } catch (err) {
       console.error(err);
       return NextResponse.json({ error: "INVALID_TOKEN" }, { status: 401 });
@@ -113,29 +99,19 @@ export async function GET(
   });
 
   if (!app) {
-    const res = NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
+    const res = NextResponse.json(
+      { isAdmin: false, appExists: false },
+      { status: 200 }
+    );
     res.headers.set("Access-Control-Allow-Origin", originHeader);
     res.headers.set("Vary", "Origin");
     res.headers.set("Access-Control-Allow-Credentials", "true");
     return res;
   }
 
-  let isAdmin = false;
+  const isAdmin = await isAppAdmin(appId, userId);
 
-  if (app.ownerId === userId) {
-    isAdmin = true;
-  } else if (app.adminIds) {
-    try {
-      const adminIds: string[] = JSON.parse(app.adminIds);
-      if (adminIds.includes(userId)) {
-        isAdmin = true;
-      }
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  const res = NextResponse.json({ isAdmin });
+  const res = NextResponse.json({ isAdmin, appExists: true });
   res.headers.set("Access-Control-Allow-Origin", originHeader);
   res.headers.set("Vary", "Origin");
   res.headers.set("Access-Control-Allow-Credentials", "true");

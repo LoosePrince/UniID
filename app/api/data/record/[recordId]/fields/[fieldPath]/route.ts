@@ -3,7 +3,11 @@ import { withDataCors, handleDataApiOptions } from "@/lib/cors";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { validateAppIdOriginMatch } from "@/lib/origin";
-import { checkFieldPermission } from "@/lib/permissions";
+import { 
+  checkFieldPermission, 
+  getEffectivePermissions, 
+  checkAuthorizationScope 
+} from "@/lib/permissions";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -87,15 +91,24 @@ export const DELETE = withDataCors(async function handler(
   const userId = tokenValidation.payload!.sub;
   const authType = tokenValidation.payload!.auth_type ?? "restricted";
 
-  if (authType === "restricted") {
-    return NextResponse.json(
-      { error: "RESTRICTED_AUTH_CANNOT_DELETE_FIELD" },
-      { status: 403 }
-    );
+  // 1. 检查授权作用域
+  const authorization = await prisma.authorization.findUnique({
+    where: { userId_appId: { userId, appId: record.appId } }
+  });
+  if (!checkAuthorizationScope(authorization?.permissions ?? null, "delete", record.dataType)) {
+    return NextResponse.json({ error: "SCOPE_INSUFFICIENT" }, { status: 403 });
   }
 
+  // 2. 获取有效权限
+  const schema = await prisma.dataSchema.findFirst({
+    where: { appId: record.appId, dataType: record.dataType, isActive: 1 },
+    orderBy: { version: "desc" }
+  });
+  const effectivePermissions = getEffectivePermissions(schema?.defaultPermissions ?? null, record.permissionOverride);
+
+  // 3. 检查字段权限（移除之前的 restricted 硬编码拦截）
   const hasPermission = await checkFieldPermission(
-    record.permissions,
+    effectivePermissions,
     userId,
     record.appId,
     record.ownerId,

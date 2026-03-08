@@ -21,12 +21,18 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { app_id?: string; auth_type?: string; parent_origin?: string | null }
+    | { 
+        app_id?: string; 
+        auth_type?: string; 
+        parent_origin?: string | null;
+        scope?: string | null;
+      }
     | null;
 
   const appId = body?.app_id;
   const authType = body?.auth_type;
   const parentOrigin = body?.parent_origin ?? null;
+  const scope = body?.scope ?? null;
 
   if (!appId || (authType !== "full" && authType !== "restricted")) {
     return NextResponse.json(
@@ -131,7 +137,8 @@ export async function POST(req: NextRequest) {
       authType,
       grantedAt: now,
       expiresAt: now + 60 * 60 * 24 * 30, // 应用授权有效期：30 天
-      revoked: 0
+      revoked: 0,
+      permissions: scope
     },
     create: {
       userId: user.id,
@@ -140,7 +147,7 @@ export async function POST(req: NextRequest) {
       grantedAt: now,
       expiresAt: now + 60 * 60 * 24 * 30,
       revoked: 0,
-      permissions: null
+      permissions: scope
     }
   });
 
