@@ -101,9 +101,9 @@ CREATE TABLE apps (
     status TEXT DEFAULT 'active',              -- 状态
     apiKey TEXT UNIQUE,                        -- API密钥
     settings TEXT,                             -- 应用设置(JSON字符串)
-    adminIds TEXT,                             -- 应用管理员ID列表(JSON数组)
     FOREIGN KEY (ownerId) REFERENCES users(id)
 );
+-- 应用管理员通过 AppAdmin 关联表维护 (appId, userId)
 
 -- 授权表
 CREATE TABLE authorizations (
@@ -127,12 +127,13 @@ CREATE TABLE records (
     ownerId TEXT,                              -- 所有者ID(空表示应用级数据)
     dataType TEXT NOT NULL,                    -- 数据类型(如: post, form)
     data TEXT NOT NULL,                        -- 实际数据(JSON字符串)
-    permissions TEXT NOT NULL,                 -- 权限配置(JSON字符串)
+    permissionOverride TEXT,                   -- 权限配置(JSON字符串，可选)
     createdAt INTEGER NOT NULL,                -- 创建时间
     updatedAt INTEGER NOT NULL,                -- 更新时间
     createdById TEXT,                          -- 创建者ID
     updatedById TEXT,                          -- 更新者ID
     deleted INTEGER DEFAULT 0,                 -- 软删除
+    schemaVersion INTEGER,                     -- 所用 Schema 版本(可选)
     FOREIGN KEY (appId) REFERENCES apps(id),
     FOREIGN KEY (ownerId) REFERENCES users(id),
     FOREIGN KEY (createdById) REFERENCES users(id),
@@ -169,7 +170,7 @@ CREATE TABLE verification_tokens (
 ### 3.2 权限数据结构
 
 ```sql
--- records表的permissions字段JSON结构示例
+-- records表的permissionOverride字段JSON结构示例（未设置时使用应用/数据类型默认权限）
     "default": {
         "read": ["$public"],           -- 默认读权限
         "create": ["$owner"],          -- 默认新增权限
@@ -237,7 +238,8 @@ CREATE TABLE verification_tokens (
 1. 用户访问网站 -> 网站检查是否有有效token
 2. 无token -> 显示登录按钮，点击后iframe弹出登录页
 3. 用户在统一登录页登录 -> 显示授权确认页面
-   - 显示申请授权的网站信息
+   - 显示申请授权的网站信息（应用名称、描述、域名、ID）
+   - 横竖屏自适应布局（桌面端双栏，移动端全贴合）
    - 提供授权类型选择(完整/限制)
 4. 用户确认授权 -> 生成授权记录和token
 5. token通过postMessage返回给网站
@@ -265,7 +267,7 @@ CREATE TABLE verification_tokens (
 5. **登录返回**：返回 Embed 后，SDK 再次发送 `uniid_init`，Embed 再次从 `event.origin` 获取父页面 Origin
 6. **授权请求**：用户点击「同意并授权」时，Embed 将 `parent_origin`（来自 `event.origin`）随请求体发送给 `/api/auth/authorize`
 7. **后端校验**：
-   - 请求 `Origin` 必须在 `AUTH_ALLOWED_ORIGINS` 内（请求来自 UniID）
+   - 请求 `Origin` 必须在 `AUTH_ALLOWED_ORIGINS` 内（未配置时使用 `NEXTAUTH_URL`/`AUTH_URL`），即请求来自 UniID 自身
    - 必须提供 `parent_origin`，否则 400
    - `parent_origin` 的 host 必须与 `app.domain` 一致，否则 403
 
@@ -276,6 +278,8 @@ CREATE TABLE verification_tokens (
 - 自定义请求头（如 `X-Parent-Origin`）：客户端可伪造
 
 ## 五、API设计
+
+**CORS 与 Origin**：认证授权接口 `/api/auth/authorize` 仅接受同源请求（Origin 在 AUTH_ALLOWED_ORIGINS / NEXTAUTH_URL 内）。数据类接口（`/api/data/*`、`/api/app/*`）及 `/api/auth/revoke` 支持跨域：允许的 Origin 为开发环境 `localhost`/`127.0.0.1`，或生产环境中与某应用注册的 `domain` 一致。
 
 ### 5.1 认证相关
 
@@ -303,23 +307,81 @@ Headers:
     Authorization: Bearer {refresh_token}
 Response: 同上
 
-POST /api/auth/logout
+POST /api/auth/authorize
+（仅同源：Origin 须在 AUTH_ALLOWED_ORIGINS / NEXTAUTH_URL 内，通常由 UniID 站内 embed 页面调用）
+Request: Cookie: uniid_token={session_token}
+Body:
+{
+    "app_id": "string",
+    "auth_type": "full | restricted",
+    "parent_origin": "string",   // 父页面 Origin（来自 postMessage event.origin，必填）
+    "scope": "string | null"     // 可选，限制授权作用域(如 data_type 白名单)
+}
+Response:
+{
+    "token": "string",
+    "refresh_token": "string",
+    "expires_in": 3600,
+    "user": { "id", "username", "role" },
+    "app_id": "string",
+    "auth_type": "full | restricted"
+}
+
+POST /api/auth/revoke
+（跨域：Origin 须与 app.domain 匹配；用于站点侧撤销授权/登出）
 Headers:
     Authorization: Bearer {token}
+Request:
+{
+    "app_id": "string"   // 必填
+}
+Response:
+{
+    "success": true,
+    "message": "Authorization revoked successfully",
+    "app_id": "string",
+    "revoked_at": 1234567890
+}
 
 GET /api/auth/check
 Headers:
     Authorization: Bearer {token}
+Query Params:
+    app_id: string   // 可选，传入时返回应用详情
 Response:
 {
     "valid": true,
     "user": {...},
+    "app": { "id", "name", "description", "domain" } | null,  // 当 app_id 有效且已登录时返回
     "app_id": "string",
     "auth_type": "full/restricted"
 }
 ```
 
-### 5.2 数据操作API
+### 5.2 应用管理 API
+
+仅**应用管理员**或**系统管理员**可调用；跨域时 Origin 须在应用注册的 `domain` 对应域名下（或开发环境 localhost）。
+
+```
+GET /api/app/{appId}
+Headers:
+    Authorization: Bearer {token}
+Response: 应用详情（含 owner、admins 等），或 404 APP_NOT_FOUND
+
+PATCH /api/app/{appId}
+Headers:
+    Authorization: Bearer {token}
+Request:
+{
+    "name": "string",           // 可选
+    "description": "string",    // 可选
+    "settings": "string|object", // 可选
+    "status": "string"          // 可选，仅系统管理员可改
+}
+Response: 更新后的应用对象
+```
+
+### 5.3 数据操作API
 
 ```
 // 创建记录（写入前会按 Schema 校验 data，未配置 Schema 则拒绝）
@@ -396,9 +458,9 @@ Response:
 }
 ```
 
-### 5.3 数据模式 (Schema) 管理
+### 5.4 数据模式 (Schema) 管理
 
-#### 5.3.1 说明
+#### 5.4.1 说明
 
 UniID 支持为每个应用的每种数据类型 (`dataType`) 定义 **JSON Schema**，用于在写入或更新数据时进行校验。只有符合 Schema 的数据才能存入，否则请求会被拒绝。
 
@@ -406,7 +468,7 @@ UniID 支持为每个应用的每种数据类型 (`dataType`) 定义 **JSON Sche
 - **版本管理**：支持 Schema 版本演进，每次更新会创建新版本
 - **权限控制**：仅应用所有者或管理员可注册/更新 Schema
 
-#### 5.3.2 JSON Schema 规范要点
+#### 5.4.2 JSON Schema 规范要点
 
 | 关键字 | 含义 | 示例 |
 |--------|------|------|
@@ -436,7 +498,7 @@ UniID 支持为每个应用的每种数据类型 (`dataType`) 定义 **JSON Sche
 }
 ```
 
-#### 5.3.3 API 用法
+#### 5.4.3 API 用法
 
 ```
 // 注册 Schema（仅应用所有者或管理员）
@@ -477,7 +539,7 @@ Response:
 }
 ```
 
-#### 5.3.4 数据写入时的验证
+#### 5.4.4 数据写入时的验证
 
 - **创建记录**：`POST /api/data/{app_id}/{data_type}` 在写入前会校验 `data` 是否符合 Schema
 - **更新记录**：`PATCH /api/data/record/{record_id}` 在更新时会对合并后的完整 `data` 重新校验
@@ -493,7 +555,7 @@ Response:
 }
 ```
 
-#### 5.3.5 后端自动填充 (Auto-fill)
+#### 5.4.5 后端自动填充 (Auto-fill)
 
 支持在数据存入数据库前由后端强制填充变量，用户无法通过 API 修改这些字段。在 Schema 中通过 `autoFill` 对象配置：
 
@@ -515,7 +577,7 @@ Response:
 - `$uuid`: 自动生成的唯一标识符（仅在字段为空时生成）
 - `$prevValue`: 该字段修改前的值
 
-#### 5.3.6 自定义验证规则示例
+#### 5.4.6 自定义验证规则示例
 
 `validationRules` 为可选的 JavaScript 代码字符串，在沙箱中执行，返回 `true` 表示通过，返回字符串表示错误信息：
 
@@ -533,6 +595,45 @@ return true;
 
 ```javascript
 // uniid.sdk.js (浏览器端 SDK)
+const auth = new AuthSDK({
+    authServer: 'https://auth.example.com',
+    appId: 'my-blog-site',
+    mountId: 'auth-iframe-mount',   // 必需：iframe 挂载点元素 ID
+    useDefaultStyle: true            // 可选，默认 true：使用 SDK 提供的默认 iframe 样式
+});
+```
+
+**配置项说明：**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `authServer` | string | 是 | UniID 服务地址 |
+| `appId` | string | 是 | 应用 ID |
+| `mountId` | string | 是 | 挂载点元素 ID，SDK 会替换该元素为 iframe |
+| `useDefaultStyle` | boolean | 否 | 默认 `true`。为 `true` 时 SDK 提供居中弹窗、遮罩、圆角、阴影及横竖屏自适应；为 `false` 时需自行编写 iframe 样式 |
+
+### 6.2 默认样式与自适应（useDefaultStyle: true）
+
+当 `useDefaultStyle` 为 `true` 时，SDK 会自动：
+
+- **桌面端**：居中弹窗，带毛玻璃遮罩；根据横竖屏设置宽度（横屏 800px、竖屏 400px）；高度由授权页通过 `uniid_resize` 消息动态上报，实现贴合内容
+- **移动端**（宽度 ≤768px）：全贴合全屏（100vw × 100vh），无圆角
+- **窗口 resize**：监听窗口大小变化，自动切换横竖版布局
+
+### 6.3 postMessage 协议
+
+| 方向 | type | 说明 |
+|------|------|------|
+| 父 → 子 | `uniid_init` | 父页面通知 SDK 初始化完成，embed 开始建立连接 |
+| 父 → 子 | `uniid_open_login` | 父页面请求打开登录/授权弹窗 |
+| 子 → 父 | `uniid_login_success` | 授权成功，携带 `token`、`user`、`app_id`、`auth_type` |
+| 子 → 父 | `uniid_login_cancel` | 用户取消授权 |
+| 子 → 父 | `uniid_resize` | 授权页上报内容高度 `{ height: number }`，用于桌面端 iframe 高度自适应 |
+
+### 6.4 SDK 核心实现（伪代码）
+
+```javascript
+// uniid.sdk.js (浏览器端 SDK)
 class AuthSDK {
     constructor(config) {
         if (!config || !config.mountId) {
@@ -544,6 +645,7 @@ class AuthSDK {
         this.token = null;
         this.iframe = null;
         this.loginResolver = null;
+        this.useDefaultStyle = config.useDefaultStyle !== false;
         this._restoreTokenFromCookie();
         this._init();
     }
@@ -604,10 +706,11 @@ class AuthSDK {
                     self.loginResolver = null;
                 }
             }
+            // 若收到 uniid_login_cancel，resolve({ token: null, user: null, cancelled: true })
         });
     }
 
-    // 登录
+    // 登录（返回 Promise<{ token, user } | { token: null, user: null, cancelled: true }>）
     login() {
         var self = this;
         return new Promise(function (resolve) {
@@ -699,7 +802,7 @@ class AuthSDK {
     }
 
     _fetch(method, path, body, requireAuth) {
-        requireAuth = requireAuth !== false; // 默认需要认证
+        requireAuth = requireAuth !== false; // 默认需要认证；read/query 可传 requireAuth: false 支持未登录访问
         if (requireAuth) {
             if (!this.token) {
                 this._restoreTokenFromCookie();
@@ -708,6 +811,7 @@ class AuthSDK {
                 return Promise.reject(new Error("NO_TOKEN"));
             }
         }
+        // 收到 401 且错误码为 INVALID_TOKEN / AUTHORIZATION_* 时，SDK 会自动清除本地 token
         var url = this.authServer + path;
         var headers = {};
         if (this.token) {
@@ -743,7 +847,7 @@ class AuthSDK {
 // 详见 SDK 源码注释
 ```
 
-### 6.2 使用示例
+### 6.5 使用示例
 
 ```html
 <!-- 网站中引入 SDK -->
@@ -756,7 +860,8 @@ class AuthSDK {
 const auth = new AuthSDK({
     authServer: 'https://auth.example.com',
     appId: 'my-blog-site',
-    mountId: 'auth-iframe-mount'  // 必需：iframe 挂载点元素 ID
+    mountId: 'auth-iframe-mount',  // 必需：iframe 挂载点元素 ID
+    useDefaultStyle: true          // 可选，默认 true，使用 SDK 默认弹窗样式
 });
 
 // 登录（显示 iframe 登录窗口）
@@ -797,10 +902,13 @@ async function getPosts() {
     return posts;
 }
 
-// 撤销授权/登出
+// 撤销授权/登出（调用 POST /api/auth/revoke，请求体带 app_id）
 async function handleLogout() {
     await auth.logout();
 }
+
+// 登录可能被用户取消：result.cancelled === true
+// read / query 在未登录时也可调用（仅返回有读权限的数据）
 </script>
 ```
 
@@ -835,4 +943,5 @@ async function handleLogout() {
 
 - 该页面是一个纯静态的示例博客站点，通过 `<script src="/sdk/uniid.sdk.js"></script>` 引入浏览器版 SDK，并调用统一认证服务完成登录与发帖。
 - 源码位于项目根目录的 `demo/index.html`
-- **数据验证**：以应用管理员身份登录后，Demo 会自动比对并同步 `post` 类型的 Schema，确保发帖、点赞、评论等操作符合验证规则
+- **默认样式**：Demo 使用 `useDefaultStyle: true`，无需自定义 iframe 样式即可获得居中弹窗、遮罩及横竖屏自适应效果。
+- **数据验证**：以应用管理员身份登录后，Demo 会自动比对并同步 `post` 类型的 Schema，确保发帖、点赞、评论等操作符合验证规则。

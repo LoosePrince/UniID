@@ -492,22 +492,6 @@
       background: rgba(255, 255, 255, 0.1);
     }
 
-    #uniid-auth-frame {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: min(420px, 100% - 2.5rem);
-      height: min(520px, 100% - 2.5rem);
-      border-radius: var(--radius-lg);
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      box-shadow: 0 28px 80px rgba(15, 23, 42, 0.98), 0 0 0 100vmax rgba(15, 23, 42, 0.75);
-      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.96), #020617);
-      backdrop-filter: blur(18px);
-      z-index: 50;
-      overflow: hidden;
-    }
-
     #userView {
       display: flex;
       align-items: center;
@@ -646,8 +630,8 @@
     </div>
   </div>
 
-  <!-- 授权 iframe -->
-  <div id="uniid-auth-frame" style="display: none;"></div>
+  <!-- 授权 iframe（由 SDK 默认样式居中弹出并自适应） -->
+  <div id="uniid-auth-frame"></div>
 
   <script src="http://localhost:3000/sdk/uniid.sdk.js"></script>
   <script>
@@ -656,7 +640,8 @@
       const auth = new window.AuthSDK({
         authServer: "http://localhost:3000",
         appId: "demo-blog",
-        mountId: "uniid-auth-frame"
+        mountId: "uniid-auth-frame",
+        useDefaultStyle: true
       });
 
       // 状态管理
@@ -890,15 +875,15 @@
             fields: {
               "title": { read: ["$public"], update: ["$owner"] },
               "content": { read: ["$public"], update: ["$owner"] },
-              "likes": { 
-                read: ["$public"], 
-                create: ["$dynamic:likes.$user"], 
-                delete: ["$dynamic:likes.$user"] 
+              "likes": {
+                read: ["$public"],
+                create: ["$dynamic:likes.$user"],
+                delete: ["$dynamic:likes.$user"]
               },
-              "comments": { 
-                read: ["$public"], 
+              "comments": {
+                read: ["$public"],
                 create: ["$dynamic:comments.$user"],
-                update: ["$dynamic:comments.$user.userId"] 
+                update: ["$dynamic:comments.$user.userId"]
               }
             }
           };
@@ -1069,10 +1054,10 @@
             state.user = result.user;
             localStorage.setItem("demo_user", JSON.stringify(result.user));
             updateUserUI();
-            
+
             // 登录后检查并同步 Schema
             await syncSchemaIfNeeded();
-            
+
             await loadPosts();
           }
         } catch (err) {
@@ -1092,7 +1077,7 @@
           // 1. 检查是否是应用管理员
           const authServer = auth.authServer;
           const appId = auth.appId;
-          
+
           if (!authServer || !appId) {
             console.error("无法获取 SDK 配置信息", { authServer, appId });
             return;

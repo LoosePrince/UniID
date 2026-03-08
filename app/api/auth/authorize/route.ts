@@ -1,6 +1,5 @@
 import {
   ACCESS_TOKEN_TTL_SECONDS,
-  REFRESH_TOKEN_TTL_SECONDS,
   signAccessToken,
   signRefreshToken,
   verifyToken
@@ -21,12 +20,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { 
-        app_id?: string; 
-        auth_type?: string; 
-        parent_origin?: string | null;
-        scope?: string | null;
-      }
+    | {
+      app_id?: string;
+      auth_type?: string;
+      parent_origin?: string | null;
+      scope?: string | null;
+    }
     | null;
 
   const appId = body?.app_id;
@@ -174,7 +173,7 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  const res = NextResponse.json({
+  return NextResponse.json({
     token: appAccessToken,
     refresh_token: refreshToken,
     expires_in: expiresIn,
@@ -186,25 +185,5 @@ export async function POST(req: NextRequest) {
     app_id: app.id,
     auth_type: authType
   });
-
-  const isProd = process.env.NODE_ENV === "production";
-
-  res.cookies.set("uniid_token", appAccessToken, {
-    httpOnly: true,
-    sameSite: isProd ? "none" : "lax",
-    secure: isProd,
-    path: "/",
-    maxAge: expiresIn
-  });
-
-  res.cookies.set("uniid_refresh_token", refreshToken, {
-    httpOnly: true,
-    sameSite: isProd ? "none" : "lax",
-    secure: isProd,
-    path: "/",
-    maxAge: REFRESH_TOKEN_TTL_SECONDS
-  });
-
-  return res;
 }
 

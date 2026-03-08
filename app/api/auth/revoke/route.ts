@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { revokeAuthorizationForUserAndApp } from "@/lib/authorization-helpers";
+import { handleDataApiOptions } from "@/lib/cors";
 import { verifyTokenWithAppIdCheck } from "@/lib/jwt";
 import { validateAppIdOriginMatch } from "@/lib/origin";
-import { handleDataApiOptions } from "@/lib/cors";
-import { revokeAuthorizationForUserAndApp } from "@/lib/authorization-helpers";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
@@ -56,8 +56,7 @@ export async function POST(req: NextRequest) {
     token = authHeader.slice("Bearer ".length).trim();
   }
 
-  if (!token) {
-    // 尝试从 cookie 获取
+  if (!token && !origin) {
     const cookieHeader =
       req.headers.get("cookie") ?? req.headers.get("Cookie") ?? "";
     if (cookieHeader) {
@@ -122,6 +121,11 @@ export async function POST(req: NextRequest) {
     app_id: appId,
     revoked_at: result.revokedAt
   });
+
+  // 确保不清除 UniID 网站的 cookie
+  // 之前的逻辑可能会因为 credentials: "include" 导致浏览器在某些情况下误操作，
+  // 但这里我们明确不返回 Set-Cookie 响应头来清除 uniid_token。
+  // 实际上，只要不调用 res.cookies.set("uniid_token", "", { maxAge: 0 })，UniID 的登录态就是安全的。
 
   // 添加 CORS 头
   if (allowedOrigin) {

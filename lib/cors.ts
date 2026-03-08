@@ -24,7 +24,7 @@ function isLocalOrigin(origin: string | null): boolean {
   }
 }
 
-async function resolveAllowedOrigin(
+export async function resolveAllowedOrigin(
   origin: string | null
 ): Promise<string | null> {
   if (!origin) return null;
@@ -49,6 +49,16 @@ async function resolveAllowedOrigin(
   } catch {
     return null;
   }
+}
+
+export function setCorsHeaders(
+  res: NextResponse,
+  allowedOrigin: string | null
+): void {
+  if (!allowedOrigin) return;
+  res.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+  res.headers.set("Vary", "Origin");
+  res.headers.set("Access-Control-Allow-Credentials", "true");
 }
 
 export async function handleDataApiOptions(

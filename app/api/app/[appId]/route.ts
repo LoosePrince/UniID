@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContextFromRequest } from "@/lib/auth-context";
 import { isAppAdmin, isSystemAdmin } from "@/lib/permissions";
+import { handleDataApiOptions, resolveAllowedOrigin, setCorsHeaders } from "@/lib/cors";
+
+export async function OPTIONS(req: NextRequest) {
+  return handleDataApiOptions(req);
+}
 
 /**
  * 更新应用信息 (应用管理员或系统管理员)
@@ -10,9 +15,17 @@ export async function PATCH(
   req: NextRequest,
   context: { params: { appId: string } }
 ) {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  const allowedOrigin = await resolveAllowedOrigin(origin);
+  if (origin && !allowedOrigin) {
+    return NextResponse.json({ error: "CORS_ORIGIN_FORBIDDEN" }, { status: 403 });
+  }
+
   const auth = await getAuthContextFromRequest(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const res = NextResponse.json({ error: auth.error }, { status: auth.status });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 
   const { appId } = context.params;
@@ -22,7 +35,9 @@ export async function PATCH(
   const isAdmin = (await isSystemAdmin(userId)) || (await isAppAdmin(appId, userId));
 
   if (!isAdmin) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    const res = NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 
   try {
@@ -46,22 +61,35 @@ export async function PATCH(
       data: updateData,
     });
 
-    return NextResponse.json(app);
+    const res = NextResponse.json(app);
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   } catch (err) {
-    return NextResponse.json({ error: "INTERNAL_SERVER_ERROR" }, { status: 500 });
+    const res = NextResponse.json({ error: "INTERNAL_SERVER_ERROR" }, { status: 500 });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 }
 
 /**
  * 获取应用详情 (应用管理员或系统管理员)
+ * 跨域时需在请求头带 Authorization: Bearer <token>，且请求来源需在应用注册的 domain 中。
  */
 export async function GET(
   req: NextRequest,
   context: { params: { appId: string } }
 ) {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  const allowedOrigin = await resolveAllowedOrigin(origin);
+  if (origin && !allowedOrigin) {
+    return NextResponse.json({ error: "CORS_ORIGIN_FORBIDDEN" }, { status: 403 });
+  }
+
   const auth = await getAuthContextFromRequest(req);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const res = NextResponse.json({ error: auth.error }, { status: auth.status });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 
   const { appId } = context.params;
@@ -70,7 +98,9 @@ export async function GET(
   const isAdmin = (await isSystemAdmin(userId)) || (await isAppAdmin(appId, userId));
 
   if (!isAdmin) {
-    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    const res = NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 
   const app = await prisma.app.findUnique({
@@ -88,8 +118,12 @@ export async function GET(
   });
 
   if (!app) {
-    return NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
+    const res = NextResponse.json({ error: "APP_NOT_FOUND" }, { status: 404 });
+    setCorsHeaders(res, allowedOrigin ?? null);
+    return res;
   }
 
-  return NextResponse.json(app);
+  const res = NextResponse.json({ ...app, isAdmin: true });
+  setCorsHeaders(res, allowedOrigin ?? null);
+  return res;
 }

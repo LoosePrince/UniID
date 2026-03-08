@@ -9,6 +9,8 @@
     this.token = null;
     this.iframe = null;
     this.loginResolver = null;
+    this.useDefaultStyle = config.useDefaultStyle !== false; // 默认开启
+    this.targetHeight = 0;
     this._restoreTokenFromCookie();
     this._init();
   }
@@ -61,6 +63,11 @@
     iframe.className = mount.className;
     iframe.title = "UniID 授权窗口";
     iframe.style.display = "none";
+
+    if (this.useDefaultStyle) {
+      this._applyDefaultStyle(iframe);
+    }
+
     mount.parentNode.replaceChild(iframe, mount);
     this.iframe = iframe;
 
@@ -76,6 +83,17 @@
 
     window.addEventListener("message", function (event) {
       if (!event.data || typeof event.data !== "object") return;
+
+      // 处理高度自适应消息
+      if (event.data.type === "uniid_resize" && event.data.height) {
+        if (self.iframe && self.useDefaultStyle && window.innerWidth > 768) {
+          // 增加一点缓冲高度
+          self.targetHeight = event.data.height;
+          self.iframe.style.height = self.targetHeight + "px";
+        }
+        return;
+      }
+
       if (event.data.type === "uniid_login_success") {
         if (event.data.token) {
           self.token = event.data.token;
@@ -94,6 +112,9 @@
         }
         if (self.iframe) {
           self.iframe.style.display = "none";
+          if (self.useDefaultStyle) {
+            self._hideOverlay();
+          }
         }
       } else if (event.data.type === "uniid_login_cancel") {
         if (self.loginResolver) {
@@ -106,9 +127,100 @@
         }
         if (self.iframe) {
           self.iframe.style.display = "none";
+          if (self.useDefaultStyle) {
+            self._hideOverlay();
+          }
         }
       }
     });
+
+    if (this.useDefaultStyle) {
+      this._setupResizeHandler();
+    }
+  };
+
+  AuthSDK.prototype._applyDefaultStyle = function (iframe) {
+    iframe.style.position = "fixed";
+    iframe.style.top = "50%";
+    iframe.style.left = "50%";
+    iframe.style.transform = "translate(-50%, -50%)";
+    iframe.style.zIndex = "2147483647"; // 最高层级
+    iframe.style.border = "none";
+    iframe.style.borderRadius = "16px";
+    iframe.style.boxShadow = "0 25px 50px -12px rgba(0, 0, 0, 0.5)";
+    iframe.style.backgroundColor = "#020617"; // 匹配授权页背景色
+    iframe.style.overflow = "hidden";
+    this._updateIframeSize(iframe);
+  };
+
+  AuthSDK.prototype._updateIframeSize = function (iframe) {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    var isLandscape = width > height;
+
+    // 基础样式重置
+    iframe.style.transition = "width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease";
+
+    if (width <= 768) {
+      // 移动端或小屏幕：全贴合（全屏）
+      iframe.style.width = "100vw";
+      iframe.style.height = "100vh";
+      iframe.style.borderRadius = "0";
+      iframe.style.maxWidth = "100vw";
+      iframe.style.maxHeight = "100vh";
+    } else {
+      // 桌面端：宽度固定，高度由 uniid_resize 动态调整，未收到前用默认值
+      iframe.style.borderRadius = "16px";
+      var h = (this.targetHeight && this.targetHeight > 0) ? this.targetHeight + "px" : "auto";
+      if (isLandscape) {
+        iframe.style.width = "800px";
+        iframe.style.height = h;
+      } else {
+        iframe.style.width = "400px";
+        iframe.style.height = h;
+      }
+      iframe.style.maxWidth = "90vw";
+      iframe.style.maxHeight = "90vh";
+    }
+  };
+
+  AuthSDK.prototype._setupResizeHandler = function () {
+    var self = this;
+    window.addEventListener("resize", function () {
+      if (self.iframe && self.iframe.style.display !== "none") {
+        self._updateIframeSize(self.iframe);
+      }
+    });
+  };
+
+  AuthSDK.prototype._showOverlay = function () {
+    var overlay = document.getElementById("uniid-sdk-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "uniid-sdk-overlay";
+      overlay.style.position = "fixed";
+      overlay.style.top = "0";
+      overlay.style.left = "0";
+      overlay.style.width = "100%";
+      overlay.style.height = "100%";
+      overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+      overlay.style.backdropFilter = "blur(4px)";
+      overlay.style.zIndex = "2147483646";
+      overlay.style.transition = "opacity 0.3s ease";
+      overlay.style.display = "none";
+      overlay.style.opacity = "0";
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = "block";
+    setTimeout(function () { overlay.style.opacity = "1"; }, 10);
+  };
+
+  AuthSDK.prototype._hideOverlay = function () {
+    var overlay = document.getElementById("uniid-sdk-overlay");
+    if (overlay) {
+      overlay.style.opacity = "0";
+      setTimeout(function () { overlay.style.display = "none"; }, 300);
+    }
   };
 
   AuthSDK.prototype.login = function () {
@@ -120,6 +232,10 @@
       }
       if (self.iframe) {
         self.iframe.style.display = "block";
+        if (self.useDefaultStyle) {
+          self._showOverlay();
+          self._updateIframeSize(self.iframe);
+        }
         self.iframe.focus();
         self.iframe.contentWindow &&
           self.iframe.contentWindow.postMessage(
@@ -367,7 +483,7 @@
       }
     };
     window.addEventListener('message', handler);
-    
+
     // 返回取消订阅函数
     return function () {
       window.removeEventListener('message', handler);
@@ -635,12 +751,12 @@
       var date = new Date(timestamp * 1000);
       var now = new Date();
       var diff = Math.floor((now - date) / 1000);
-      
+
       if (diff < 60) return '刚刚';
       if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
       if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
       if (diff < 604800) return Math.floor(diff / 86400) + '天前';
-      
+
       return date.toLocaleDateString();
     },
 
@@ -720,7 +836,7 @@
         attempt++;
         return fn.apply(self, args).catch(function (err) {
           if (attempt >= maxRetries) throw err;
-          
+
           // 只在网络错误或 5xx 错误时重试
           if (err.status >= 500 || err.message === 'Network Error' || err.message === 'TIMEOUT') {
             return new Promise(function (resolve) {
