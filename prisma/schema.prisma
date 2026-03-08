@@ -147,6 +147,11 @@ model DataSchema {
   @@unique([appId, dataType, version])
 }
 
+model GlobalConfig {
+  key   String @id
+  value String
+}
+
 model VerificationToken {
   identifier String
   token      String @unique

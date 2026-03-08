@@ -17,6 +17,22 @@ export async function POST(req: NextRequest) {
     );
   }
   try {
+    // 检查是否允许注册（若 GlobalConfig 未就绪则默认允许）
+    const client = prisma as unknown as {
+      globalConfig?: { findUnique: (args: { where: { key: string } }) => Promise<{ value: string } | null> };
+    };
+    if (client.globalConfig) {
+      const config = await client.globalConfig.findUnique({
+        where: { key: "registration_enabled" }
+      });
+      if (config && config.value === "false") {
+        return NextResponse.json(
+          { error: "REGISTRATION_DISABLED" },
+          { status: 403 }
+        );
+      }
+    }
+
     const body = await req.json().catch(() => null);
     const { username, password, email } = (body ?? {}) as {
       username?: string;
