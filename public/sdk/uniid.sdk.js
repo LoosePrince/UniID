@@ -57,12 +57,13 @@
       );
     }
     var iframe = document.createElement("iframe");
-    // 不传递 parent_origin：embed 仅从 postMessage 的 event.origin 获取（浏览器生成，可信）
-    iframe.src = this.authServer + "/embed?app_id=" + encodeURIComponent(this.appId);
+    // 初始化时不设置 src，避免无意义请求
     iframe.id = mount.id;
     iframe.className = mount.className;
     iframe.title = "UniID 授权窗口";
     iframe.style.display = "none";
+    iframe.setAttribute("scrolling", "no"); // 隐藏滚动条
+    iframe.style.overflow = "hidden"; // 确保容器也不显示滚动条
 
     if (this.useDefaultStyle) {
       this._applyDefaultStyle(iframe);
@@ -72,14 +73,6 @@
     this.iframe = iframe;
 
     var self = this;
-    iframe.onload = function () {
-      if (self.iframe && self.iframe.contentWindow) {
-        self.iframe.contentWindow.postMessage(
-          { type: "uniid_init" },
-          self.authServer
-        );
-      }
-    };
 
     window.addEventListener("message", function (event) {
       if (!event.data || typeof event.data !== "object") return;
@@ -87,9 +80,19 @@
       // 处理高度自适应消息
       if (event.data.type === "uniid_resize" && event.data.height) {
         if (self.iframe && self.useDefaultStyle && window.innerWidth > 768) {
-          // 增加一点缓冲高度
           self.targetHeight = event.data.height;
           self.iframe.style.height = self.targetHeight + "px";
+        }
+        return;
+      }
+
+      // 处理授权页 Ready 消息
+      if (event.data.type === "uniid_ready") {
+        if (self.iframe && self.iframe.contentWindow) {
+          self.iframe.contentWindow.postMessage(
+            { type: "uniid_authorize_request", appId: self.appId },
+            self.authServer
+          );
         }
         return;
       }
@@ -112,6 +115,7 @@
         }
         if (self.iframe) {
           self.iframe.style.display = "none";
+          self.iframe.src = "about:blank"; // 使用 about:blank 彻底重置
           if (self.useDefaultStyle) {
             self._hideOverlay();
           }
@@ -127,6 +131,7 @@
         }
         if (self.iframe) {
           self.iframe.style.display = "none";
+          self.iframe.src = "about:blank"; // 使用 about:blank 彻底重置
           if (self.useDefaultStyle) {
             self._hideOverlay();
           }
@@ -148,7 +153,7 @@
     iframe.style.border = "none";
     iframe.style.borderRadius = "16px";
     iframe.style.boxShadow = "0 25px 50px -12px rgba(0, 0, 0, 0.5)";
-    iframe.style.backgroundColor = "#020617"; // 匹配授权页背景色
+    iframe.style.backgroundColor = "#090F20"; // 匹配授权页背景色
     iframe.style.overflow = "hidden";
     this._updateIframeSize(iframe);
   };
@@ -231,21 +236,22 @@
         self._init();
       }
       if (self.iframe) {
+        // 仅在打开时填入链接
+        if (!self.iframe.src || self.iframe.src === "about:blank" || self.iframe.src === window.location.href) {
+          self.iframe.src = self.authServer + "/embed?app_id=" + encodeURIComponent(self.appId);
+        }
         self.iframe.style.display = "block";
         if (self.useDefaultStyle) {
           self._showOverlay();
           self._updateIframeSize(self.iframe);
         }
         self.iframe.focus();
-        self.iframe.contentWindow &&
-          self.iframe.contentWindow.postMessage(
-            { type: "uniid_open_login" },
-            self.authServer
-          );
+        // 等待授权页 ready 后由 ready 处理函数发送 authorize_request
       }
     }).finally(function () {
       if (self.iframe) {
         self.iframe.style.display = "none";
+        self.iframe.src = "about:blank"; // 移除链接
       }
     });
   };

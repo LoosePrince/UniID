@@ -34,6 +34,55 @@ function EmbedPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+
+  // 始终根据内容实际高度向父页面报告高度，在高度变化后可多次上报
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const content = document.getElementById("auth-content");
+    if (!content) return;
+
+    const reportHeight = () => {
+      const card =
+        (content.querySelector(".rounded-2xl") as HTMLElement | null) ||
+        (content.firstElementChild as HTMLElement | null);
+      const height = card
+        ? card.getBoundingClientRect().height
+        : content.scrollHeight;
+
+      window.parent.postMessage(
+        { type: "uniid_resize", height },
+        "*"
+      );
+    };
+
+    // 首次渲染后立即上报一次
+    reportHeight();
+
+    // 优先使用 ResizeObserver 监听内容尺寸变化
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        // 使用 rAF 合并同一帧内的多次回调
+        window.requestAnimationFrame(reportHeight);
+      });
+      observer.observe(content);
+
+      return () => {
+        observer.disconnect();
+      };
+    }
+
+    // 降级方案：仅在窗口尺寸变化时重算高度
+    const handleResize = () => {
+      reportHeight();
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -93,18 +142,6 @@ function EmbedPageContent() {
 
             console.log("[Embed] Setting step to authorize");
             setStep("authorize");
-
-            // 发送高度更新消息给父页面
-            setTimeout(() => {
-              const content = document.getElementById("auth-content");
-              if (content) {
-                // 获取卡片的实际渲染高度
-                const card = content.querySelector('.rounded-2xl') || content.firstElementChild;
-                const height = card ? card.getBoundingClientRect().height : content.scrollHeight;
-                console.log("[Embed] Reporting height", height);
-                window.parent.postMessage({ type: "uniid_resize", height: height }, "*");
-              }
-            }, 300);
             return;
           }
         }
@@ -117,20 +154,21 @@ function EmbedPageContent() {
       window.location.href = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
     }
 
+    // 自动初始化逻辑：如果 URL 中有 appId 且处于 idle，直接开始检查
+    if (appId && step === "idle" && !cancelled) {
+      void checkLoginAndMaybeRedirect("*");
+    }
+
     function handleMessage(event: MessageEvent) {
       if (!event.data || typeof event.data !== "object") return;
       const msgType = event.data.type;
-      if (msgType !== "uniid_init" && msgType !== "uniid_open_login") return;
 
-      console.log("[Embed] Received message", msgType, "from", event.origin);
-
-      const originFromBrowser = event.origin;
-      if (!originFromBrowser) return;
-
-      if (parentOrigin !== originFromBrowser) {
-        setParentOrigin(originFromBrowser);
+      // 处理 SDK 发来的授权请求
+      if (msgType === "uniid_authorize_request") {
+        console.log("[Embed] Received authorize request from", event.origin);
+        setParentOrigin(event.origin);
+        setIsReady(true);
       }
-      void checkLoginAndMaybeRedirect(originFromBrowser);
     }
 
     window.addEventListener("message", handleMessage);
@@ -140,6 +178,13 @@ function EmbedPageContent() {
       window.removeEventListener("message", handleMessage);
     };
   }, [appId, parentOrigin, step]);
+
+  useEffect(() => {
+    if (step === "authorize") {
+      console.log("[Embed] Step is authorize, broadcasting ready");
+      window.parent.postMessage({ type: "uniid_ready", appId: appId }, "*");
+    }
+  }, [step, appId]);
 
   async function handleAuthorize(e: React.FormEvent) {
     e.preventDefault();
@@ -282,7 +327,7 @@ function EmbedPageContent() {
             )}
 
             {step === "authorize" && (
-              <form onSubmit={handleAuthorize} className="space-y-6">
+              <form onSubmit={handleAuthorize} className={`space-y-6 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <div className="space-y-5">
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-800/50">
                     <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-300 shrink-0">

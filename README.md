@@ -250,7 +250,7 @@ CREATE TABLE verification_tokens (
 
 授权流程**全程只信任浏览器生成的 Origin**，不信任任何可自定义内容（URL 参数、`event.data` 等），确保父页面身份不可伪造。
 
-#### 可信来源
+#### 可信来源（握手协议）
 
 | 环节 | 可信来源 | 说明 |
 |------|----------|------|
@@ -261,11 +261,11 @@ CREATE TABLE verification_tokens (
 #### 流程说明
 
 1. **父页面发起**：父页面（如 `http://example.com`）加载 SDK，创建 iframe `src="/embed?app_id=xxx"`（不传 `parent_origin`，传了也没用）
-2. **iframe 加载**：SDK 的 `iframe.onload` 向 iframe 发送 `postMessage({ type: "uniid_init" })`
-3. **获取父页面 Origin**：Embed 收到消息时，**仅从 `event.origin` 读取**父页面 Origin，存入状态
-4. **登录检查**：若未登录，重定向到 `/login?redirectTo=/embed?app_id=xxx`（不携带 `parent_origin`）
-5. **登录返回**：返回 Embed 后，SDK 再次发送 `uniid_init`，Embed 再次从 `event.origin` 获取父页面 Origin
-6. **授权请求**：用户点击「同意并授权」时，Embed 将 `parent_origin`（来自 `event.origin`）随请求体发送给 `/api/auth/authorize`
+2. **授权页初始化并检查登录**：Embed 页面根据 `app_id` 调用 `/api/auth/check`，如果未登录则跳转到 `/login?redirectTo=/embed?app_id=xxx`，登录完成后再回到 Embed。
+3. **授权页就绪广播**：当 Embed 确认用户已登录并进入授权界面时，向父页面广播 `postMessage({ type: "uniid_ready", appId })`。
+4. **SDK 发起授权请求**：SDK 监听到 `uniid_ready` 后，使用浏览器提供的 `event.origin` 作为父页面 Origin，向 iframe 发送 `postMessage({ type: "uniid_authorize_request", appId })`。
+5. **Embed 锁定父页面 Origin**：Embed 收到 `uniid_authorize_request` 时，从 `event.origin` 读取并锁定 `parent_origin`，后续只向该 Origin 回传结果。
+6. **授权请求**：用户点击「同意并授权」时，Embed 将 `parent_origin`（来自前一步的 `event.origin`）随请求体发送给 `/api/auth/authorize`。
 7. **后端校验**：
    - 请求 `Origin` 必须在 `AUTH_ALLOWED_ORIGINS` 内（未配置时使用 `NEXTAUTH_URL`/`AUTH_URL`），即请求来自 UniID 自身
    - 必须提供 `parent_origin`，否则 400
@@ -620,12 +620,14 @@ const auth = new AuthSDK({
 - **移动端**（宽度 ≤768px）：全贴合全屏（100vw × 100vh），无圆角
 - **窗口 resize**：监听窗口大小变化，自动切换横竖版布局
 
-### 6.3 postMessage 协议
+### 6.3 postMessage 协议（新版握手流程）
+
+> 当前代码实现采用「授权页就绪 → SDK 发起授权请求 → 授权页回传结果」的握手模式，不再使用早期的 `uniid_init` / `uniid_open_login` 协议。
 
 | 方向 | type | 说明 |
 |------|------|------|
-| 父 → 子 | `uniid_init` | 父页面通知 SDK 初始化完成，embed 开始建立连接 |
-| 父 → 子 | `uniid_open_login` | 父页面请求打开登录/授权弹窗 |
+| 子 → 父 | `uniid_ready` | 授权页加载并完成登录状态检查后广播「已就绪」，携带 `appId` |
+| 父 → 子 | `uniid_authorize_request` | SDK 收到 `uniid_ready` 后，向授权页发送授权请求，携带 `appId`，用于建立可信父页面身份（origin） |
 | 子 → 父 | `uniid_login_success` | 授权成功，携带 `token`、`user`、`app_id`、`auth_type` |
 | 子 → 父 | `uniid_login_cancel` | 用户取消授权 |
 | 子 → 父 | `uniid_resize` | 授权页上报内容高度 `{ height: number }`，用于桌面端 iframe 高度自适应 |
