@@ -98,8 +98,7 @@ export async function POST(req: NextRequest) {
 
   const result = await revokeAuthorizationForUserAndApp({
     userId,
-    appId,
-    sessionTokenPrefix: token.substring(0, 20)
+    appId
   });
 
   if (!result.ok) {

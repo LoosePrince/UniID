@@ -13,9 +13,8 @@ export type RevokeAuthorizationResult =
 export async function revokeAuthorizationForUserAndApp(options: {
   userId: string;
   appId: string;
-  sessionTokenPrefix?: string | null;
 }): Promise<RevokeAuthorizationResult> {
-  const { userId, appId, sessionTokenPrefix } = options;
+  const { userId, appId } = options;
   const now = Math.floor(Date.now() / 1000);
 
   const authorization = await prisma.authorization.findUnique({
@@ -45,20 +44,6 @@ export async function revokeAuthorizationForUserAndApp(options: {
       revoked: 1
     }
   });
-
-  if (sessionTokenPrefix) {
-    await prisma.session.updateMany({
-      where: {
-        userId,
-        token: {
-          startsWith: sessionTokenPrefix
-        }
-      },
-      data: {
-        expiresAt: now
-      }
-    });
-  }
 
   return {
     ok: true,
