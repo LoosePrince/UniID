@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
 
     const now = Math.floor(Date.now() / 1000);
     if (session.expiresAt < now) {
+      await prisma.session.deleteMany({
+        where: {
+          userId: session.userId,
+          expiresAt: {
+            lte: now
+          }
+        }
+      });
       return NextResponse.json({ error: "REFRESH_TOKEN_EXPIRED" }, { status: 401 });
     }
 

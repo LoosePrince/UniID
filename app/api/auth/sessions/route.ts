@@ -22,10 +22,21 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Math.floor(Date.now() / 1000);
+  await prisma.session.deleteMany({
+    where: {
+      userId: auth.user.id,
+      expiresAt: {
+        lte: now
+      }
+    }
+  });
 
   const sessions = await prisma.session.findMany({
     where: {
-      userId: auth.user.id
+      userId: auth.user.id,
+      expiresAt: {
+        gt: now
+      }
     },
     orderBy: {
       createdAt: "desc"
@@ -40,7 +51,7 @@ export async function GET(req: NextRequest) {
     expiresAt: session.expiresAt,
     userAgent: session.userAgent,
     is_current: session.token === auth.token,
-    is_active: session.expiresAt > now
+    is_active: true
   }));
 
   return NextResponse.json({ sessions: data });

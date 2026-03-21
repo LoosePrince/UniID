@@ -84,7 +84,23 @@ export async function getAuthContextFromRequest(
       where: { token }
     });
 
-    if (!session || session.userId !== user.id || session.expiresAt <= now) {
+    if (!session || session.userId !== user.id) {
+      return {
+        ok: false,
+        status: 401,
+        error: "SESSION_EXPIRED"
+      };
+    }
+
+    if (session.expiresAt <= now) {
+      await prisma.session.deleteMany({
+        where: {
+          userId: user.id,
+          expiresAt: {
+            lte: now
+          }
+        }
+      });
       return {
         ok: false,
         status: 401,
