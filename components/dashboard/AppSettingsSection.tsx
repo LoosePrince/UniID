@@ -47,8 +47,13 @@ export function AppSettingsSection() {
       const res = await fetch("/api/apps/managed");
       if (!res.ok) throw new Error("加载失败");
       const list = await res.json();
-      setApps(list);
-      if (list.length > 0 && !selectedApp) setSelectedApp(list[0]);
+      const activeApps = list.filter((app: AppItem) => app.status !== "deleted");
+      setApps(activeApps);
+      if (activeApps.length === 0) {
+        setSelectedApp(null);
+      } else if (!selectedApp || !activeApps.some((app: AppItem) => app.id === selectedApp.id)) {
+        setSelectedApp(activeApps[0]);
+      }
     } catch (err: any) {
       setError("加载应用列表失败");
     } finally {

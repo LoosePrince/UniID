@@ -19,6 +19,11 @@ export async function GET(req: NextRequest) {
 
   if (sysAdmin) {
     const apps = await prisma.app.findMany({
+      where: {
+        status: {
+          not: "deleted",
+        },
+      },
       select: {
         id: true,
         name: true,
@@ -33,6 +38,9 @@ export async function GET(req: NextRequest) {
 
   const apps = await prisma.app.findMany({
     where: {
+      status: {
+        not: "deleted",
+      },
       OR: [
         { ownerId: userId },
         { admins: { some: { userId } } },

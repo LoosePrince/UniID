@@ -37,6 +37,8 @@ export function AdminAppsSection() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [domainEdits, setDomainEdits] = useState<Record<string, string>>({});
+  const [savingDomainId, setSavingDomainId] = useState<string | null>(null);
 
   async function loadApps() {
     setLoading(true);
@@ -45,6 +47,12 @@ export function AdminAppsSection() {
       if (!res.ok) throw new Error("加载应用失败");
       const data = await res.json();
       setApps(data);
+      setDomainEdits(
+        data.reduce((acc: Record<string, string>, app: AppItem) => {
+          acc[app.id] = app.domain;
+          return acc;
+        }, {})
+      );
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,6 +81,49 @@ export function AdminAppsSection() {
       await loadApps();
     } catch (err: any) {
       setFeedback(err.message ?? "删除失败");
+    }
+  }
+
+  async function restoreApp(appId: string) {
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/admin/apps/${appId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "active" }),
+      });
+      if (!res.ok) throw new Error("恢复失败");
+      await loadApps();
+    } catch (err: any) {
+      setFeedback(err.message ?? "恢复失败");
+    }
+  }
+
+  async function updateDomain(app: AppItem) {
+    const nextDomain = (domainEdits[app.id] ?? "").trim();
+    if (!nextDomain) {
+      setFeedback("域名不能为空");
+      return;
+    }
+    if (nextDomain === app.domain) return;
+
+    setFeedback(null);
+    setSavingDomainId(app.id);
+    try {
+      const res = await fetch(`/api/admin/apps/${app.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: nextDomain }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error === "DOMAIN_TAKEN" ? "该域名已被使用" : "更新域名失败");
+      }
+      await loadApps();
+    } catch (err: any) {
+      setFeedback(err.message ?? "更新域名失败");
+    } finally {
+      setSavingDomainId(null);
     }
   }
 
@@ -185,7 +236,22 @@ export function AdminAppsSection() {
                       {app.status}
                     </span>
                   </div>
-                  <p className="text-slate-500">域名: {app.domain}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-slate-500">域名:</span>
+                    <input
+                      className="min-w-[220px] rounded border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-[11px] text-slate-100 focus:border-sky-500 focus:outline-none"
+                      value={domainEdits[app.id] ?? ""}
+                      onChange={(e) => setDomainEdits((prev) => ({ ...prev, [app.id]: e.target.value }))}
+                      placeholder="example.com"
+                    />
+                    <SecondaryButton
+                      className="h-6 px-2 text-[10px]"
+                      disabled={savingDomainId === app.id || (domainEdits[app.id] ?? "").trim() === app.domain}
+                      onClick={() => updateDomain(app)}
+                    >
+                      {savingDomainId === app.id ? "更新中..." : "更新域名"}
+                    </SecondaryButton>
+                  </div>
                   <p className="text-slate-500">所有者: {app.owner.username} ({app.owner.id})</p>
                   <p className="text-slate-500">管理员: {app.admins.map(a => a.user.username).join(", ") || "无"}</p>
                 </div>
@@ -196,6 +262,13 @@ export function AdminAppsSection() {
                       <SecondaryButton className="text-[10px]" onClick={() => setConfirmDeleteId(null)}>取消</SecondaryButton>
                       <SecondaryButton className="text-[10px] border-red-500/50 text-red-400 hover:bg-red-500/10" onClick={() => deleteApp(app.id)}>确定删除</SecondaryButton>
                     </>
+                  ) : app.status === "deleted" ? (
+                    <SecondaryButton
+                      className="text-[10px] border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+                      onClick={() => restoreApp(app.id)}
+                    >
+                      恢复
+                    </SecondaryButton>
                   ) : (
                     <>
                       <SecondaryButton
