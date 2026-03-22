@@ -59,9 +59,7 @@ export async function GET(
     originalName: share.file.originalName,
     mimeType: share.file.mimeType,
     size: share.file.size,
-    downloadUrl: buildProxyFilePath(share.file.id, {
-      appId: share.file.appId,
-      originalName: share.file.originalName,
+    downloadUrl: buildProxyFilePath(share.file.objectKey, {
       shareToken: token
     }),
     expiresAt: share.expiresAt

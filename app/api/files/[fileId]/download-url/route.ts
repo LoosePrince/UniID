@@ -68,9 +68,7 @@ export async function GET(
       originalName: file.originalName,
       mimeType: file.mimeType,
       size: file.size,
-      downloadUrl: buildProxyFilePath(file.id, {
-        appId: file.appId,
-        originalName: file.originalName,
+      downloadUrl: buildProxyFilePath(file.objectKey, {
         shareToken
       }),
       via: "share_token"
@@ -91,10 +89,7 @@ export async function GET(
     originalName: file.originalName,
     mimeType: file.mimeType,
     size: file.size,
-    downloadUrl: buildProxyFilePath(file.id, {
-      appId: file.appId,
-      originalName: file.originalName
-    }),
+    downloadUrl: buildProxyFilePath(file.objectKey),
     via: "auth"
   });
 }

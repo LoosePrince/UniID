@@ -1,6 +1,6 @@
-import type { User } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import { isSystemAdmin } from "@/lib/permissions";
+import { prisma } from "@/lib/prisma";
+import type { User } from "@prisma/client";
 
 type FilePolicy = {
   upload: {

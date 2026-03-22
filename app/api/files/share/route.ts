@@ -99,9 +99,7 @@ export async function POST(req: NextRequest) {
     fileId: file.id,
     token: share.token,
     expiresAt: share.expiresAt,
-    sharePath: buildProxyFilePath(file.id, {
-      appId: file.appId,
-      originalName: file.originalName,
+    sharePath: buildProxyFilePath(file.objectKey, {
       shareToken: share.token
     }),
     /** 元数据接口（JSON），不含文件流 */

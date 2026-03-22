@@ -5,7 +5,7 @@ import {
   S3Client
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 
 type StorageConfig = {
@@ -157,16 +157,30 @@ export async function getPresignedGetObjectUrl(args: {
   return getSignedUrl(client, command, { expiresIn });
 }
 
-function sanitizeFilename(input: string): string {
-  return input.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "file";
+/**
+ * 从上传时的原始文件名取扩展名（仅最后一段，小写），无则 `bin`
+ */
+export function extensionFromOriginalFilename(originalFilename: string): string {
+  const name = String(originalFilename ?? "").trim();
+  const m = name.match(/\.([a-zA-Z0-9]{1,16})$/);
+  return m ? m[1].toLowerCase() : "bin";
 }
 
-export function createObjectKey(ownerId: string, originalFilename: string): string {
+/**
+ * 对象键：`files/{ownerId}/{yyyy}/{mm}/{md5}.{ext}`
+ * - `md5` 为文件内容的 MD5 十六进制（小写）
+ * - `ext` 来自上传时的原始文件名扩展名（不含主文件名）
+ */
+export function createObjectKey(
+  ownerId: string,
+  contentMd5Hex: string,
+  originalFilename: string
+): string {
+  const ext = extensionFromOriginalFilename(originalFilename);
   const now = new Date();
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const safeName = sanitizeFilename(originalFilename);
-  return `files/${ownerId}/${yyyy}/${mm}/${randomUUID()}-${safeName}`;
+  return `files/${ownerId}/${yyyy}/${mm}/${contentMd5Hex}.${ext}`;
 }
 
 export async function getObjectStreamFromStorage(objectKey: string): Promise<{
@@ -241,6 +255,10 @@ export async function deleteObject(objectKey: string): Promise<void> {
 
 export function sha256Hex(buffer: Buffer): string {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+export function md5Hex(buffer: Buffer): string {
+  return createHash("md5").update(buffer).digest("hex");
 }
 
 export function getObjectStorageBucket(): string {

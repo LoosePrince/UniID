@@ -85,10 +85,7 @@ export async function GET(req: NextRequest) {
       mimeType: file.mimeType,
       size: file.size,
       createdAt: file.createdAt,
-      downloadUrl: buildProxyFilePath(file.id, {
-        appId: file.appId,
-        originalName: file.originalName
-      })
+      downloadUrl: buildProxyFilePath(file.objectKey)
     }))
   });
 }

@@ -3,7 +3,9 @@ import { canUpload } from "@/lib/file-permissions";
 import { buildProxyFilePath } from "@/lib/file-public-path";
 import {
   createObjectKey,
+  extensionFromOriginalFilename,
   getObjectStorageBucket,
+  md5Hex,
   sha256Hex,
   uploadObject
 } from "@/lib/object-storage";
@@ -35,16 +37,6 @@ function getMaxFileSizeBytes(): number {
   const parsed = raw ? Number(raw) : 10 * 1024 * 1024;
   if (!Number.isFinite(parsed) || parsed <= 0) return 10 * 1024 * 1024;
   return Math.floor(parsed);
-}
-
-function isAllowedMimeType(mimeType: string): boolean {
-  const raw = process.env.FILE_ALLOWED_MIME_TYPES?.trim();
-  if (!raw || raw === "*") return true;
-  const allowed = raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return allowed.includes(mimeType);
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -111,18 +103,37 @@ export async function POST(req: NextRequest) {
       return json(req, { error: "FILE_TOO_LARGE" }, { status: 400 });
     }
 
-    if (!isAllowedMimeType(inputFile.type)) {
-      return json(req, { error: "MIME_TYPE_NOT_ALLOWED" }, { status: 400 });
+    const buffer = Buffer.from(await inputFile.arrayBuffer());
+    const mime = inputFile.type || "application/octet-stream";
+    const md5 = md5Hex(buffer);
+    const objectKey = createObjectKey(auth.user.id, md5, inputFile.name);
+    const originalName =
+      objectKey.split("/").pop() ??
+      `${md5}.${extensionFromOriginalFilename(inputFile.name)}`;
+
+    const existing = await prisma.fileObject.findFirst({
+      where: {
+        objectKey,
+        deleted: 0
+      }
+    });
+    if (existing) {
+      return json(req, {
+        id: existing.id,
+        originalName: existing.originalName,
+        mimeType: existing.mimeType,
+        size: existing.size,
+        createdAt: existing.createdAt,
+        downloadUrl: buildProxyFilePath(existing.objectKey)
+      });
     }
 
-    const objectKey = createObjectKey(auth.user.id, inputFile.name);
-    const buffer = Buffer.from(await inputFile.arrayBuffer());
     const now = Math.floor(Date.now() / 1000);
 
     await uploadObject({
       objectKey,
       body: buffer,
-      contentType: inputFile.type || "application/octet-stream"
+      contentType: mime
     });
 
     const record = await client.fileObject.create({
@@ -131,8 +142,8 @@ export async function POST(req: NextRequest) {
         appId,
         bucket: getObjectStorageBucket(),
         objectKey,
-        originalName: inputFile.name,
-        mimeType: inputFile.type || "application/octet-stream",
+        originalName,
+        mimeType: mime,
         size: inputFile.size,
         checksum: sha256Hex(buffer),
         visibility: "private",
@@ -147,10 +158,7 @@ export async function POST(req: NextRequest) {
       mimeType: record.mimeType,
       size: record.size,
       createdAt: record.createdAt,
-      downloadUrl: buildProxyFilePath(record.id, {
-        appId: record.appId,
-        originalName: record.originalName
-      })
+      downloadUrl: buildProxyFilePath(record.objectKey)
     });
   } catch (error) {
     console.error("FILE_UPLOAD_FAILED", error);

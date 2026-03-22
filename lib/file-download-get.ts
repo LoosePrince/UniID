@@ -1,6 +1,5 @@
 import { getAuthContextFromRequest } from "@/lib/auth-context";
 import { canDownloadFile } from "@/lib/file-permissions";
-import { appIdMatchesStored } from "@/lib/file-public-path";
 import {
   getObjectStreamFromStorage,
   getPresignedGetObjectUrl
@@ -36,8 +35,8 @@ function contentDisposition(
 }
 
 export type FileDownloadGetOptions = {
-  /** 来自 `/api/files/{appId}/...` 路径首段，与库内 FileObject.appId 校验 */
-  pathAppId?: string;
+  /** 来自 `/api/files/{ownerId}/{yyyy}/{mm}/...` 的完整 objectKey，须与库内 FileObject.objectKey 一致 */
+  pathObjectKey?: string;
 };
 
 /**
@@ -63,8 +62,8 @@ export async function executeFileDownloadGet(
   }
 
   if (
-    options?.pathAppId != null &&
-    !appIdMatchesStored(file.appId, options.pathAppId)
+    options?.pathObjectKey != null &&
+    file.objectKey !== options.pathObjectKey
   ) {
     return NextResponse.json(
       { error: "FILE_NOT_FOUND" },
