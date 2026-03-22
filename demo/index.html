@@ -76,8 +76,7 @@
               </div>
               <div class="flex items-center gap-2" id="userSection">
                 <div id="guestView">
-                  <button
-                    id="loginButton"
+                  <button id="loginButton"
                     class="inline-flex items-center gap-1 rounded-full bg-sky-500 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white shadow-sm hover:bg-sky-600 transition">
                     <i data-lucide="log-in" class="w-4 h-4"></i>
                     <span>登录 / 授权</span>
@@ -88,13 +87,11 @@
                     <div class="font-medium text-slate-900" id="usernameDisplay">-</div>
                     <div class="text-slate-500">已登录</div>
                   </div>
-                  <div
-                    id="userAvatar"
+                  <div id="userAvatar"
                     class="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-white text-xs font-semibold">
                     -
                   </div>
-                  <button
-                    id="logoutButton"
+                  <button id="logoutButton"
                     class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition">
                     退出
                   </button>
@@ -119,34 +116,52 @@
                   <label for="postTitle" class="block text-xs font-medium text-slate-600">
                     标题
                   </label>
-                  <input
-                    type="text"
-                    id="postTitle"
-                    required
-                    placeholder="输入帖子标题..."
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
-                  />
+                  <input type="text" id="postTitle" required placeholder="输入帖子标题..."
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
                 </div>
                 <div class="space-y-1">
                   <label for="postContent" class="block text-xs font-medium text-slate-600">
                     内容
                   </label>
-                  <textarea
-                    id="postContent"
-                    required
-                    placeholder="分享你的想法..."
+                  <textarea id="postContent" required placeholder="分享你的想法..."
                     class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none min-h-[120px] resize-y focus:border-sky-400 focus:ring-1 focus:ring-sky-200"></textarea>
                 </div>
+                <div class="space-y-1">
+                  <label for="postFiles" class="block text-xs font-medium text-slate-600">
+                    附件（可多选）
+                  </label>
+                  <input type="file" id="postFiles" multiple
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
+                  <p class="m-0 text-[11px] text-slate-400">支持图片与文件，发布时自动上传并关联到帖子。</p>
+                </div>
                 <div class="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="submit"
-                    id="submitPostBtn"
+                  <button type="submit" id="submitPostBtn"
                     class="inline-flex items-center justify-center rounded-full bg-sky-500 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed transition">
                     发布帖子
                   </button>
                 </div>
               </form>
               <div id="formMessage" class="hidden"></div>
+            </div>
+          </div>
+          <div id="adminFilesCard" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div class="px-4 py-3 sm:px-5 sm:py-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <div class="h-7 w-7 rounded-full bg-violet-500/10 flex items-center justify-center text-violet-600">
+                    <i data-lucide="shield" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-sm font-medium text-slate-900">管理员文件管理</span>
+                </div>
+                <button id="refreshAdminFilesBtn"
+                  class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                  <span>刷新</span>
+                </button>
+              </div>
+              <div id="adminFilesContainer" class="space-y-2 text-xs text-slate-500">
+                暂无数据
+              </div>
             </div>
           </div>
         </section>
@@ -187,11 +202,9 @@
   </div>
 
   <!-- 编辑帖子模态框 -->
-  <div
-    id="editModal"
+  <div id="editModal"
     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm px-4">
-    <div
-      class="bg-white rounded-xl border border-slate-200 shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="m-0 flex items-center gap-2 text-base font-semibold text-slate-900">
           <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
@@ -201,46 +214,33 @@
         </h3>
         <button
           class="inline-flex items-center justify-center rounded-full border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 w-7 h-7 text-xs transition"
-          id="closeEditModal"
-          aria-label="关闭">
+          id="closeEditModal" aria-label="关闭">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
       <form id="editForm" class="space-y-3">
         <input type="hidden" id="editPostId" />
         <div class="space-y-1">
-          <label
-            for="editTitle"
-            class="block text-xs font-medium text-slate-600">
+          <label for="editTitle" class="block text-xs font-medium text-slate-600">
             标题
           </label>
-          <input
-            type="text"
-            id="editTitle"
-            required
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
-          />
+          <input type="text" id="editTitle" required
+            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
         </div>
         <div class="space-y-1">
-          <label
-            for="editContent"
-            class="block text-xs font-medium text-slate-600">
+          <label for="editContent" class="block text-xs font-medium text-slate-600">
             内容
           </label>
-          <textarea
-            id="editContent"
-            required
+          <textarea id="editContent" required
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none min-h-[120px] resize-y focus:border-sky-400 focus:ring-1 focus:ring-sky-200"></textarea>
         </div>
         <div class="flex items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
+          <button type="button"
             class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition"
             id="cancelEdit">
             取消
           </button>
-          <button
-            type="submit"
+          <button type="submit"
             class="inline-flex items-center justify-center rounded-full bg-sky-500 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-600 transition">
             保存修改
           </button>
@@ -268,7 +268,9 @@
       const state = {
         user: null,
         posts: [],
-        editingPostId: null
+        editingPostId: null,
+        isAdmin: false,
+        adminFiles: []
       };
 
       // DOM 元素
@@ -283,10 +285,14 @@
         postFormCard: document.getElementById("postFormCard"),
         postTitle: document.getElementById("postTitle"),
         postContent: document.getElementById("postContent"),
+        postFiles: document.getElementById("postFiles"),
         submitPostBtn: document.getElementById("submitPostBtn"),
         formMessage: document.getElementById("formMessage"),
         postsContainer: document.getElementById("postsContainer"),
         refreshBtn: document.getElementById("refreshBtn"),
+        adminFilesCard: document.getElementById("adminFilesCard"),
+        adminFilesContainer: document.getElementById("adminFilesContainer"),
+        refreshAdminFilesBtn: document.getElementById("refreshAdminFilesBtn"),
         editModal: document.getElementById("editModal"),
         editForm: document.getElementById("editForm"),
         editPostId: document.getElementById("editPostId"),
@@ -331,6 +337,105 @@
         }
       }
 
+      async function authFetch(url, options = {}) {
+        const headers = new Headers(options.headers || {});
+        const token = auth.getToken();
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
+        const isAbsoluteUrl = /^https?:\/\//i.test(url);
+        const base = (auth.authServer || "").replace(/\/+$/, "");
+        const path = String(url || "");
+        const finalUrl = isAbsoluteUrl
+          ? path
+          : `${base}${path.startsWith("/") ? path : `/${path}`}`;
+        return fetch(finalUrl, { ...options, headers });
+      }
+
+      /** 将 API 返回的相对路径与 authServer 拼成浏览器可用的绝对 URL */
+      function resolveAppUrl(pathOrUrl) {
+        if (!pathOrUrl) return "#";
+        if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+        const base = (auth.authServer || "").replace(/\/+$/, "");
+        return `${base}${pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`}`;
+      }
+
+      function formatFileSize(size) {
+        const units = ["B", "KB", "MB", "GB"];
+        let value = Number(size || 0);
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+          value /= 1024;
+          unitIndex += 1;
+        }
+        return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+      }
+
+      async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append("file", file);
+        if (auth.appId) {
+          formData.append("appId", auth.appId);
+        }
+        const res = await authFetch("/api/files/upload", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "上传失败");
+        }
+        return data;
+      }
+
+      async function deleteFileById(fileId) {
+        const res = await authFetch(`/api/files/${encodeURIComponent(fileId)}`, {
+          method: "DELETE"
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "删除文件失败");
+        }
+      }
+
+      function collectPostFileIds(postData) {
+        const ids = new Set();
+        const attachments = Array.isArray(postData.attachments) ? postData.attachments : [];
+        for (const item of attachments) {
+          if (item && item.fileId) {
+            ids.add(item.fileId);
+          }
+        }
+        const comments = postData.comments || {};
+        for (const userComments of Object.values(comments)) {
+          if (!userComments || typeof userComments !== "object") continue;
+          for (const comment of Object.values(userComments)) {
+            if (!comment || typeof comment !== "object") continue;
+            if (comment.image && comment.image.fileId) {
+              ids.add(comment.image.fileId);
+            }
+          }
+        }
+        return Array.from(ids);
+      }
+
+      async function detectAdminStatus() {
+        if (!state.user) {
+          state.isAdmin = false;
+          return false;
+        }
+        try {
+          const appId = auth.appId;
+          const res = await authFetch(`/api/app/${appId}`);
+          const data = await res.json().catch(() => ({}));
+          state.isAdmin = Boolean(data.isAdmin);
+          return state.isAdmin;
+        } catch {
+          state.isAdmin = false;
+          return false;
+        }
+      }
+
       // 用户状态管理
       function updateUserUI() {
         if (state.user) {
@@ -343,6 +448,11 @@
           if (status) {
             status.textContent = "已登录，可发帖与互动";
           }
+          if (state.isAdmin) {
+            elements.adminFilesCard.classList.remove("hidden");
+          } else {
+            elements.adminFilesCard.classList.add("hidden");
+          }
         } else {
           elements.guestView.classList.remove("hidden");
           elements.userView.classList.add("hidden");
@@ -351,6 +461,7 @@
           if (status) {
             status.textContent = "请先登录以发帖和互动";
           }
+          elements.adminFilesCard.classList.add("hidden");
         }
       }
 
@@ -412,6 +523,7 @@
             }
           }
           const likes = data.likes || {};
+          const attachments = Array.isArray(data.attachments) ? data.attachments : [];
           const likeCount = Object.keys(likes).length;
           const userLiked = state.user && likes[state.user.id];
 
@@ -447,14 +559,16 @@
                   </div>
                 ` : ""}
               </div>
-              <div class="text-xs sm:text-sm text-slate-700 leading-relaxed">
+              <div class="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                 ${escapeHtml(data.content || "")}
               </div>
+              ${renderPostImages(attachments)}
+              ${renderPostFileAttachments(attachments)}
               <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 mt-1">
                 <button
                   class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] sm:text-xs font-medium border ${userLiked
-                    ? "bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
-                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"} transition"
+              ? "bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
+              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"} transition"
                   onclick="toggleLike('${post.id}')">
                   <i data-lucide="heart" class="w-4 h-4"></i>
                   <span>点赞 (${likeCount})</span>
@@ -474,19 +588,27 @@
                 </div>
                 ${renderComments(comments)}
                 ${state.user ? `
-                  <div class="flex items-center gap-2 mt-1">
+                  <div class="space-y-2 mt-1">
+                    <div class="flex items-center gap-2">
+                      <input
+                        type="text"
+                        id="comment-input-${post.id}"
+                        placeholder="写下你的评论..."
+                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
+                      />
+                      <button
+                        class="inline-flex items-center gap-1 rounded-full bg-sky-500 px-3 py-1 text-[11px] sm:text-xs font-medium text-white shadow-sm hover:bg-sky-600 transition"
+                        onclick="addComment('${post.id}')">
+                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                        <span>发送</span>
+                      </button>
+                    </div>
                     <input
-                      type="text"
-                      id="comment-input-${post.id}"
-                      placeholder="写下你的评论..."
-                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
+                      type="file"
+                      id="comment-image-${post.id}"
+                      accept="image/*"
+                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] sm:text-xs text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
                     />
-                    <button
-                      class="inline-flex items-center gap-1 rounded-full bg-sky-500 px-3 py-1 text-[11px] sm:text-xs font-medium text-white shadow-sm hover:bg-sky-600 transition"
-                      onclick="addComment('${post.id}')">
-                      <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                      <span>发送</span>
-                    </button>
                   </div>
                 ` : `
                   <div
@@ -502,6 +624,78 @@
         if (window.lucide && typeof window.lucide.createIcons === "function") {
           window.lucide.createIcons();
         }
+      }
+
+      function isImageAttachment(item) {
+        return item && /^image\//i.test(item.mimeType || "");
+      }
+
+      /** 帖子内图片：附件中的图片在正文下直接渲染 */
+      function renderPostImages(attachments) {
+        if (!Array.isArray(attachments) || attachments.length === 0) {
+          return "";
+        }
+        const images = attachments.filter(isImageAttachment);
+        if (images.length === 0) return "";
+
+        return `
+          <div class="space-y-2 mt-2">
+            <div class="text-[11px] sm:text-xs font-semibold text-slate-500">图片 (${images.length})</div>
+            <div class="flex flex-wrap gap-2">
+              ${images.map(item => {
+                const src = resolveAppUrl(item.url || "");
+                const href = escapeHtml(src);
+                return `
+                <figure class="m-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden max-w-full">
+                  <a href="${href}" target="_blank" rel="noreferrer" class="block">
+                    <img
+                      src="${href}"
+                      alt="${escapeHtml(item.name || "图片")}"
+                      class="max-w-full max-h-96 w-auto object-contain block mx-auto"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </a>
+                  ${item.name ? `
+                    <figcaption class="px-2 py-1 text-[10px] text-slate-500 truncate border-t border-slate-100 bg-white">
+                      ${escapeHtml(item.name)}
+                    </figcaption>
+                  ` : ""}
+                </figure>
+              `;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      /** 非图片附件：列表下载 */
+      function renderPostFileAttachments(attachments) {
+        if (!Array.isArray(attachments) || attachments.length === 0) {
+          return "";
+        }
+        const files = attachments.filter(
+          (item) => item && !isImageAttachment(item)
+        );
+        if (files.length === 0) return "";
+
+        return `
+          <div class="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 mt-2">
+            <div class="text-[11px] sm:text-xs font-semibold text-slate-500">附件 (${files.length})</div>
+            <div class="space-y-1.5">
+              ${files.map(item => `
+                <a
+                  href="${escapeHtml(resolveAppUrl(item.url || ""))}"
+                  target="_blank"
+                  rel="noreferrer"
+                  class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] sm:text-xs text-slate-700 hover:bg-slate-50 transition">
+                  <span class="truncate pr-2">${escapeHtml(item.name || "未命名文件")}</span>
+                  <span class="text-slate-400">${formatFileSize(item.size || 0)}</span>
+                </a>
+              `).join("")}
+            </div>
+          </div>
+        `;
       }
 
       function renderComments(comments) {
@@ -543,9 +737,27 @@
                 ${formatTime(comment.time)}
               </span>
             </div>
-            <div class="text-xs sm:text-sm text-slate-700">
-              ${escapeHtml(comment.content)}
+            <div class="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap">
+              ${escapeHtml(comment.content || "")}
             </div>
+            ${comment.image ? `
+              <div class="mt-1.5 rounded-md border border-slate-200 bg-white overflow-hidden max-w-[min(100%,20rem)]">
+                <a href="${escapeHtml(resolveAppUrl(comment.image.url || ""))}" target="_blank" rel="noreferrer" class="block">
+                  <img
+                    src="${escapeHtml(resolveAppUrl(comment.image.url || ""))}"
+                    alt="${escapeHtml(comment.image.name || "评论图片")}"
+                    class="w-full max-h-56 object-contain bg-slate-50"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                ${comment.image.name ? `
+                  <div class="px-2 py-1 text-[10px] text-slate-500 truncate border-t border-slate-100">
+                    ${escapeHtml(comment.image.name)}
+                  </div>
+                ` : ""}
+              </div>
+            ` : ""}
           </div>
         `).join("");
       }
@@ -555,6 +767,64 @@
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
+      }
+
+      function renderAdminFiles() {
+        if (!state.isAdmin) {
+          elements.adminFilesCard.classList.add("hidden");
+          return;
+        }
+        elements.adminFilesCard.classList.remove("hidden");
+        if (!Array.isArray(state.adminFiles) || state.adminFiles.length === 0) {
+          elements.adminFilesContainer.innerHTML = `
+            <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-slate-400">
+              暂无文件
+            </div>
+          `;
+          return;
+        }
+
+        elements.adminFilesContainer.innerHTML = state.adminFiles.map(file => `
+          <div class="rounded-lg border border-slate-200 bg-white px-3 py-2.5 space-y-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-medium text-slate-800 truncate">${escapeHtml(file.originalName || "未命名文件")}</span>
+              <button
+                class="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] text-red-600 hover:bg-red-100 transition"
+                onclick="deleteManagedFile('${file.id}')">
+                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                <span>删除</span>
+              </button>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
+              <span>用户: @${escapeHtml(file.ownerName || file.ownerId || "-")}</span>
+              <span>大小: ${formatFileSize(file.size || 0)}</span>
+            </div>
+          </div>
+        `).join("");
+
+        if (window.lucide && typeof window.lucide.createIcons === "function") {
+          window.lucide.createIcons();
+        }
+      }
+
+      async function loadAdminFiles() {
+        if (!state.user || !state.isAdmin) return;
+        try {
+          const res = await authFetch("/api/files?scope=all");
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data.error || "加载失败");
+          }
+          state.adminFiles = Array.isArray(data.items) ? data.items : [];
+          renderAdminFiles();
+        } catch (err) {
+          console.error("加载管理员文件失败:", err);
+          elements.adminFilesContainer.innerHTML = `
+            <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+              文件列表加载失败
+            </div>
+          `;
+        }
       }
 
       // 发帖
@@ -567,6 +837,7 @@
 
         const title = elements.postTitle.value.trim();
         const content = elements.postContent.value.trim();
+        const selectedFiles = Array.from(elements.postFiles.files || []);
 
         if (!title || !content) {
           showMessage("标题和内容不能为空");
@@ -577,11 +848,24 @@
         elements.submitPostBtn.textContent = "发布中...";
 
         try {
+          const attachments = [];
+          for (const file of selectedFiles) {
+            const uploaded = await uploadFile(file);
+            attachments.push({
+              fileId: uploaded.id,
+              name: uploaded.originalName,
+              mimeType: uploaded.mimeType,
+              size: uploaded.size,
+              url: uploaded.downloadUrl
+            });
+          }
+
           const data = {
             title,
             content,
             likes: {},
-            comments: {}
+            comments: {},
+            attachments
           };
 
           // 注意：在新的架构下，permissions 字段现在是可选的覆盖项 (permissionOverride)
@@ -600,6 +884,11 @@
                 read: ["$public"],
                 create: ["$dynamic:comments.$user"],
                 update: ["$dynamic:comments.$user.userId"]
+              },
+              "attachments": {
+                read: ["$public"],
+                create: ["$owner"],
+                update: ["$owner"]
               }
             }
           };
@@ -608,7 +897,11 @@
           showMessage("发布成功！", "success");
           elements.postTitle.value = "";
           elements.postContent.value = "";
+          elements.postFiles.value = "";
           await loadPosts();
+          if (state.isAdmin) {
+            await loadAdminFiles();
+          }
         } catch (err) {
           console.error("发帖失败:", err);
           showMessage("发布失败: " + (err.message || "未知错误"));
@@ -664,9 +957,27 @@
         if (!confirm("确定要删除这篇帖子吗？此操作不可恢复。")) return;
 
         try {
+          const post = state.posts.find((item) => item.id === postId);
+          const fileIds = post ? collectPostFileIds(post.data || {}) : [];
+          const deleteErrors = [];
+          for (const fileId of fileIds) {
+            try {
+              await deleteFileById(fileId);
+            } catch (fileErr) {
+              deleteErrors.push(fileId);
+              console.warn("删除关联文件失败:", fileId, fileErr);
+            }
+          }
           await auth.delete(postId);
-          showMessage("删除成功！", "success");
+          if (deleteErrors.length > 0) {
+            showMessage(`帖子已删除，但有 ${deleteErrors.length} 个附件删除失败，请管理员在文件管理中处理`, "error");
+          } else {
+            showMessage("删除成功！", "success");
+          }
           await loadPosts();
+          if (state.isAdmin) {
+            await loadAdminFiles();
+          }
         } catch (err) {
           console.error("删除失败:", err);
           showMessage("删除失败: " + (err.message || "未知错误"));
@@ -718,10 +1029,12 @@
         }
 
         const input = document.getElementById(`comment-input-${postId}`);
+        const imageInput = document.getElementById(`comment-image-${postId}`);
         const content = input.value.trim();
+        const imageFile = imageInput && imageInput.files ? imageInput.files[0] : null;
 
-        if (!content) {
-          showMessage("评论内容不能为空");
+        if (!content && !imageFile) {
+          showMessage("评论内容和图片至少填写一项");
           return;
         }
 
@@ -735,18 +1048,36 @@
             comments[state.user.id] = {};
           }
           const commentId = `${Date.now()}`;
+          let image = null;
+          if (imageFile) {
+            const uploaded = await uploadFile(imageFile);
+            image = {
+              fileId: uploaded.id,
+              name: uploaded.originalName,
+              mimeType: uploaded.mimeType,
+              size: uploaded.size,
+              url: uploaded.downloadUrl
+            };
+          }
 
           // userId, username, time 将由后端 autoFill 自动填充，前端传占位符即可
           comments[state.user.id][commentId] = {
             userId: state.user.id,
             username: state.user.username,
             content,
-            time: 0
+            time: 0,
+            image
           };
 
           await auth.update(postId, { comments });
           input.value = "";
+          if (imageInput) {
+            imageInput.value = "";
+          }
           await loadPosts();
+          if (state.isAdmin) {
+            await loadAdminFiles();
+          }
 
           // 保持评论区展开
           setTimeout(() => {
@@ -769,12 +1100,14 @@
           if (result && result.user) {
             state.user = result.user;
             localStorage.setItem("demo_user", JSON.stringify(result.user));
+            await detectAdminStatus();
             updateUserUI();
 
             // 登录后检查并同步 Schema
             await syncSchemaIfNeeded();
 
             await loadPosts();
+            await loadAdminFiles();
           }
         } catch (err) {
           console.error("登录失败:", err);
@@ -805,7 +1138,11 @@
             }
           }).then(res => res.json());
 
-          if (!adminCheck.isAdmin) return;
+          if (!adminCheck.isAdmin) {
+            state.isAdmin = false;
+            return;
+          }
+          state.isAdmin = true;
 
           console.log("检测到应用管理员身份，正在同步数据验证规则...");
 
@@ -838,13 +1175,38 @@
                   type: "object",
                   additionalProperties: {
                     type: "object",
-                    required: ["userId", "username", "content", "time"],
+                    required: ["userId", "username", "time"],
                     properties: {
                       userId: { type: "string" },
                       username: { type: "string" },
-                      content: { type: "string", minLength: 1, maxLength: 500 },
+                      content: { type: "string", minLength: 0, maxLength: 500 },
+                      image: {
+                        type: ["object", "null"],
+                        required: ["fileId", "name", "mimeType", "size", "url"],
+                        properties: {
+                          fileId: { type: "string" },
+                          name: { type: "string" },
+                          mimeType: { type: "string" },
+                          size: { type: "integer", minimum: 0 },
+                          url: { type: "string" }
+                        }
+                      },
                       time: { type: "integer", minimum: 0 }
                     }
+                  }
+                }
+              },
+              attachments: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["fileId", "name", "mimeType", "size", "url"],
+                  properties: {
+                    fileId: { type: "string" },
+                    name: { type: "string" },
+                    mimeType: { type: "string" },
+                    size: { type: "integer", minimum: 0 },
+                    url: { type: "string" }
                   }
                 }
               }
@@ -915,6 +1277,8 @@
         try {
           await auth.revoke();
           state.user = null;
+          state.isAdmin = false;
+          state.adminFiles = [];
           localStorage.removeItem("demo_user");
           updateUserUI();
           await loadPosts();
@@ -924,6 +1288,21 @@
       };
 
       elements.refreshBtn.onclick = loadPosts;
+      elements.refreshAdminFilesBtn.onclick = loadAdminFiles;
+
+      window.deleteManagedFile = async (fileId) => {
+        if (!state.user || !state.isAdmin) return;
+        if (!confirm("确定删除该文件吗？删除后不可恢复。")) return;
+        try {
+          await deleteFileById(fileId);
+          showMessage("文件删除成功", "success");
+          await loadAdminFiles();
+          await loadPosts();
+        } catch (err) {
+          console.error("管理员删除文件失败:", err);
+          showMessage("删除失败: " + (err.message || "未知错误"));
+        }
+      };
 
       // 初始化
       function init() {
@@ -939,9 +1318,18 @@
         if (!state.user) {
           localStorage.removeItem("demo_user");
         }
-
-        updateUserUI();
-        loadPosts();
+        Promise.resolve()
+          .then(async () => {
+            await detectAdminStatus();
+            updateUserUI();
+            await loadPosts();
+            await loadAdminFiles();
+          })
+          .catch((err) => {
+            console.error("初始化失败:", err);
+            updateUserUI();
+            loadPosts();
+          });
       }
 
       init();

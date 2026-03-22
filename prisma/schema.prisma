@@ -27,6 +27,8 @@ model User {
   recordsUpdated Record[]   @relation("RecordUpdatedBy")
   schemasCreated DataSchema[] @relation("SchemaCreatedBy")
   appAdmins     AppAdmin[]
+  filesOwned    FileObject[]    @relation("FileOwner")
+  fileSharesCreated FileShareToken[] @relation("FileShareCreatedBy")
 }
 
 model Session {
@@ -158,5 +160,43 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model FileObject {
+  id           String  @id @default(cuid())
+  appId        String?
+  ownerId      String
+  bucket       String
+  objectKey    String  @unique
+  originalName String
+  mimeType     String
+  size         Int
+  checksum     String?
+  visibility   String  @default("private")
+  createdAt    Int
+  updatedAt    Int
+  deleted      Int     @default(0)
+
+  owner       User             @relation("FileOwner", fields: [ownerId], references: [id])
+  shareTokens FileShareToken[]
+
+  @@index([ownerId, deleted])
+  @@index([createdAt])
+}
+
+model FileShareToken {
+  id          String @id @default(cuid())
+  fileId      String
+  token       String @unique
+  expiresAt   Int
+  createdById String
+  revoked     Int    @default(0)
+  createdAt   Int
+
+  file      FileObject @relation(fields: [fileId], references: [id])
+  createdBy User       @relation("FileShareCreatedBy", fields: [createdById], references: [id])
+
+  @@index([fileId, revoked])
+  @@index([token, revoked, expiresAt])
 }
 

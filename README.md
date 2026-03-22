@@ -555,6 +555,74 @@ Response:
 }
 ```
 
+### 5.5 文件存储 API（Object Storage）
+
+文件对象存储使用**私密桶**时，不在业务数据里存放桶直链。API 返回的 `downloadUrl` 为**相对路径**（`/api/files/{appId}/{fileId}.{ext}`，`ext` 来自原始文件名，仅美化 URL）。访问该路径时：
+
+- **默认**：服务端在校验登录或 `share_token` 后返回 **302**，`Location` 为存储桶的 **S3 预签名 GET URL**，浏览器与 `<img src>` 跟随重定向后**流量直连对象存储**，应用不承担文件字节转发。
+- **可选**：`GET /api/files/{appId}/{fileId}.{ext}?proxy=1` 走应用内**流式代理**（适用于不便使用预签名的环境或调试）。
+
+预签名有效期由 `FILE_PRESIGN_EXPIRES_SECONDS` 控制。签名使用的 endpoint 优先为 `OBJECT_STORAGE_ENDPOINT_EXTERNAL`（公网客户端必须能访问该主机上的桶路径）。
+
+#### 5.5.1 环境变量
+
+- `OBJECT_STORAGE_ENDPOINT_INTERNAL`: 对象存储内部 endpoint（S3 兼容，集群内）
+- `OBJECT_STORAGE_ENDPOINT_EXTERNAL`: 对象存储外部可访问 endpoint（本地开发或公网 Worker 无法解析内部域名时必填）
+- `OBJECT_STORAGE_BUCKET`: 存储桶
+- `OBJECT_STORAGE_ACCESS_KEY`: 访问密钥
+- `OBJECT_STORAGE_SECRET_KEY`: 密钥
+- 下载链接由 API 返回**相对路径**（如 `/api/files/{appId}/{fileId}.png`），客户端使用与鉴权一致的 **应用根地址**（如 SDK 的 `authServer`）拼接后再请求；上传时可传表单字段 `appId` 以写入 `FileObject.appId` 并固定 URL 命名空间
+- `FILE_MAX_SIZE_BYTES`: 上传大小上限（默认 10MB）
+- `FILE_PRESIGN_EXPIRES_SECONDS`: 预签名 GET 有效期（秒，默认 300，范围 60～604800）
+- `FILE_ALLOWED_MIME_TYPES`: 允许的 MIME 列表（逗号分隔，`*` 表示不限制）
+- `FILE_SHARE_TOKEN_EXPIRES_IN_SECONDS`: 分享 token 默认有效期（秒）
+
+#### 5.5.2 管理员可配置权限策略
+
+通过系统管理员接口 `PATCH /api/admin/config` 写入 `key=file_policy` 实现策略更新，`value` 为 JSON 字符串。
+
+示例：
+
+```json
+{
+  "upload": {
+    "allowAuthenticated": false,
+    "allowedRoles": ["admin"]
+  },
+  "download": {
+    "ownerOnly": true,
+    "adminCanDownloadAll": true,
+    "allowShareToken": true
+  },
+  "delete": {
+    "ownerCanDelete": true,
+    "adminCanManageAll": true
+  }
+}
+```
+
+#### 5.5.3 首期接口
+
+```text
+POST   /api/files/upload
+DELETE /api/files/{fileId}
+GET    /api/files/{fileId}/download-url
+GET    /api/files/{appId}/{fileId}.{ext}
+GET    /api/files?scope=own|all
+POST   /api/files/share
+DELETE /api/files/share
+GET    /api/files/public/{token}
+```
+
+简要说明：
+- `upload`: multipart/form-data 上传，字段名 `file`，可选 `appId`（用于 URL 与 `FileObject.appId`）
+- `download-url`: 返回 JSON，其中 `downloadUrl` 为**相对路径**（`/api/files/{appId}/{fileId}.{ext}` 或带 `share_token`）；可传 `?share_token=...` 校验分享令牌
+- `GET /api/files/{appId}/{fileId}.{ext}`：默认 **302 → 预签名直链**；`?proxy=1` 时为应用内流式代理。默认 **`Content-Disposition: inline`**（浏览器内预览，不强制另存为）；需要强制下载时加 **`?download=1`**。需登录且有权下载，或带有效 `share_token`
+- `share`:
+  - `POST` 创建分享 token（`{ fileId, expiresInSeconds? }`）
+  - `DELETE` 吊销分享 token（`{ token }`）
+- `public/{token}`: 公开校验 token 后返回下载地址和文件元信息
+
 #### 5.4.5 后端自动填充 (Auto-fill)
 
 支持在数据存入数据库前由后端强制填充变量，用户无法通过 API 修改这些字段。在 Schema 中通过 `autoFill` 对象配置：
