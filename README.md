@@ -571,7 +571,7 @@ Response:
 #### 5.5.1 环境变量
 
 - `OBJECT_STORAGE_ENDPOINT_INTERNAL`: 对象存储内部 endpoint（S3 兼容，集群内）
-- `OBJECT_STORAGE_ENDPOINT_EXTERNAL`: 对象存储外部可访问 endpoint（本地开发或公网 Worker 无法解析内部域名时必填）
+- `OBJECT_STORAGE_ENDPOINT_EXTERNAL`: 对象存储外部可访问 endpoint。**本机开发**若配置了集群内地址（如 `*.svc.cluster.local`）但本机无法连通，会出现 `ECONNRESET` / TLS 失败；请在本机 `.env` 中配置可访问的 **EXTERNAL**（或仅保留 EXTERNAL），与 INTERNAL 同时配置时上传/删除会先尝试 INTERNAL，连接类失败会自动回退到 EXTERNAL
 - `OBJECT_STORAGE_BUCKET`: 存储桶
 - `OBJECT_STORAGE_ACCESS_KEY`: 访问密钥
 - `OBJECT_STORAGE_SECRET_KEY`: 密钥

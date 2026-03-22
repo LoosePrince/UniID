@@ -57,14 +57,27 @@ function getCandidateEndpoints(cfg: StorageConfig): string[] {
   return [...new Set(candidates)];
 }
 
+/**
+ * 内部 endpoint（如 K8s `*.svc.cluster.local`）在本机开发时常因 DNS/网络不可达而失败；
+ * 此类错误应继续尝试 `OBJECT_STORAGE_ENDPOINT_EXTERNAL`。
+ */
 function shouldTryNextEndpoint(error: unknown): boolean {
   if (!(error instanceof Error)) return true;
   const code = (error as Error & { code?: string }).code ?? "";
-  if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ETIMEDOUT") {
+  if (
+    code === "ENOTFOUND" ||
+    code === "ECONNREFUSED" ||
+    code === "ETIMEDOUT" ||
+    code === "ECONNRESET" ||
+    code === "EPIPE" ||
+    code === "ECONNABORTED"
+  ) {
     return true;
   }
   const message = error.message || "";
-  return /ENOTFOUND|ECONNREFUSED|ETIMEDOUT|TimeoutError|getaddrinfo/i.test(message);
+  return /ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EPIPE|ECONNABORTED|TimeoutError|getaddrinfo|TLS connection|socket disconnected|secure TLS/i.test(
+    message
+  );
 }
 
 function getClient(endpoint: string, cfg: StorageConfig): S3Client {
