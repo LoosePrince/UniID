@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuthContextFromRequest } from "@/lib/auth-context";
-import { canDeleteFile } from "@/lib/file-permissions";
+import {
+  canDeleteFile,
+  toFilePermissionSubject
+} from "@/lib/file-permissions";
 import { deleteObject } from "@/lib/object-storage";
 
 function corsHeaders(req: NextRequest): Record<string, string> {
@@ -49,7 +52,7 @@ export async function DELETE(
     return json(req, { error: "FILE_NOT_FOUND" }, { status: 404 });
   }
 
-  if (!(await canDeleteFile(file, auth.user))) {
+  if (!(await canDeleteFile(toFilePermissionSubject(file), auth.user))) {
     return json(req, { error: "FORBIDDEN" }, { status: 403 });
   }
 

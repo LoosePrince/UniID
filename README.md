@@ -579,7 +579,34 @@ Response:
 - `FILE_PRESIGN_EXPIRES_SECONDS`: 预签名 GET 有效期（秒，默认 300，范围 60～604800）
 - `FILE_SHARE_TOKEN_EXPIRES_IN_SECONDS`: 分享 token 默认有效期（秒）
 
-#### 5.5.2 管理员可配置权限策略
+#### 5.5.2 应用 DataSchema：文件权限（`dataType: "file"`）
+
+除全局 `file_policy` 外，可为**每个应用**注册保留类型 **`file`** 的 `DataSchema`，用 **`defaultPermissions`** 描述该应用下文件的上传/下载/删除，语义与业务记录的权限 JSON **相同**（与 `checkRecordPermission` 一致）：
+
+| 操作 | 使用权限键 | 说明 |
+|------|-------------|------|
+| 上传 `POST /api/files/upload`（表单带 `appId`） | `default.write` | 与「写」记录一致，如 `$owner`、`$app_admin`、`$public` 等 |
+| 下载 `GET /api/files/...`（无 `share_token`） | `default.read` | 与「读」记录一致；含 `$public` 时**允许未登录**访问该文件 |
+| 删除 `DELETE /api/files/{fileId}` | `default.delete` | 与「删」记录一致 |
+
+- 取该应用 **`dataType === "file"`** 且 **`isActive === 1`** 的 **最高 `version`** 条目的 `defaultPermissions`。
+- 若该应用**未配置** `file` 类型 Schema，或 **`defaultPermissions` 为空**：该应用下文件仍按全局 **`file_policy`**（`PATCH /api/admin/config`）处理。
+- **`FileObject.appId` 为空**（上传未传 `appId`）时：仅走全局 `file_policy`，不按应用 Schema。
+- **分享链接** `?share_token=` 是否允许仍由全局 `file_policy.download.allowShareToken` 控制（与应用 Schema 独立）。
+
+示例（应用管理员通过 Schema 接口注册，`schema` 可为最小 JSON 如 `{"type":"object"}`）：
+
+```json
+{
+  "default": {
+    "read": ["$public"],
+    "write": ["$public"],
+    "delete": ["$owner", "$app_admin"]
+  }
+}
+```
+
+#### 5.5.3 管理员可配置全局文件策略（`file_policy`）
 
 通过系统管理员接口 `PATCH /api/admin/config` 写入 `key=file_policy` 实现策略更新，`value` 为 JSON 字符串。
 
@@ -603,7 +630,7 @@ Response:
 }
 ```
 
-#### 5.5.3 首期接口
+#### 5.5.4 首期接口
 
 ```text
 POST   /api/files/upload
@@ -617,7 +644,7 @@ GET    /api/files/public/{token}
 ```
 
 简要说明：
-- `upload`: multipart/form-data 上传，字段名 `file`，可选 `appId`（写入 `FileObject.appId`，与下载 URL 路径无关）
+- `upload`: multipart/form-data 上传，字段名 `file`，可选 `appId`（写入 `FileObject.appId`；若应用已注册 `dataType: "file"` 的 Schema，则按该 Schema 的 `default.write` 鉴权，否则按全局 `file_policy`）
 - `download-url`: 返回 JSON，其中 `downloadUrl` 为**相对路径**（`/api/files/{ownerId}/{yyyy}/{mm}/{fileNamePart}` 或带 `share_token`）；可传 `?share_token=...` 校验分享令牌
 - `GET /api/files/{ownerId}/{yyyy}/{mm}/{fileNamePart}`：默认 **302 → 预签名直链**；`?proxy=1` 时为应用内流式代理。默认 **`Content-Disposition: inline`**（浏览器内预览，不强制另存为）；需要强制下载时加 **`?download=1`**。需登录且有权下载，或带有效 `share_token`
 - `share`:

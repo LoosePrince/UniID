@@ -1,5 +1,8 @@
 import { getAuthContextFromRequest } from "@/lib/auth-context";
-import { canDownloadFile } from "@/lib/file-permissions";
+import {
+  canDownloadFile,
+  toFilePermissionSubject
+} from "@/lib/file-permissions";
 import { buildProxyFilePath } from "@/lib/file-public-path";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -80,7 +83,7 @@ export async function GET(
     return json(req, { error: auth.error }, { status: auth.status });
   }
 
-  if (!(await canDownloadFile(file, auth.user))) {
+  if (!(await canDownloadFile(toFilePermissionSubject(file), auth.user))) {
     return json(req, { error: "FORBIDDEN" }, { status: 403 });
   }
 

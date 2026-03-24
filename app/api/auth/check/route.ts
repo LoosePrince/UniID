@@ -1,17 +1,45 @@
 import { getAuthContextFromRequest } from "@/lib/auth-context";
-import { isSameOriginAuthRequest } from "@/lib/origin";
+import {
+  isSameOriginAuthRequest,
+  resolveAllowedAuthOrigin,
+  setAuthCorsHeaders
+} from "@/lib/origin";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const allowedOrigin = resolveAllowedAuthOrigin(origin);
+
+  if (!allowedOrigin) {
+    return new NextResponse(null, { status: 403 });
+  }
+
+  const res = new NextResponse(null, { status: 204 });
+  setAuthCorsHeaders(res, allowedOrigin);
+  return res;
+}
+
 export async function GET(req: NextRequest) {
+  const origin = req.headers.get("origin");
+  const allowedOrigin = resolveAllowedAuthOrigin(origin);
+
   if (!isSameOriginAuthRequest(req)) {
-    return NextResponse.json({ valid: false }, { status: 403 });
+    const res = NextResponse.json({ valid: false }, { status: 403 });
+    if (allowedOrigin) {
+      setAuthCorsHeaders(res, allowedOrigin);
+    }
+    return res;
   }
 
   const auth = await getAuthContextFromRequest(req);
 
   if (!auth.ok) {
-    return NextResponse.json({ valid: false }, { status: auth.status });
+    const res = NextResponse.json({ valid: false }, { status: auth.status });
+    if (allowedOrigin) {
+      setAuthCorsHeaders(res, allowedOrigin);
+    }
+    return res;
   }
 
   const payload = auth.payload as any;
@@ -33,7 +61,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     valid: true,
     user: {
       id: auth.user.id,
@@ -44,5 +72,9 @@ export async function GET(req: NextRequest) {
     app_id: payload.app_id ?? null,
     auth_type: payload.auth_type ?? "full"
   });
+  if (allowedOrigin) {
+    setAuthCorsHeaders(res, allowedOrigin);
+  }
+  return res;
 }
 

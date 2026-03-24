@@ -49,10 +49,6 @@ export async function POST(req: NextRequest) {
     return json(req, { error: auth.error }, { status: auth.status });
   }
 
-  if (!(await canUpload(auth.user))) {
-    return json(req, { error: "FORBIDDEN" }, { status: 403 });
-  }
-
   try {
     const client = prisma as unknown as {
       fileObject: {
@@ -88,6 +84,10 @@ export async function POST(req: NextRequest) {
       typeof appIdRaw === "string" && appIdRaw.trim() !== ""
         ? appIdRaw.trim()
         : null;
+
+    if (!(await canUpload(auth.user, appId))) {
+      return json(req, { error: "FORBIDDEN" }, { status: 403 });
+    }
 
     const inputFile = formData.get("file");
     if (!(inputFile instanceof File)) {

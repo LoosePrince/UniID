@@ -1,5 +1,9 @@
 import { getAuthContextFromRequest } from "@/lib/auth-context";
-import { canDownloadFile } from "@/lib/file-permissions";
+import {
+  canDownloadFile,
+  canDownloadFileUnauthenticated,
+  toFilePermissionSubject
+} from "@/lib/file-permissions";
 import {
   getObjectStreamFromStorage,
   getPresignedGetObjectUrl
@@ -94,17 +98,23 @@ export async function executeFileDownloadGet(
     }
   } else {
     const auth = await getAuthContextFromRequest(req);
-    if (!auth.ok) {
-      return NextResponse.json(
-        { error: auth.error },
-        { status: auth.status, headers: corsHeaders(req) }
+    if (auth.ok) {
+      if (!(await canDownloadFile(toFilePermissionSubject(file), auth.user))) {
+        return NextResponse.json(
+          { error: "FORBIDDEN" },
+          { status: 403, headers: corsHeaders(req) }
+        );
+      }
+    } else {
+      const allowPublic = await canDownloadFileUnauthenticated(
+        toFilePermissionSubject(file)
       );
-    }
-    if (!(await canDownloadFile(file, auth.user))) {
-      return NextResponse.json(
-        { error: "FORBIDDEN" },
-        { status: 403, headers: corsHeaders(req) }
-      );
+      if (!allowPublic) {
+        return NextResponse.json(
+          { error: auth.error },
+          { status: auth.status, headers: corsHeaders(req) }
+        );
+      }
     }
   }
 

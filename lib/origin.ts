@@ -15,6 +15,49 @@ function getAllowedAuthOrigins(): string[] {
   return url ? [url] : [];
 }
 
+function isLocalOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function resolveAllowedAuthOrigin(origin: string | null): string | null {
+  if (!origin) return null;
+
+  const isDev = process.env.NODE_ENV !== "production";
+  if (isDev && isLocalOrigin(origin)) {
+    return origin;
+  }
+
+  const allowed = getAllowedAuthOrigins();
+  if (allowed.length === 0) return null;
+
+  for (const base of allowed) {
+    try {
+      const allowedUrl = new URL(base);
+      const originUrl = new URL(origin);
+      if (
+        allowedUrl.protocol === originUrl.protocol &&
+        allowedUrl.host === originUrl.host
+      ) {
+        return origin;
+      }
+    } catch {
+      // Ignore invalid URL and continue checking.
+    }
+  }
+
+  return null;
+}
+
 export function isSameOriginAuthRequest(req: NextRequest): boolean {
   const origin = req.headers.get("origin");
   if (!origin) {
@@ -22,18 +65,18 @@ export function isSameOriginAuthRequest(req: NextRequest): boolean {
     return true;
   }
 
-  const allowed = getAllowedAuthOrigins();
-  if (allowed.length === 0) return false;
+  return resolveAllowedAuthOrigin(origin) !== null;
+}
 
-  return allowed.some((base) => {
-    try {
-      const u = new URL(base);
-      const o = new URL(origin);
-      return u.protocol === o.protocol && u.host === o.host;
-    } catch {
-      return false;
-    }
-  });
+export function setAuthCorsHeaders(res: NextResponse, origin: string): void {
+  res.headers.set("Access-Control-Allow-Origin", origin);
+  res.headers.set("Vary", "Origin");
+  res.headers.set(
+    "Access-Control-Allow-Headers",
+    "Authorization, Content-Type"
+  );
+  res.headers.set("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.headers.set("Access-Control-Allow-Credentials", "true");
 }
 
 export function setDataApiCorsHeaders(res: NextResponse, origin: string) {
