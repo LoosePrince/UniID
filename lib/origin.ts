@@ -1,6 +1,35 @@
 import type { NextRequest, NextResponse } from "next/server";
 import { prisma } from "./prisma";
 
+/**
+ * `/api/auth/check` 跨域：除 UniID 自身来源（AUTH_ALLOWED_ORIGINS 等）外，
+ * 当查询参数含 `app_id` 且 Origin 与该应用注册的 `domain` 一致时允许（与数据 API CORS 策略对齐）。
+ */
+export async function resolveAuthCheckAllowedOrigin(
+  req: NextRequest
+): Promise<string | null> {
+  const origin = req.headers.get("origin");
+  if (!origin) return null;
+
+  const fromAuth = resolveAllowedAuthOrigin(origin);
+  if (fromAuth) return fromAuth;
+
+  const appId = req.nextUrl.searchParams.get("app_id");
+  if (!appId) return null;
+
+  const match = await validateAppIdOriginMatchWithOrigin(appId, origin);
+  return match.valid ? origin : null;
+}
+
+export async function isAuthCheckRequestAllowed(
+  req: NextRequest
+): Promise<boolean> {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  const allowed = await resolveAuthCheckAllowedOrigin(req);
+  return allowed !== null;
+}
+
 const AUTH_ORIGINS_ENV = process.env.AUTH_ALLOWED_ORIGINS;
 
 function getAllowedAuthOrigins(): string[] {

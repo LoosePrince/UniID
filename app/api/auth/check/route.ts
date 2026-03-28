@@ -1,15 +1,14 @@
 import { getAuthContextFromRequest } from "@/lib/auth-context";
 import {
-  isSameOriginAuthRequest,
-  resolveAllowedAuthOrigin,
+  isAuthCheckRequestAllowed,
+  resolveAuthCheckAllowedOrigin,
   setAuthCorsHeaders
 } from "@/lib/origin";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function OPTIONS(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  const allowedOrigin = resolveAllowedAuthOrigin(origin);
+  const allowedOrigin = await resolveAuthCheckAllowedOrigin(req);
 
   if (!allowedOrigin) {
     return new NextResponse(null, { status: 403 });
@@ -21,10 +20,9 @@ export async function OPTIONS(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  const allowedOrigin = resolveAllowedAuthOrigin(origin);
+  const allowedOrigin = await resolveAuthCheckAllowedOrigin(req);
 
-  if (!isSameOriginAuthRequest(req)) {
+  if (!(await isAuthCheckRequestAllowed(req))) {
     const res = NextResponse.json({ valid: false }, { status: 403 });
     if (allowedOrigin) {
       setAuthCorsHeaders(res, allowedOrigin);
