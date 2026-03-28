@@ -10,6 +10,32 @@ import {
   checkAuthorizationScope
 } from "@/lib/permissions";
 
+/**
+ * 将 query body 的 filter 与单条记录的 data JSON 比对。
+ * 键名沿用 `data.xxx` 约定：`data.postId` 表示业务 JSON 根上的 `postId` 字段。
+ */
+function recordMatchesDataFilter(
+  parsedData: unknown,
+  filter: Record<string, unknown> | null | undefined
+): boolean {
+  if (!filter || typeof filter !== "object") return true;
+  const getByPath = (obj: unknown, path: string): unknown => {
+    const keys = path.split(".");
+    let cur: unknown = obj;
+    for (const k of keys) {
+      if (cur == null || typeof cur !== "object") return undefined;
+      cur = (cur as Record<string, unknown>)[k];
+    }
+    return cur;
+  };
+  for (const [rawKey, expected] of Object.entries(filter)) {
+    const path = rawKey.startsWith("data.") ? rawKey.slice("data.".length) : rawKey;
+    const val = getByPath(parsedData, path);
+    if (val !== expected) return false;
+  }
+  return true;
+}
+
 export async function OPTIONS(req: NextRequest) {
   return handleDataApiOptions(req);
 }
@@ -22,6 +48,7 @@ export const POST = withDataCors(async function handler(
     | {
         app_id?: string;
         data_type?: string;
+        filter?: Record<string, unknown>;
       }
     | null;
 
@@ -97,6 +124,17 @@ export const POST = withDataCors(async function handler(
   // 过滤记录并执行字段级过滤
   let accessibleRecords = [];
   for (const record of records) {
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(record.data);
+    } catch {
+      continue;
+    }
+
+    if (!recordMatchesDataFilter(parsedData, body.filter)) {
+      continue;
+    }
+
     // 1. 检查授权作用域（如果请求没带 data_type，这里逐个检查）
     if (authScope && !checkAuthorizationScope(authScope, "read", record.dataType)) {
       continue;
@@ -119,7 +157,7 @@ export const POST = withDataCors(async function handler(
     if (hasPermission) {
       // 4. 执行字段级读过滤
       const filteredData = await filterReadableFields(
-        JSON.parse(record.data),
+        parsedData as Record<string, unknown>,
         effectivePermissions,
         userId,
         record.appId,
