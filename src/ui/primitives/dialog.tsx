@@ -44,12 +44,15 @@ export const DialogContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          className="absolute right-4 top-4 rounded-md p-1.5 text-ink-400 transition-colors hover:bg-white/72 hover:text-ink-900"
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </DialogPrimitive.Close>
+        <div data-dialog-close-wrapper className="absolute right-4 top-4 z-10">
+          <DialogPrimitive.Close
+            data-dialog-close
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-white/72 hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-accent-300"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </DialogPrimitive.Close>
+        </div>
       </DialogPrimitive.Content>
     </DialogPortal>
   );

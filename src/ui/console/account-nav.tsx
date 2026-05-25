@@ -5,16 +5,16 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/ui/primitives";
 
 const items = [
-  { href: "/account", label: "授权应用" },
-  { href: "/account/sessions", label: "会话" },
-  { href: "/account/files", label: "我的文件" },
-  { href: "/account/settings", label: "账号设置" }
+  { href: "/console/account", label: "授权应用" },
+  { href: "/console/account/sessions", label: "会话" },
+  { href: "/console/account/files", label: "我的文件" },
+  { href: "/console/account/settings", label: "账号设置" }
 ];
 
 export function AccountNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-2 border-b border-ink-100 -mb-px">
+    <nav className="flex flex-wrap items-center gap-2 border-b border-ink-100 -mb-px">
       {items.map((it) => {
         const active = pathname === it.href;
         return (

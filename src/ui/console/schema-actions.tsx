@@ -279,7 +279,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
               />
             ) : null}
             <Button asChild variant="secondary" size="sm">
-              <Link href={`/console/apps/${appId}/data/${schema.dataType}`}>
+              <Link href={`/console/apps/${appId}/data?dataType=${encodeURIComponent(schema.dataType)}`}>
                 <Database /> 浏览数据
               </Link>
             </Button>

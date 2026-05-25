@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, Search, User as UserIcon } from "lucide-react";
+import { Home, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
 import {
   Button,
   DropdownMenu,
@@ -24,15 +24,27 @@ export interface ConsoleTopbarProps {
 
 const APP_PATH_RE = /^\/console\/apps\/([^/]+)/;
 
+const SECTION_LABELS: Array<{ test: (pathname: string) => boolean; label: string }> = [
+  { test: (pathname) => pathname.startsWith("/console/account"), label: "账号" },
+  { test: (pathname) => pathname.startsWith("/console/admin"), label: "系统管理" },
+  { test: (pathname) => pathname.startsWith("/console/apps"), label: "应用" }
+];
+
 function useCurrentAppId(): string | undefined {
   const pathname = usePathname();
   const match = APP_PATH_RE.exec(pathname ?? "");
   return match?.[1];
 }
 
+function useSectionLabel() {
+  const pathname = usePathname() ?? "/console";
+  return SECTION_LABELS.find((item) => item.test(pathname))?.label ?? "控制台";
+}
+
 export function ConsoleTopbar(props: ConsoleTopbarProps) {
   const router = useRouter();
   const currentAppId = useCurrentAppId();
+  const sectionLabel = useSectionLabel();
 
   async function logout() {
     try {
@@ -53,8 +65,13 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
           </span>
           <span className="hidden text-sm font-semibold tracking-tight sm:inline">UniID Console</span>
         </Link>
-        <span className="text-ink-200">/</span>
-        <AppSwitcher apps={props.apps} currentAppId={currentAppId} />
+        <span className="hidden text-ink-200 sm:inline">/</span>
+        <span className="hidden rounded-full border border-white/70 bg-white/48 px-2.5 py-1 text-xs font-medium text-ink-500 shadow-xs sm:inline-flex">
+          {sectionLabel}
+        </span>
+        <div className="hidden sm:block">
+          <AppSwitcher apps={props.apps} currentAppId={currentAppId} />
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -76,18 +93,34 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="个人菜单">
+            <Button variant="ghost" size="sm" aria-label="个人菜单" className="gap-2">
               <UserIcon className="h-4 w-4" />
+              <span className="hidden max-w-28 truncate sm:inline">{props.user.username}</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuLabel>{props.user.username}</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="min-w-56">
+            <DropdownMenuLabel>
+              <span className="block truncate">{props.user.username}</span>
+              <span className="mt-0.5 block text-2xs font-normal text-ink-400">{props.user.role}</span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/account">账号中心</Link>
+              <Link href="/">
+                <Home className="h-3.5 w-3.5" />
+                前往首页
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/account/settings">个人设置</Link>
+              <Link href="/console/account">
+                <UserIcon className="h-3.5 w-3.5" />
+                账号中心
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/console/account/settings">
+                <Settings className="h-3.5 w-3.5" />
+                个人设置
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

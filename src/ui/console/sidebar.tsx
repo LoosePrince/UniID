@@ -13,6 +13,7 @@ import {
   Shield,
   Users,
   Settings,
+  BookOpen,
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/ui/primitives";
@@ -33,12 +34,14 @@ const APP_NAV = (appId: string): NavItem[] => [
   { href: `/console/apps/${appId}/cron`, label: "定时", icon: Clock },
   { href: `/console/apps/${appId}/webhooks`, label: "Webhooks", icon: Webhook },
   { href: `/console/apps/${appId}/members`, label: "成员", icon: Users },
+  { href: "/docs", label: "文档", icon: BookOpen },
   { href: `/console/apps/${appId}/settings`, label: "设置", icon: Settings }
 ];
 
 const ROOT_NAV: NavItem[] = [
   { href: "/console", label: "概览", icon: LayoutDashboard },
-  { href: "/console/apps", label: "应用", icon: Database }
+  { href: "/console/apps", label: "应用", icon: Database },
+  { href: "/docs", label: "文档", icon: BookOpen }
 ];
 
 const ADMIN_NAV: NavItem[] = [

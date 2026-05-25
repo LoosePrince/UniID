@@ -13,12 +13,14 @@ import {
   Clock,
   Webhook,
   Radio,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/ui/primitives";
 
 const ITEMS = [
   { label: "数据浏览器", href: "/console", icon: Database, hint: "data" },
+  { label: "Schemas", href: "/console", icon: Shield, hint: "schemas" },
   { label: "文件", href: "/console", icon: Files, hint: "files" },
   { label: "函数", href: "/console", icon: Code2, hint: "functions" },
   { label: "定时任务", href: "/console", icon: Clock, hint: "cron" },
@@ -45,17 +47,17 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-lg p-0">
+      <DialogContent className="max-w-lg p-0 [&_[data-dialog-close-wrapper]]:right-3 [&_[data-dialog-close-wrapper]]:top-2">
         <DialogTitle className="sr-only">命令面板</DialogTitle>
         <Command className="flex flex-col">
-          <div className="flex items-center gap-2 border-b border-ink-100 px-3 py-2.5 pr-14">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-ink-100 px-3 py-2.5 pr-16">
             <Search className="h-3.5 w-3.5 text-ink-400" />
             <Command.Input
               autoFocus
               placeholder="搜索资源、跳转、操作…"
-              className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-ink-400"
+              className="min-w-0 bg-transparent text-sm focus:outline-none placeholder:text-ink-400"
             />
-            <span className="text-2xs font-mono text-ink-400 border border-ink-200 rounded-xs px-1.5 py-0.5">
+            <span className="rounded-xs border border-ink-200 px-1.5 py-0.5 font-mono text-2xs text-ink-400">
               ⌘K
             </span>
           </div>
@@ -89,7 +91,7 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
                 value="账号中心"
                 onSelect={() => {
                   setOpen(false);
-                  router.push("/account");
+                  router.push("/console/account");
                 }}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-sm text-sm text-ink-700 aria-selected:bg-cream-100 cursor-pointer"
               >
