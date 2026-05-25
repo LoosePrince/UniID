@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { ConsoleSidebar } from "./sidebar";
 
-const APP_PATH_RE = /^\/console\/apps\/([^/]+)/;
+const APP_PATH_RE = /^\/console\/apps\/(?!new(?:\/|$))([^/]+)/;
 
 export function ConsoleSidebarShell({ isSystemAdmin }: { isSystemAdmin: boolean }) {
   const pathname = usePathname();

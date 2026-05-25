@@ -62,7 +62,10 @@ export function ConsoleSidebar({
 
   function isActive(item: NavItem) {
     if (!pathname) return false;
+    if (item.href === "/docs") return pathname === item.href || pathname.startsWith("/docs/");
     if (appId && item.href === `/console/apps/${appId}`) return pathname === item.href;
+    if (item.href === "/console") return pathname === "/console";
+    if (item.href === "/console/apps") return pathname === item.href || pathname === "/console/apps/new";
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
 

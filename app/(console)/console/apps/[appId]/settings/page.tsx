@@ -23,6 +23,7 @@ export default async function SettingsPage({ params }: { params: { appId: string
     await AppService.requireOwnerOrAdmin(app.ownerId, app.admins, auth.user.id);
   }
   const isOwner = app.ownerId === auth.user.id;
+  const isSystemAdmin = auth.user.role === "admin";
   const quota = await QuotaService.getOrDefault(app.id);
 
   return (
@@ -45,6 +46,7 @@ export default async function SettingsPage({ params }: { params: { appId: string
               description: app.description,
               primaryDomain: app.primaryDomain
             }}
+            canManageDomain={isSystemAdmin}
           />
         </CardContent>
       </Card>
@@ -52,7 +54,9 @@ export default async function SettingsPage({ params }: { params: { appId: string
       <Card>
         <CardHeader>
           <CardTitle className="text-base">附加域名</CardTitle>
-          <CardDescription>除主域名外，其它需要访问 SDK 的域名。</CardDescription>
+          <CardDescription>
+            除主域名外，其它需要访问 SDK 的域名。仅 UniID 系统管理员可管理域名绑定。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {app.domains.length === 0 && (
@@ -65,11 +69,11 @@ export default async function SettingsPage({ params }: { params: { appId: string
                 <Badge tone={d.verified ? "success" : "warning"}>
                   {d.verified ? "已校验" : "待校验"}
                 </Badge>
-                <RemoveDomainButton appId={app.id} domainId={d.id} host={d.host} />
+                <RemoveDomainButton appId={app.id} domainId={d.id} host={d.host} disabled={!isSystemAdmin} />
               </div>
             </div>
           ))}
-          <AddDomainForm appId={app.id} />
+          <AddDomainForm appId={app.id} disabled={!isSystemAdmin} />
         </CardContent>
       </Card>
 

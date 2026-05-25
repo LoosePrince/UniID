@@ -1,11 +1,18 @@
 import { ArrowLeft, BadgeCheck, Globe2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { requireConsoleAuth } from "@/shared/iam";
+import { prisma } from "@/shared/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button } from "@/ui/primitives";
 import { CreateAppForm } from "@/ui/console/create-app-form";
 
 export default async function NewAppPage() {
-  await requireConsoleAuth();
+  const auth = await requireConsoleAuth();
+  const users = await prisma.user.findMany({
+    where: { deletedAt: null },
+    orderBy: { username: "asc" },
+    select: { id: true, username: true, displayName: true, email: true }
+  });
+  const canCreate = auth.user.role === "admin";
 
   return (
     <div className="container-page py-8">
@@ -22,11 +29,17 @@ export default async function NewAppPage() {
           <CardHeader>
             <CardTitle className="text-2xl">新建应用</CardTitle>
             <CardDescription>
-              创建后即可配置 Schema、文件、函数、Webhook 与 SDK 授权。
+              仅 UniID 系统管理员可创建应用，并可在创建时指定 owner 与管理员。
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <CreateAppForm />
+            {canCreate ? (
+              <CreateAppForm users={users} currentUserId={auth.user.id} />
+            ) : (
+              <div className="rounded-xl border border-sand-200 bg-cream-50 px-4 py-3 text-sm text-ink-600">
+                当前账号没有创建应用权限。请联系 UniID 系统管理员创建，并将你设为 owner 或管理员。
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -34,12 +47,12 @@ export default async function NewAppPage() {
           <InfoCard
             icon={Globe2}
             title="先绑定主域名"
-            text="主域名会成为 SDK 请求来源校验的默认边界。附加域名可在设置页继续添加。"
+            text="主域名会成为 SDK 请求来源校验的默认边界。附加域名只能由系统管理员继续添加。"
           />
           <InfoCard
             icon={ShieldCheck}
             title="默认最小权限"
-            text="新应用只对创建者开放管理权限，后续可在成员页添加管理员。"
+            text="创建时可指定应用 owner，并可同时分配多个应用管理员。"
           />
           <InfoCard
             icon={BadgeCheck}

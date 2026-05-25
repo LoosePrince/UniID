@@ -26,6 +26,7 @@ interface ApiErrorResponse {
 interface BasicInfoFormProps {
   appId: string;
   initial: { name: string; description: string | null; primaryDomain: string };
+  canManageDomain: boolean;
 }
 
 interface QuotaFormProps {
@@ -52,7 +53,7 @@ function toPositiveInt(value: string) {
   return Math.max(1, toNonNegativeInt(value));
 }
 
-export function BasicInfoForm({ appId, initial }: BasicInfoFormProps) {
+export function BasicInfoForm({ appId, initial, canManageDomain }: BasicInfoFormProps) {
   const router = useRouter();
   const [name, setName] = React.useState(initial.name);
   const [description, setDescription] = React.useState(initial.description ?? "");
@@ -72,7 +73,7 @@ export function BasicInfoForm({ appId, initial }: BasicInfoFormProps) {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || undefined,
-          primaryDomain: primaryDomain.trim()
+          ...(canManageDomain ? { primaryDomain: primaryDomain.trim() } : {})
         })
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
@@ -115,14 +116,14 @@ export function BasicInfoForm({ appId, initial }: BasicInfoFormProps) {
         label="主域名"
         required
         error={error}
-        help="仅此域名（及已校验的附加域名）可访问该应用的 SDK API。"
+        help={canManageDomain ? "仅此域名（及已校验的附加域名）可访问该应用的 SDK API。" : "仅 UniID 系统管理员可修改主域名。"}
       >
         <Input
           id="app-domain"
           required
           value={primaryDomain}
           onChange={(event) => setPrimaryDomain(event.target.value)}
-          disabled={busy}
+          disabled={busy || !canManageDomain}
           invalid={Boolean(error)}
           placeholder="example.com"
         />
@@ -305,7 +306,7 @@ export function DangerZone({ appId, appName }: { appId: string; appName: string 
   );
 }
 
-export function AddDomainForm({ appId }: { appId: string }) {
+export function AddDomainForm({ appId, disabled = false }: { appId: string; disabled?: boolean }) {
   const router = useRouter();
   const [host, setHost] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -313,6 +314,7 @@ export function AddDomainForm({ appId }: { appId: string }) {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (disabled) return;
     const normalizedHost = host.trim();
     if (!normalizedHost) return;
 
@@ -348,12 +350,12 @@ export function AddDomainForm({ appId }: { appId: string }) {
           placeholder="example.com"
           value={host}
           onChange={(event) => setHost(event.target.value)}
-          disabled={busy}
+          disabled={busy || disabled}
           invalid={Boolean(error)}
         />
       </Field>
-      <Button type="submit" className="sm:mt-5" loading={busy} loadingText="添加中…" disabled={!host.trim()}>
-        <Globe2 /> 添加
+      <Button type="submit" className="sm:mt-5" loading={busy} loadingText="添加中…" disabled={disabled || !host.trim()}>
+        <Globe2 /> {disabled ? "仅系统管理员可添加" : "添加"}
       </Button>
     </form>
   );
@@ -362,11 +364,13 @@ export function AddDomainForm({ appId }: { appId: string }) {
 export function RemoveDomainButton({
   appId,
   domainId,
-  host
+  host,
+  disabled = false
 }: {
   appId: string;
   domainId: string;
   host?: string;
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -375,6 +379,7 @@ export function RemoveDomainButton({
   const label = host ?? domainId;
 
   async function removeDomain() {
+    if (disabled) return;
     setBusy(true);
     setError(null);
     try {
@@ -399,7 +404,7 @@ export function RemoveDomainButton({
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="ghost">
+        <Button size="sm" variant="ghost" disabled={disabled} title={disabled ? "仅系统管理员可移除域名" : undefined}>
           移除
         </Button>
       </DialogTrigger>

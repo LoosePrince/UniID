@@ -67,7 +67,7 @@ export const PATCH = withCors(
       const ctx = await requireAppAccess(String(params.appId));
       const { quota, ...appPatch } = body;
       if (Object.keys(appPatch).length > 0) {
-        await AppService.update(ctx.app.id, ctx.user.id, appPatch);
+        await AppService.update(ctx.app.id, ctx.user.id, appPatch, ctx.user.role);
       }
       if (quota) {
         await QuotaService.update(ctx.app.id, quota);

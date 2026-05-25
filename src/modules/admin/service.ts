@@ -2,7 +2,7 @@
  * AdminService — 系统级管理操作（仅 role=admin 可调）。
  *
  * 公开接口：
- *   - listUsers / disableUser / enableUser / setRole / resetPassword
+ *   - listUsers / updateUser / deleteUser / disableUser / enableUser / setRole / resetPassword
  *   - listApps（跨所有应用）
  *   - getGlobalConfig / setGlobalConfig
  *   - getDefaultQuota / setDefaultQuota
@@ -34,11 +34,92 @@ export class AdminService {
         username: true,
         email: true,
         displayName: true,
+        locale: true,
         role: true,
         deletedAt: true,
         createdAt: true,
-        _count: { select: { appSessions: true, recordsOwned: true, filesOwned: true } }
+        _count: { select: { appSessions: true, appsOwned: true, recordsOwned: true, filesOwned: true } }
       }
+    });
+  }
+
+  static async updateUser(
+    actorId: string,
+    userId: string,
+    patch: { username?: string; email?: string | null; displayName?: string | null; locale?: string }
+  ) {
+    const before = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, email: true, displayName: true, locale: true }
+    });
+    if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "用户不存在" });
+
+    const data: { username?: string; email?: string | null; displayName?: string | null; locale?: string; updatedAt: number } = {
+      updatedAt: now()
+    };
+    if (patch.username !== undefined) data.username = patch.username;
+    if (patch.email !== undefined) data.email = patch.email;
+    if (patch.displayName !== undefined) data.displayName = patch.displayName;
+    if (patch.locale !== undefined) data.locale = patch.locale;
+
+    try {
+      const after = await prisma.user.update({ where: { id: userId }, data });
+      AuditService.log({
+        userId: actorId,
+        action: "admin.user.update",
+        resourceType: "user",
+        resourceId: userId,
+        before,
+        after: {
+          username: after.username,
+          email: after.email,
+          displayName: after.displayName,
+          locale: after.locale
+        }
+      });
+      return after;
+    } catch {
+      throw new ApiError("AUTH_INVALID_CREDENTIALS", { message: "用户名或邮箱已被占用" });
+    }
+  }
+
+  static async deleteUser(actorId: string, userId: string) {
+    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "不能删除自己" });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        _count: {
+          select: {
+            appsOwned: true,
+            appSessions: true,
+            authorizations: true,
+            recordsOwned: true,
+            filesOwned: true
+          }
+        }
+      }
+    });
+    if (!user) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "用户不存在" });
+
+    const hasAssets =
+      user._count.appsOwned > 0 ||
+      user._count.appSessions > 0 ||
+      user._count.authorizations > 0 ||
+      user._count.recordsOwned > 0 ||
+      user._count.filesOwned > 0;
+    if (hasAssets) {
+      throw new ApiError("APP_FORBIDDEN", { message: "该用户仍有关联应用、授权、记录或文件，请先禁用或迁移资产" });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+    AuditService.log({
+      userId: actorId,
+      action: "admin.user.delete",
+      resourceType: "user",
+      resourceId: userId,
+      before: { username: user.username }
     });
   }
 

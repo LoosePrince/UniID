@@ -135,6 +135,9 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
                       user={{
                         id: u.id,
                         username: u.username,
+                        email: u.email,
+                        displayName: u.displayName,
+                        locale: u.locale,
                         role: u.role as "user" | "admin",
                         disabled: u.deletedAt !== null
                       }}

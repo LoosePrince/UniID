@@ -3,22 +3,35 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
-import { Button, Field, Input, Textarea, toast } from "@/ui/primitives";
+import { Button, Field, Input, Select, Textarea, toast } from "@/ui/primitives";
 
 interface CreateAppResponse {
   app?: { id: string; name: string };
   error?: { message?: string };
 }
 
-export function CreateAppForm() {
+interface CreateAppUserOption {
+  id: string;
+  username: string;
+  displayName: string | null;
+  email: string | null;
+}
+
+export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOption[]; currentUserId: string }) {
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [primaryDomain, setPrimaryDomain] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [ownerId, setOwnerId] = React.useState(currentUserId);
+  const [adminIdsText, setAdminIdsText] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
-  const canSubmit = name.trim().length > 0 && primaryDomain.trim().length > 0 && !busy;
+  const adminIds = React.useMemo(
+    () => adminIdsText.split(/[\s,，]+/).map((id) => id.trim()).filter(Boolean),
+    [adminIdsText]
+  );
+  const canSubmit = name.trim().length > 0 && primaryDomain.trim().length > 0 && ownerId.length > 0 && !busy;
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,7 +47,9 @@ export function CreateAppForm() {
         body: JSON.stringify({
           name: name.trim(),
           primaryDomain: primaryDomain.trim().toLowerCase(),
-          description: description.trim() || undefined
+          description: description.trim() || undefined,
+          ownerId,
+          adminIds
         })
       });
       const json = (await res.json().catch(() => ({}))) as CreateAppResponse;
@@ -89,6 +104,39 @@ export function CreateAppForm() {
           value={primaryDomain}
           invalid={Boolean(error) && primaryDomain.trim().length === 0}
           onChange={(e) => setPrimaryDomain(e.target.value)}
+        />
+      </Field>
+
+      <Field
+        htmlFor="new-app-owner"
+        label="应用 owner"
+        required
+        help="owner 具备该应用最高管理权限。"
+      >
+        <Select
+          id="new-app-owner"
+          value={ownerId}
+          onValueChange={setOwnerId}
+          disabled={busy}
+          options={users.map((user) => ({
+            value: user.id,
+            label: `${user.displayName ?? user.username} · @${user.username}${user.email ? ` · ${user.email}` : ""}`
+          }))}
+        />
+      </Field>
+
+      <Field
+        htmlFor="new-app-admins"
+        label="应用管理员"
+        help="可选，填写用户 ID，多个 ID 用逗号或空格分隔。owner 不需要重复填写。"
+      >
+        <Input
+          id="new-app-admins"
+          autoComplete="off"
+          placeholder="userId1, userId2"
+          value={adminIdsText}
+          onChange={(e) => setAdminIdsText(e.target.value)}
+          disabled={busy}
         />
       </Field>
 

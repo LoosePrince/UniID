@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { ArrowUpRight, ShieldCheck, Database, Files, Radio, Code2, Clock } from "lucide-react";
+import { ArrowUpRight, ShieldCheck, Database, Files, Radio, Code2, Clock, User as UserIcon } from "lucide-react";
+import { getCurrentUserSession } from "@/shared/iam";
 import { Button } from "@/ui/primitives";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getCurrentUserSession();
+
   return (
     <main className="min-h-screen overflow-hidden bg-cream-50 text-ink-900">
       <div className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[620px] bg-[radial-gradient(circle_at_20%_10%,rgba(119,111,218,0.16),transparent_32%),radial-gradient(circle_at_78%_8%,rgba(197,184,145,0.22),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.72),rgba(251,249,244,0))]" />
@@ -21,8 +24,21 @@ export default function Home() {
             <Link className="rounded-full px-3.5 py-2 hover:bg-white/76 hover:text-ink-900" href="/account">我的账号</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm"><Link href="/login">登录</Link></Button>
-            <Button asChild variant="hero" size="sm"><Link href="/register">开始使用 <ArrowUpRight /></Link></Button>
+            {session ? (
+              <>
+                <div className="hidden items-center gap-2 rounded-full border border-white/70 bg-white/52 px-3 py-1.5 text-sm text-ink-600 shadow-xs sm:flex">
+                  <UserIcon className="h-3.5 w-3.5" />
+                  <span className="max-w-28 truncate">@{session.username}</span>
+                  <span className="rounded-full bg-success-50 px-2 py-0.5 text-2xs font-medium text-success-700">已登录</span>
+                </div>
+                <Button asChild variant="hero" size="sm"><Link href="/console">进入控制台 <ArrowUpRight /></Link></Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm"><Link href="/login">登录</Link></Button>
+                <Button asChild variant="hero" size="sm"><Link href="/register">开始使用 <ArrowUpRight /></Link></Button>
+              </>
+            )}
           </div>
         </div>
       </header>

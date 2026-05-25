@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { defineRoute, domainSchema } from "@/shared/http";
 import { withCors } from "@/shared/cors";
-import { requireConsoleAuth } from "@/shared/iam";
+import { requireConsoleAuth, requireSystemAdmin } from "@/shared/iam";
 import { AppService } from "@/modules/apps";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(64),
   primaryDomain: domainSchema.transform((v) => v.toLowerCase()),
-  description: z.string().trim().max(500).optional()
+  description: z.string().trim().max(500).optional(),
+  ownerId: z.string().min(1),
+  adminIds: z.array(z.string().min(1)).default([])
 });
 
 export const GET = withCors(
@@ -26,9 +28,10 @@ export const POST = withCors(
   defineRoute({
     schema: { body: createSchema },
     handler: async ({ body }) => {
-      const auth = await requireConsoleAuth();
+      await requireSystemAdmin();
       const app = await AppService.create({
-        ownerId: auth.user.id,
+        ownerId: body.ownerId,
+        adminIds: body.adminIds,
         name: body.name,
         primaryDomain: body.primaryDomain,
         description: body.description
