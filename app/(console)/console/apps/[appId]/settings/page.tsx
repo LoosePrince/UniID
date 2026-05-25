@@ -65,7 +65,7 @@ export default async function SettingsPage({ params }: { params: { appId: string
                 <Badge tone={d.verified ? "success" : "warning"}>
                   {d.verified ? "已校验" : "待校验"}
                 </Badge>
-                <RemoveDomainButton appId={app.id} domainId={d.id} />
+                <RemoveDomainButton appId={app.id} domainId={d.id} host={d.host} />
               </div>
             </div>
           ))}

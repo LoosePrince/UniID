@@ -3,7 +3,7 @@
  */
 import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
-import { invalidateSchemaCache } from "@/shared/validator";
+import { ajv, invalidateSchemaCache } from "@/shared/validator";
 import { bus } from "@/shared/bus";
 
 const now = () => Math.floor(Date.now() / 1000);
@@ -25,8 +25,15 @@ export class SchemaService {
       include: {
         versions: {
           orderBy: { version: "desc" },
-          take: 1,
-          select: { id: true, version: true, isActive: true, createdAt: true }
+          select: {
+            id: true,
+            version: true,
+            jsonSchema: true,
+            autoFill: true,
+            validationRules: true,
+            isActive: true,
+            createdAt: true
+          }
         }
       }
     });
@@ -73,6 +80,14 @@ export class SchemaService {
     setActive?: boolean;
     actorUserId?: string;
   }) {
+    try {
+      ajv().compile(input.jsonSchema);
+    } catch (err) {
+      throw new ApiError("SCHEMA_INVALID", {
+        details: err instanceof Error ? err.message : String(err)
+      });
+    }
+
     const t = now();
     const schema = await prisma.dataSchema.upsert({
       where: { appId_dataType: { appId: input.appId, dataType: input.dataType } },

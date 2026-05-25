@@ -64,7 +64,7 @@ export default async function MembersPage({ params }: { params: { appId: string 
               </div>
               <div className="flex items-center gap-2">
                 <Badge tone="accent">admin</Badge>
-                <RemoveMemberButton appId={app.id} userId={a.user.id} />
+                <RemoveMemberButton appId={app.id} userId={a.user.id} username={a.user.username} />
               </div>
             </div>
           ))}
