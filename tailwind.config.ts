@@ -31,7 +31,10 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 200ms ease-out",
         "slide-up": "slideUp 220ms cubic-bezier(0.16,1,0.3,1)",
-        "scale-in": "scaleIn 160ms cubic-bezier(0.16,1,0.3,1)"
+        "scale-in": "scaleIn 160ms cubic-bezier(0.16,1,0.3,1)",
+        sheen: "sheen 7.8s ease-in-out infinite",
+        "pulse-glow": "pulseGlow 4.2s ease-in-out infinite",
+        "float-subtle": "floatSubtle 5.4s ease-in-out infinite"
       },
       keyframes: {
         fadeIn: {
@@ -45,6 +48,19 @@ const config: Config = {
         scaleIn: {
           "0%": { opacity: "0", transform: "scale(0.96)" },
           "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        sheen: {
+          "0%": { transform: "translateX(-120%) rotate(12deg)" },
+          "45%": { transform: "translateX(120%) rotate(12deg)" },
+          "100%": { transform: "translateX(120%) rotate(12deg)" }
+        },
+        pulseGlow: {
+          "0%, 100%": { opacity: "0.52", transform: "scale(0.98)" },
+          "50%": { opacity: "0.9", transform: "scale(1.03)" }
+        },
+        floatSubtle: {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-4px)" }
         }
       }
     }

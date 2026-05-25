@@ -90,12 +90,13 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
         <Select
           id="account-locale"
           value={form.locale}
-          onChange={(event) => update("locale", event.target.value)}
+          onValueChange={(value) => update("locale", value)}
           disabled={pending}
-        >
-          <option value="zh-CN">简体中文</option>
-          <option value="en-US">English</option>
-        </Select>
+          options={[
+            { value: "zh-CN", label: "简体中文" },
+            { value: "en-US", label: "English" }
+          ]}
+        />
       </Field>
 
       {error && form.displayName.trim().length > 0 ? (

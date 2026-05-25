@@ -15,3 +15,6 @@ export * from "./switch";
 export * from "./checkbox";
 export * from "./spinner";
 export * from "./skeleton";
+export * from "./callout";
+export * from "./table";
+export * from "./code-block";

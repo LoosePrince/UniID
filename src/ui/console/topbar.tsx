@@ -45,11 +45,13 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
   }
 
   return (
-    <header className="h-14 flex items-center justify-between gap-3 px-5 border-b border-ink-100 bg-cream-50">
-      <div className="flex items-center gap-3">
-        <Link href="/console" className="flex items-center gap-2">
-          <span className="h-6 w-6 rounded-md bg-ink-900 text-cream-50 flex items-center justify-center font-bold text-xs">U</span>
-          <span className="text-sm font-semibold tracking-tight">UniID Console</span>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/60 bg-cream-50/72 px-5 shadow-[0_10px_30px_rgba(19,17,14,0.04)] backdrop-blur-xl supports-[backdrop-filter]:bg-cream-50/56">
+      <div className="flex min-w-0 items-center gap-3">
+        <Link href="/console" className="group flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink-900 text-xs font-bold text-cream-50 shadow-[0_12px_26px_rgba(19,17,14,0.16),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform group-hover:-translate-y-0.5">
+            U
+          </span>
+          <span className="hidden text-sm font-semibold tracking-tight sm:inline">UniID Console</span>
         </Link>
         <span className="text-ink-200">/</span>
         <AppSwitcher apps={props.apps} currentAppId={currentAppId} />
@@ -59,7 +61,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
         <Button
           variant="outline"
           size="sm"
-          className="min-w-52 justify-between text-ink-400 font-normal"
+          className="hidden min-w-52 justify-between font-normal text-ink-400 md:inline-flex"
           onClick={() => {
             const ev = new KeyboardEvent("keydown", { key: "k", metaKey: true });
             window.dispatchEvent(ev);
@@ -69,7 +71,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
             <Search className="h-3.5 w-3.5" />
             搜索 / 跳转
           </span>
-          <span className="text-2xs font-mono border border-ink-200 rounded-xs px-1.5 py-0.5">⌘K</span>
+          <span className="rounded-md border border-ink-200/80 bg-white/56 px-1.5 py-0.5 font-mono text-2xs text-ink-400">⌘K</span>
         </Button>
 
         <DropdownMenu>

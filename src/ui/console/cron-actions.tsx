@@ -160,13 +160,13 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
         />
       </Field>
       <Field htmlFor="cron-fn" label="函数" required>
-        <Select id="cron-fn" value={fnId} onChange={(e) => setFnId(e.target.value)} disabled={busy}>
-          {fns.map((fn) => (
-            <option key={fn.id} value={fn.id}>
-              {fn.name}
-            </option>
-          ))}
-        </Select>
+        <Select
+          id="cron-fn"
+          value={fnId}
+          onValueChange={setFnId}
+          disabled={busy}
+          options={fns.map((fn) => ({ value: fn.id, label: fn.name }))}
+        />
       </Field>
       <Field htmlFor="cron-payload" label="Payload JSON" error={error}>
         <Textarea
@@ -351,19 +351,25 @@ export function CronJobControls({
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field htmlFor={`cron-fn-${job.id}`} label="函数" required>
-                  <Select id={`cron-fn-${job.id}`} value={fnId} onChange={(e) => setFnId(e.target.value)} disabled={busy === "edit"}>
-                    {fns.map((fn) => (
-                      <option key={fn.id} value={fn.id}>
-                        {fn.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <Select
+                    id={`cron-fn-${job.id}`}
+                    value={fnId}
+                    onValueChange={setFnId}
+                    disabled={busy === "edit"}
+                    options={fns.map((fn) => ({ value: fn.id, label: fn.name }))}
+                  />
                 </Field>
                 <Field htmlFor={`cron-active-${job.id}`} label="状态">
-                  <Select id={`cron-active-${job.id}`} value={isActive} onChange={(e) => setIsActive(e.target.value)} disabled={busy === "edit"}>
-                    <option value="true">active</option>
-                    <option value="false">paused</option>
-                  </Select>
+                  <Select
+                    id={`cron-active-${job.id}`}
+                    value={isActive}
+                    onValueChange={setIsActive}
+                    disabled={busy === "edit"}
+                    options={[
+                      { value: "true", label: "active" },
+                      { value: "false", label: "paused" }
+                    ]}
+                  />
                 </Field>
               </div>
               <Field htmlFor={`cron-payload-${job.id}`} label="Payload JSON" error={editOpen ? error : undefined}>

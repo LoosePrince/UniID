@@ -72,12 +72,17 @@ export default async function AdminAppsPage({ searchParams }: { searchParams?: S
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
               <Input name="q" defaultValue={q} className="pl-9" placeholder="搜索名称、域名或所有者" />
             </div>
-            <Select name="status" defaultValue={status ?? "all"} aria-label="状态筛选">
-              <option value="all">全部状态</option>
-              <option value="active">active</option>
-              <option value="suspended">suspended</option>
-              <option value="archived">archived</option>
-            </Select>
+            <Select
+              name="status"
+              defaultValue={status ?? "all"}
+              aria-label="状态筛选"
+              options={[
+                { value: "all", label: "全部状态" },
+                { value: "active", label: "active" },
+                { value: "suspended", label: "suspended" },
+                { value: "archived", label: "archived" }
+              ]}
+            />
             <Button type="submit">筛选</Button>
           </form>
         </CardContent>

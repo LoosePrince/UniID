@@ -141,10 +141,16 @@ export function UserActions({ user }: { user: UserSummary }) {
 
             {dialog === "role" ? (
               <Field label="新角色" htmlFor={`role-${user.id}`}>
-                <Select id={`role-${user.id}`} value={role} onChange={(event) => setRole(event.target.value as "user" | "admin")} disabled={pending}>
-                  <option value="user">user</option>
-                  <option value="admin">admin</option>
-                </Select>
+                <Select
+                  id={`role-${user.id}`}
+                  value={role}
+                  onValueChange={(value) => setRole(value as "user" | "admin")}
+                  disabled={pending}
+                  options={[
+                    { value: "user", label: "user" },
+                    { value: "admin", label: "admin" }
+                  ]}
+                />
               </Field>
             ) : null}
 

@@ -16,12 +16,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         data-invalid={invalid ? "true" : undefined}
         aria-invalid={invalid || undefined}
         className={cn(
-          "flex h-9 w-full rounded-md border border-ink-200 bg-white px-3 text-sm text-ink-900",
+          "flex h-10 w-full rounded-lg border border-white/70 bg-white/76 px-3.5 text-sm text-ink-900",
+          "shadow-[0_8px_20px_rgba(19,17,14,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-sm",
           "placeholder:text-ink-400",
-          "transition-[border,box-shadow] duration-150 ease-out",
-          "focus-visible:outline-none focus-visible:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-400/30",
-          "disabled:cursor-not-allowed disabled:bg-cream-50 disabled:opacity-60",
-          "data-[invalid=true]:border-danger-500 data-[invalid=true]:focus-visible:ring-danger-500/30",
+          "transition-[border,box-shadow,background-color] duration-200 ease-out",
+          "focus-visible:border-accent-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/30 focus-visible:shadow-[0_10px_28px_rgba(91,91,214,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+          "disabled:cursor-not-allowed disabled:bg-cream-50 disabled:opacity-65 disabled:shadow-none",
+          "data-[invalid=true]:border-danger-300 data-[invalid=true]:focus-visible:ring-danger-500/28",
           className
         )}
         {...props}
@@ -42,12 +43,13 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         data-invalid={invalid ? "true" : undefined}
         aria-invalid={invalid || undefined}
         className={cn(
-          "flex min-h-20 w-full resize-y rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900",
+          "flex min-h-24 w-full resize-y rounded-lg border border-white/70 bg-white/76 px-3.5 py-2.5 text-sm text-ink-900",
+          "shadow-[0_8px_20px_rgba(19,17,14,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-sm",
           "placeholder:text-ink-400",
-          "transition-[border,box-shadow] duration-150 ease-out",
-          "focus-visible:outline-none focus-visible:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-400/30",
-          "disabled:cursor-not-allowed disabled:bg-cream-50 disabled:opacity-60",
-          "data-[invalid=true]:border-danger-500 data-[invalid=true]:focus-visible:ring-danger-500/30",
+          "transition-[border,box-shadow,background-color] duration-200 ease-out",
+          "focus-visible:border-accent-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/30 focus-visible:shadow-[0_10px_28px_rgba(91,91,214,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
+          "disabled:cursor-not-allowed disabled:bg-cream-50 disabled:opacity-65 disabled:shadow-none",
+          "data-[invalid=true]:border-danger-300 data-[invalid=true]:focus-visible:ring-danger-500/28",
           className
         )}
         {...props}

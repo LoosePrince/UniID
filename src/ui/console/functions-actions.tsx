@@ -411,12 +411,13 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
                   <Select
                     id={`fn-active-${fn.id}`}
                     value={isActive}
-                    onChange={(e) => setIsActive(e.target.value)}
+                    onValueChange={setIsActive}
                     disabled={busy === "settings"}
-                  >
-                    <option value="true">active</option>
-                    <option value="false">disabled</option>
-                  </Select>
+                    options={[
+                      { value: "true", label: "active" },
+                      { value: "false", label: "disabled" }
+                    ]}
+                  />
                 </Field>
                 <Field htmlFor={`fn-memory-${fn.id}`} label="内存 MB">
                   <Input

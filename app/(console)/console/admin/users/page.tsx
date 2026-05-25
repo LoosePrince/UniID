@@ -71,16 +71,26 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
               <Input name="q" defaultValue={q} className="pl-9" placeholder="搜索用户名或邮箱" />
             </div>
-            <Select name="role" defaultValue={role} aria-label="角色筛选">
-              <option value="all">全部角色</option>
-              <option value="admin">admin</option>
-              <option value="user">user</option>
-            </Select>
-            <Select name="status" defaultValue={status} aria-label="状态筛选">
-              <option value="all">全部状态</option>
-              <option value="active">活跃</option>
-              <option value="disabled">已禁用</option>
-            </Select>
+            <Select
+              name="role"
+              defaultValue={role}
+              aria-label="角色筛选"
+              options={[
+                { value: "all", label: "全部角色" },
+                { value: "admin", label: "admin" },
+                { value: "user", label: "user" }
+              ]}
+            />
+            <Select
+              name="status"
+              defaultValue={status}
+              aria-label="状态筛选"
+              options={[
+                { value: "all", label: "全部状态" },
+                { value: "active", label: "活跃" },
+                { value: "disabled", label: "已禁用" }
+              ]}
+            />
             <Button type="submit">筛选</Button>
           </form>
         </CardContent>

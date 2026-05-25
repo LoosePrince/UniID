@@ -119,11 +119,12 @@ export function AppFileUploadButton({ appId }: { appId: string }) {
                 id="file-visibility"
                 value={visibility}
                 disabled={busy}
-                onChange={(e) => setVisibility(e.target.value === "public" ? "public" : "private")}
-              >
-                <option value="private">private</option>
-                <option value="public">public</option>
-              </Select>
+                onValueChange={(value) => setVisibility(value === "public" ? "public" : "private")}
+                options={[
+                  { value: "private", label: "private" },
+                  { value: "public", label: "public" }
+                ]}
+              />
             </Field>
             {error && file ? <p className="text-xs text-danger-700">{error}</p> : null}
           </DialogBody>

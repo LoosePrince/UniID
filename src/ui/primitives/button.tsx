@@ -8,36 +8,39 @@ import { cn } from "./utils";
 
 const buttonVariants = cva(
   [
-    "inline-flex items-center justify-center gap-2",
-    "font-medium select-none whitespace-nowrap",
-    "transition-[background,border,color,box-shadow,transform] duration-150 ease-out",
+    "relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap border border-transparent",
+    "font-medium select-none",
+    "transition-[background,border,color,box-shadow,transform,opacity] duration-200 ease-out",
+    "hover:-translate-y-0.5 active:translate-y-0",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-50",
-    "disabled:pointer-events-none disabled:opacity-55",
-    "data-[loading=true]:cursor-wait data-[loading=true]:opacity-85",
+    "disabled:pointer-events-none disabled:opacity-55 disabled:shadow-none",
+    "data-[loading=true]:cursor-wait data-[loading=true]:opacity-90",
     "[&>svg]:size-4 [&>svg]:shrink-0"
   ].join(" "),
   {
     variants: {
       variant: {
         primary:
-          "bg-ink-900 text-cream-50 hover:bg-ink-800 active:bg-ink-950 shadow-xs",
+          "bg-ink-900 text-cream-50 shadow-[0_16px_34px_rgba(19,17,14,0.18),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-ink-800 active:bg-ink-950",
         secondary:
-          "bg-cream-100 text-ink-900 hover:bg-cream-200 active:bg-cream-300 border border-ink-100",
+          "border-white/80 bg-white/76 text-ink-900 shadow-[0_12px_28px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-sm hover:bg-white hover:shadow-[0_18px_34px_rgba(19,17,14,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]",
         outline:
-          "bg-transparent text-ink-900 border border-ink-200 hover:bg-cream-100 active:bg-cream-200",
+          "border-ink-200/80 bg-white/30 text-ink-900 shadow-[0_8px_20px_rgba(19,17,14,0.04),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-sm hover:bg-white/78 hover:shadow-[0_16px_30px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.86)]",
         ghost:
-          "bg-transparent text-ink-700 hover:bg-cream-100 hover:text-ink-900 active:bg-cream-200",
+          "bg-transparent text-ink-700 shadow-none hover:bg-white/72 hover:text-ink-900",
         danger:
-          "bg-danger-500 text-white hover:bg-danger-600 active:bg-danger-700 shadow-xs",
+          "bg-danger-500 text-white shadow-[0_16px_32px_rgba(197,59,59,0.24),inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-danger-600 active:bg-danger-700",
         link:
-          "bg-transparent text-accent-600 underline-offset-4 hover:underline px-0 h-auto"
+          "h-auto rounded-none border-transparent bg-transparent px-0 text-accent-600 shadow-none hover:translate-y-0 hover:text-accent-700 hover:underline",
+        hero:
+          "accent-halo sheen-subtle border border-accent-200/70 bg-[linear-gradient(135deg,#4b4bc4_0%,#5b5bd6_42%,#776fda_100%)] text-white shadow-[0_22px_48px_rgba(61,61,160,0.28),inset_0_1px_0_rgba(255,255,255,0.18)] hover:bg-[linear-gradient(135deg,#4343b4_0%,#5757cf_42%,#7068d7_100%)]"
       },
       size: {
-        xs: "h-7 px-2.5 text-xs rounded-sm",
-        sm: "h-8 px-3 text-sm rounded-sm",
-        md: "h-9 px-4 text-sm rounded-md",
-        lg: "h-11 px-5 text-md rounded-md",
-        icon: "h-9 w-9 rounded-md"
+        xs: "h-8 rounded-lg px-3 text-xs",
+        sm: "h-9 rounded-lg px-4 text-sm",
+        md: "h-10 rounded-xl px-4 text-sm",
+        lg: "h-12 rounded-xl px-6 text-md",
+        icon: "h-10 w-10 rounded-xl"
       }
     },
     defaultVariants: {

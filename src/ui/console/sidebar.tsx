@@ -58,13 +58,17 @@ export function ConsoleSidebar({
   const items = appId ? APP_NAV(appId) : ROOT_NAV;
 
   return (
-    <nav className="flex flex-col gap-0.5 px-2 py-3 text-sm">
+    <nav className="flex flex-col gap-1 px-3 py-4 text-sm">
       {items.map((item) => (
-        <SidebarLink key={item.href} item={item} active={pathname === item.href || (item.href !== "/console" && pathname.startsWith(item.href))} />
+        <SidebarLink
+          key={item.href}
+          item={item}
+          active={pathname === item.href || (item.href !== "/console" && pathname.startsWith(item.href))}
+        />
       ))}
       {isSystemAdmin && (
         <>
-          <div className="mt-4 mb-1 px-3 text-2xs uppercase tracking-wider font-medium text-ink-400">
+          <div className="mb-1 mt-5 px-3 text-2xs font-medium uppercase tracking-[0.16em] text-ink-400">
             系统管理
           </div>
           {ADMIN_NAV.map((item) => (
@@ -82,11 +86,20 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={cn(
-        "flex items-center gap-2 px-3 py-1.5 rounded-sm transition-colors",
-        active ? "bg-cream-200 text-ink-900 font-medium" : "text-ink-600 hover:bg-cream-100 hover:text-ink-900"
+        "group relative flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-[background,color,box-shadow,transform] duration-200",
+        active
+          ? "bg-white/78 text-ink-900 font-medium shadow-[0_10px_24px_rgba(19,17,14,0.07),inset_0_1px_0_rgba(255,255,255,0.82)]"
+          : "text-ink-600 hover:-translate-y-px hover:bg-white/54 hover:text-ink-900"
       )}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <span
+        className={cn(
+          "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
+          active ? "bg-ink-900 text-cream-50" : "bg-white/50 text-ink-500 group-hover:text-accent-700"
+        )}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </span>
       <span className="truncate">{item.label}</span>
     </Link>
   );
