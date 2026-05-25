@@ -14,6 +14,10 @@ next-env.d.ts
 dist/
 packages/*/dist/
 
+# SDK UMD（由 npm run sdk:build:core 生成）
+demo/sdk/uniid.umd.js
+public/sdk/uniid.umd.js
+
 # Misc
 .DS_Store
 *.pem

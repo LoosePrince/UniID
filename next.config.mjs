@@ -8,7 +8,9 @@ const nextConfig = {
       "argon2",
       "quickjs-emscripten",
       "@aws-sdk/client-s3",
-      "node-cron"
+      "node-cron",
+      "pino",
+      "pino-pretty"
     ],
     // 启用 Next.js instrumentation 钩子（用于 audit/cron/webhooks boot）。
     instrumentationHook: true,
@@ -22,6 +24,12 @@ const nextConfig = {
           : [];
       // node-cron 内部用到 worker_threads/child_process，必须 require() 在运行时解析。
       externals.push({ "node-cron": "commonjs node-cron" });
+      // pino / pino-pretty 依赖 Node 内置模块与可选 worker，避免打进 vendor-chunks。
+      externals.push(
+        { pino: "commonjs pino" },
+        { "pino-pretty": "commonjs pino-pretty" },
+        { "thread-stream": "commonjs thread-stream" }
+      );
       // 把 node:* scheme 全部按 commonjs 外部模块解析（next 14 webpack 默认不识别此 scheme）。
       externals.push(({ request }, cb) => {
         if (request && request.startsWith("node:")) {

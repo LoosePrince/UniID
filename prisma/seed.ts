@@ -73,6 +73,7 @@ async function main() {
   const app = await prisma.app.upsert({
     where: { primaryDomain: "localhost:5500" },
     create: {
+      id: "app_demo_blog",
       name: "Demo Blog",
       description: "示例博客应用，演示 UniID 的认证、数据与文件能力。",
       primaryDomain: "localhost:5500",
@@ -81,7 +82,7 @@ async function main() {
       createdAt: t,
       updatedAt: t
     },
-    update: {}
+    update: { status: "active" }
   });
 
   await prisma.appDomain.upsert({
@@ -125,6 +126,8 @@ async function main() {
     properties: {
       title: { type: "string", minLength: 1, maxLength: 200 },
       content: { type: "string", minLength: 1 },
+      createdAt: { type: "integer", minimum: 0 },
+      authorId: { type: "string", minLength: 1 },
       status: { type: "string", enum: ["draft", "published"], default: "draft" },
       tags: { type: "array", items: { type: "string" }, default: [] },
       likes: {

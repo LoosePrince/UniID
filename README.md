@@ -61,7 +61,14 @@ npm run dev
 | `alice` | `password` | 演示用户 |
 | `bob` | `password` | 演示用户 |
 
-演示应用主域名：`localhost:5500`（可用 `demo/index.html` 配合本地静态服务器验证 SDK）。
+演示应用：`app_demo_blog`，主域名 `localhost:5500`。本地验证：
+
+```powershell
+npm run dev          # 终端 A：API http://localhost:3000
+npm run demo         # 终端 B：静态页 http://localhost:5500
+```
+
+详见 [demo/README.md](demo/README.md)。
 
 ### 验证构建与测试
 
@@ -129,7 +136,7 @@ e2e/                              # Playwright 烟测
 
 ### 浏览器（UMD）
 
-构建 SDK 后，将 `packages/sdk-core/dist/uniid.umd.global.js` 挂到静态页，或参考 [demo/index.html](demo/index.html)。
+执行 `npm run sdk:build:core` 会生成 `packages/sdk-core/dist/uniid.umd.js` 并复制到 `demo/sdk/` 与 `public/sdk/`。浏览器示例见 [demo/index.html](demo/index.html)。
 
 ### TypeScript
 

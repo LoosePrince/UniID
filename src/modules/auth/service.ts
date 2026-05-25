@@ -105,14 +105,20 @@ export class AuthService {
         }
       });
 
-      // 若已存在 AppSession 先 revoke 旧的（每个 user×app 只保留最新一个活跃）
-      await tx.appSession.updateMany({
-        where: { userId: input.userId, appId: input.appId, revokedAt: null },
-        data: { revokedAt: t }
+      // user×app 在库中仅一行（@@unique）；重复授权时复用该行并轮换 refresh。
+      const existing = await tx.appSession.findUnique({
+        where: { userId_appId: { userId: input.userId, appId: input.appId } }
       });
+      if (existing) {
+        await tx.refreshToken.updateMany({
+          where: { sessionId: existing.id, revokedAt: null },
+          data: { revokedAt: t }
+        });
+      }
 
-      const s = await tx.appSession.create({
-        data: {
+      const s = await tx.appSession.upsert({
+        where: { userId_appId: { userId: input.userId, appId: input.appId } },
+        create: {
           userId: input.userId,
           appId: input.appId,
           authType: input.authType,
@@ -121,6 +127,14 @@ export class AuthService {
           userAgent: input.userAgent ?? null,
           lastSeenAt: t,
           createdAt: t
+        },
+        update: {
+          authType: input.authType,
+          scope,
+          ip: input.ip ?? null,
+          userAgent: input.userAgent ?? null,
+          lastSeenAt: t,
+          revokedAt: null
         }
       });
 

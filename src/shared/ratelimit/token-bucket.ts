@@ -9,7 +9,15 @@
 import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
 
-const nowMs = () => Date.now();
+/** Unix 秒（与 Prisma `RateLimitBucket.refilledAt` INT 字段一致）。 */
+const nowSec = () => Math.floor(Date.now() / 1000);
+
+/** 历史 bug 曾写入毫秒时间戳，读库时归一化为秒。 */
+function normalizeRefilledAt(raw: number | undefined, fallbackSec: number): number {
+  if (raw == null) return fallbackSec;
+  if (raw > 1_000_000_000_000) return Math.floor(raw / 1000);
+  return raw;
+}
 
 export interface RateLimitOptions {
   /** 桶 key，如 "app:{appId}:ip:{ip}" 或 "user:{userId}:login"。 */
@@ -28,16 +36,26 @@ export interface RateLimitResult {
   resetMs: number;
 }
 
+/** Prisma 读 INT 失败时（历史毫秒脏数据），用 raw SQL 删除，避免 delete/findUnique 再次触发 P2023。 */
+async function purgeRateLimitBucketKey(key: string): Promise<void> {
+  await prisma.$executeRaw`DELETE FROM "RateLimitBucket" WHERE "key" = ${key}`;
+}
+
 export async function rateLimit(opts: RateLimitOptions): Promise<RateLimitResult> {
   const cost = opts.cost ?? 1;
-  const t = nowMs();
+  const t = nowSec();
 
-  const bucket = await prisma.rateLimitBucket.findUnique({ where: { key: opts.key } });
+  let bucket: { tokens: number; refilledAt: number } | null = null;
+  try {
+    bucket = await prisma.rateLimitBucket.findUnique({ where: { key: opts.key } });
+  } catch {
+    await purgeRateLimitBucketKey(opts.key);
+  }
 
   let tokens = bucket?.tokens ?? opts.capacity;
-  let refilledAt = bucket?.refilledAt ?? t;
+  let refilledAt = normalizeRefilledAt(bucket?.refilledAt, t);
 
-  const elapsedSec = Math.max(0, (t - refilledAt) / 1000);
+  const elapsedSec = Math.max(0, t - refilledAt);
   tokens = Math.min(opts.capacity, tokens + Math.floor(elapsedSec * opts.refillPerSecond));
   refilledAt = t;
 

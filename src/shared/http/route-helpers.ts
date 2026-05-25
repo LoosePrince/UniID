@@ -84,8 +84,15 @@ export function defineRoute<S extends SchemaShape, TResponse>(
         } else if (contentType.includes("application/x-www-form-urlencoded")) {
           const formData = await req.formData();
           body = Object.fromEntries(formData.entries());
+        } else if (req.method !== "GET" && req.method !== "HEAD") {
+          // SDK fetch 有时仅带 body 未带 Content-Type，仍尝试按 JSON 解析
+          try {
+            body = await req.json();
+          } catch {
+            body = {};
+          }
         } else {
-          body = undefined;
+          body = {};
         }
         body = opts.schema.body.parse(body);
       }
@@ -109,7 +116,10 @@ export function defineRoute<S extends SchemaShape, TResponse>(
       if (!(err instanceof ApiError)) {
         log.error({ err }, "route handler crashed");
       } else {
-        log.warn({ code: err.code, status: err.httpStatus }, err.message);
+        log.warn(
+          { code: err.code, status: err.httpStatus, details: err.details },
+          err.message
+        );
       }
       return res;
     }

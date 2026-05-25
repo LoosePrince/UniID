@@ -12,43 +12,71 @@
       }
       h1 { font-size: 28px; letter-spacing: -0.02em; }
       .card { background: #fff; border: 1px solid #e9e1ce; border-radius: 14px; padding: 20px; max-width: 680px; }
-      button { background: #13110e; color: #fbf9f4; border: 0; padding: 8px 16px; border-radius: 10px; cursor: pointer; }
+      button { background: #13110e; color: #fbf9f4; border: 0; padding: 8px 16px; border-radius: 10px; cursor: pointer; margin-right: 8px; }
       ul { padding-left: 18px; }
+      .muted { color: #6b645a; font-size: 14px; }
     </style>
   </head>
   <body>
     <div id="app">
       <div class="card">
         <h1>Vue Demo</h1>
+        <p class="muted">API: {{ cfg.url }} · App: {{ cfg.appId }}</p>
         <p v-if="user">欢迎，{{ user.displayName ?? user.username }}</p>
         <p v-else>未登录</p>
-        <button v-if="user" @click="logout">退出</button>
-        <button v-else @click="login">登录</button>
+        <button v-if="user" type="button" @click="logout">退出</button>
+        <button v-else type="button" @click="login">登录</button>
+        <p v-if="error" class="muted">{{ error }}</p>
         <ul>
-          <li v-for="r in list" :key="r.id">{{ r.data.title }}</li>
+          <li v-for="r in list" :key="r.id">{{ r.data.title ?? '(无标题)' }}</li>
         </ul>
       </div>
     </div>
 
+    <script src="./config.js"></script>
+    <script src="./sdk/uniid.umd.js"></script>
     <script src="https://unpkg.com/vue@3.4/dist/vue.global.prod.js"></script>
-    <script src="../public/sdk/uniid.umd.js"></script>
     <script>
       const { createApp, ref, onMounted } = Vue;
-      const uniid = new UniID({ url: window.location.origin.replace(/:\d+$/, ":3000"), appId: "app_demo_blog" });
+      const uniid = createUniID();
+      const loginOpts = { parentOrigin: window.location.origin };
 
       createApp({
         setup() {
           const user = ref(uniid.auth.user);
           const list = ref([]);
+          const error = ref("");
+          const cfg = UNIID_DEMO;
+
           uniid.auth.onChange((u) => { user.value = u; });
+
           const reload = async () => {
-            const r = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
-            list.value = r.records;
+            try {
+              error.value = "";
+              const r = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
+              list.value = r.records;
+            } catch (e) {
+              error.value = e?.message ?? String(e);
+            }
           };
-          onMounted(reload);
+
+          onMounted(() => {
+            uniid.auth.check().finally(reload);
+          });
+
           return {
-            user, list,
-            login: async () => { await uniid.auth.login(); await reload(); },
+            user,
+            list,
+            error,
+            cfg,
+            login: async () => {
+              try {
+                await uniid.auth.login(loginOpts);
+                await reload();
+              } catch (e) {
+                error.value = e?.message ?? String(e);
+              }
+            },
             logout: () => uniid.auth.logout()
           };
         }

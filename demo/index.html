@@ -69,6 +69,7 @@
         font-size: 11px; background: var(--cream-100); color: var(--ink-700);
         border: 1px solid var(--sand-200);
       }
+      #status { font-size: 13px; color: var(--ink-500); margin-top: 8px; }
     </style>
   </head>
   <body>
@@ -77,15 +78,20 @@
         <div class="brand">UniID Demo · 米色博客</div>
         <div class="row">
           <span id="user" class="muted">未登录</span>
-          <button id="btn-login" class="btn-primary">登录 / 授权</button>
-          <button id="btn-logout" class="btn-ghost" hidden>退出</button>
+          <button id="btn-login" class="btn-primary" type="button">登录 / 授权</button>
+          <button id="btn-logout" class="btn-ghost" type="button" hidden>退出</button>
         </div>
       </div>
     </header>
 
     <main class="container">
       <h1>所有文章</h1>
-      <p class="muted">用 UniID 的 Auth + Data + Realtime 跑一个最小博客 demo。</p>
+      <p class="muted">
+        用 <code>@uniid/sdk</code> 的 Auth + Data + Realtime。请先
+        <code>npm run dev</code> 与 <code>npm run demo</code>，详见
+        <a href="./README.md">demo/README.md</a>。
+      </p>
+      <p id="status" class="muted"></p>
 
       <section class="card" id="composer" hidden>
         <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
@@ -95,7 +101,7 @@
         <input id="title" placeholder="标题" />
         <textarea id="content" placeholder="内容（支持纯文本）"></textarea>
         <div class="row" style="margin-top: 8px;">
-          <button id="btn-publish" class="btn-primary">发布</button>
+          <button id="btn-publish" class="btn-primary" type="button">发布</button>
           <span id="composer-msg" class="muted"></span>
         </div>
       </section>
@@ -103,14 +109,12 @@
       <ul class="posts" id="list"></ul>
     </main>
 
-    <!-- UMD 入口（生产环境从 /sdk/uniid.umd.js 引用） -->
-    <script src="../public/sdk/uniid.umd.js"></script>
+    <script src="./config.js"></script>
+    <script src="./sdk/uniid.umd.js"></script>
     <script>
-      const uniid = new UniID({
-        url: window.location.origin.replace(/:\d+$/, ":3000"),
-        appId: "app_demo_blog",
-        theme: "light"
-      });
+      const uniid = createUniID();
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = `API: ${UNIID_DEMO.url} · App: ${UNIID_DEMO.appId}`;
 
       const userEl = document.getElementById("user");
       const btnLogin = document.getElementById("btn-login");
@@ -122,9 +126,11 @@
       const contentInput = document.getElementById("content");
       const msg = document.getElementById("composer-msg");
 
+      const loginOpts = { parentOrigin: window.location.origin };
+
       function renderUser(user) {
         if (user) {
-          userEl.textContent = `${user.displayName ?? user.username}`;
+          userEl.textContent = user.displayName ?? user.username;
           btnLogin.hidden = true;
           btnLogout.hidden = false;
           composer.hidden = false;
@@ -143,11 +149,12 @@
           li.innerHTML = `
             <p class="title"></p>
             <p class="meta"></p>
-            <p style="margin: 4px 0 0; color: var(--ink-700);"></p>
+            <p class="body" style="margin: 4px 0 0; color: var(--ink-700);"></p>
           `;
           li.querySelector(".title").textContent = r.data.title ?? "(无标题)";
-          li.querySelector(".meta").textContent = `${r.ownerId ?? "anonymous"} · ${new Date(r.createdAt * 1000).toLocaleString()}`;
-          li.querySelector("p:last-child").textContent = r.data.content ?? "";
+          li.querySelector(".meta").textContent =
+            `${r.ownerId ?? "anonymous"} · ${new Date(r.createdAt * 1000).toLocaleString()}`;
+          li.querySelector(".body").textContent = r.data.content ?? "";
           list.appendChild(li);
         }
       }
@@ -155,19 +162,22 @@
       async function reload() {
         try {
           const res = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
-          renderPosts(res.records);
+          const rows = Array.isArray(res.records) ? res.records : [];
+          renderPosts(rows);
         } catch (err) {
           console.warn("加载文章失败：", err);
+          statusEl.textContent = `加载失败: ${err?.message ?? err}`;
         }
       }
 
       btnLogin.onclick = async () => {
         try {
-          const u = await uniid.auth.login();
+          const u = await uniid.auth.login(loginOpts);
           renderUser(u);
           await reload();
         } catch (err) {
           console.warn(err);
+          statusEl.textContent = `登录失败: ${err?.message ?? err}（请先在 ${UNIID_DEMO.url}/login 登录 UniID 账户）`;
         }
       };
 
@@ -179,12 +189,16 @@
       btnPublish.onclick = async () => {
         const title = titleInput.value.trim();
         const content = contentInput.value.trim();
-        if (!title) { msg.textContent = "标题不能为空"; return; }
+        if (!title) {
+          msg.textContent = "标题不能为空";
+          return;
+        }
         btnPublish.disabled = true;
         msg.textContent = "发布中...";
         try {
-          await uniid.from("post").insert({ title, content });
-          titleInput.value = ""; contentInput.value = "";
+          await uniid.from("post").insert({ title, content, status: "published" });
+          titleInput.value = "";
+          contentInput.value = "";
           msg.textContent = "已发布";
           await reload();
         } catch (err) {
@@ -194,20 +208,34 @@
         }
       };
 
-      // 启动
-      renderUser(uniid.auth.user);
-      uniid.auth.onChange(renderUser);
-      uniid.auth.check().catch(() => {});
-      reload();
+      let realtimeChannel = null;
 
-      // Realtime
-      try {
-        const ch = uniid.realtime.channel("records:post");
-        ch.on("insert", reload);
-        ch.on("update", reload);
-        ch.on("delete", reload);
-        ch.subscribe();
-      } catch {}
+      function bindRealtime() {
+        if (!uniid.auth.user || typeof EventSource === "undefined") return;
+        if (realtimeChannel) return;
+        try {
+          realtimeChannel = uniid.realtime.channel(`records:${UNIID_DEMO.appId}:post`);
+          realtimeChannel.on("insert", reload);
+          realtimeChannel.on("update", reload);
+          realtimeChannel.on("delete", reload);
+          realtimeChannel.subscribe();
+        } catch (err) {
+          console.warn("Realtime 未连接", err);
+        }
+      }
+
+      function renderUserAndRealtime(user) {
+        renderUser(user);
+        if (user) bindRealtime();
+        else if (realtimeChannel) {
+          realtimeChannel.unsubscribe();
+          realtimeChannel = null;
+        }
+      }
+
+      renderUserAndRealtime(uniid.auth.user);
+      uniid.auth.onChange(renderUserAndRealtime);
+      uniid.auth.check().then(() => reload()).catch(() => reload());
     </script>
   </body>
 </html>

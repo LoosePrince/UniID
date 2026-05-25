@@ -13,49 +13,64 @@
       }
       h1 { font-size: 28px; letter-spacing: -0.02em; }
       .card { background: #fff; border: 1px solid #e9e1ce; border-radius: 14px; padding: 20px; max-width: 680px; }
-      button { background: #13110e; color: #fbf9f4; border: 0; padding: 8px 16px; border-radius: 10px; cursor: pointer; }
+      button { background: #13110e; color: #fbf9f4; border: 0; padding: 8px 16px; border-radius: 10px; cursor: pointer; margin-right: 8px; }
       ul { padding-left: 18px; }
+      .muted { color: #6b645a; font-size: 14px; }
     </style>
   </head>
   <body>
     <div id="root"></div>
 
+    <script src="./config.js"></script>
+    <script src="./sdk/uniid.umd.js"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script type="module">
-      // 在生产部署中，请使用打包过的 React + @uniid/sdk-react 包。
-      // 这里走最小化 demo：手动通过 UniID 实例 + React 状态管理。
-    </script>
-    <script src="../public/sdk/uniid.umd.js"></script>
-    <script type="text/babel">
-      // 简化版（无 @uniid/sdk-react 直接 UMD）：把 SDK 当成普通对象。
-      const { useEffect, useState, useCallback } = React;
-      const uniid = new UniID({ url: window.location.origin.replace(/:\d+$/, ":3000"), appId: "app_demo_blog" });
+    <script>
+      const { useEffect, useState, useCallback, createElement: h } = React;
+      const uniid = createUniID();
+      const loginOpts = { parentOrigin: window.location.origin };
 
       function App() {
         const [user, setUser] = useState(uniid.auth.user);
         const [list, setList] = useState([]);
-        useEffect(() => uniid.auth.onChange(setUser), []);
-        const load = useCallback(async () => {
-          const r = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
-          setList(r.records);
-        }, []);
-        useEffect(() => { load(); }, [load]);
+        const [err, setErr] = useState("");
 
-        return (
-          <div className="card">
-            <h1>React Demo</h1>
-            <p>{user ? `欢迎，${user.displayName ?? user.username}` : "未登录"}</p>
-            {user
-              ? <button onClick={() => uniid.auth.logout()}>退出</button>
-              : <button onClick={() => uniid.auth.login().then(load)}>登录</button>}
-            <ul>
-              {list.map(r => <li key={r.id}>{r.data.title}</li>)}
-            </ul>
-          </div>
-        );
+        useEffect(() => uniid.auth.onChange(setUser), []);
+
+        const load = useCallback(async () => {
+          try {
+            setErr("");
+            const r = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
+            setList(r.records);
+          } catch (e) {
+            setErr(e?.message ?? String(e));
+          }
+        }, []);
+
+        useEffect(() => {
+          uniid.auth.check().finally(load);
+        }, [load]);
+
+        return h("div", { className: "card" }, [
+          h("h1", null, "React Demo"),
+          h("p", { className: "muted" }, `API: ${UNIID_DEMO.url} · App: ${UNIID_DEMO.appId}`),
+          h("p", null, user ? `欢迎，${user.displayName ?? user.username}` : "未登录"),
+          user
+            ? h("button", { type: "button", onClick: () => uniid.auth.logout() }, "退出")
+            : h("button", {
+                type: "button",
+                onClick: () => uniid.auth.login(loginOpts).then(load).catch((e) => setErr(e?.message ?? String(e)))
+              }, "登录"),
+          err ? h("p", { className: "muted" }, err) : null,
+          h(
+            "ul",
+            null,
+            list.map((r) => h("li", { key: r.id }, r.data.title ?? "(无标题)"))
+          )
+        ]);
       }
-      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+
+      ReactDOM.createRoot(document.getElementById("root")).render(h(App));
     </script>
   </body>
 </html>

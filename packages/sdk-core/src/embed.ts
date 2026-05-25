@@ -8,7 +8,7 @@
  * - 子 → 父：`uniid_login_cancel`      { reason? }
  * - 子 → 父：`uniid_resize`            { height }
  */
-import type { AuthorizeOptions, UniIDSession } from "./types";
+import type { AuthorizeOptions, UniIDSession, UniIDUser } from "./types";
 
 const HANDSHAKE_TIMEOUT_MS = 60_000;
 
@@ -97,6 +97,40 @@ export interface AuthorizeResult {
   session: UniIDSession;
 }
 
+/** 将 embed 页 postMessage 载荷规范为 UniIDSession。 */
+function sessionFromLoginSuccess(
+  data: Record<string, unknown>,
+  appId: string
+): UniIDSession | null {
+  if (data.session && typeof data.session === "object") {
+    return data.session as UniIDSession;
+  }
+  const accessToken =
+    (typeof data.accessToken === "string" && data.accessToken) ||
+    (typeof data.token === "string" && data.token) ||
+    null;
+  const refreshToken =
+    (typeof data.refreshToken === "string" && data.refreshToken) ||
+    (typeof data.refresh_token === "string" && data.refresh_token) ||
+    null;
+  const user = data.user as UniIDUser | undefined;
+  if (!accessToken || !refreshToken || !user?.id) return null;
+
+  const expiresIn =
+    typeof data.expires_in === "number" ? data.expires_in : 15 * 60;
+
+  return {
+    user,
+    appId: (typeof data.app_id === "string" && data.app_id) || appId,
+    authType:
+      data.auth_type === "full" || data.authType === "full" ? "full" : "restricted",
+    scope: (data.scope as Record<string, unknown> | null | undefined) ?? null,
+    accessToken,
+    refreshToken,
+    accessTokenExpiresAt: Math.floor(Date.now() / 1000) + expiresIn
+  };
+}
+
 export async function authorizeViaEmbed(opts: {
   baseUrl: string;
   appId: string;
@@ -134,8 +168,16 @@ export async function authorizeViaEmbed(opts: {
           return;
         }
         if (data?.type === "uniid_login_success") {
+          const session = sessionFromLoginSuccess(
+            data as Record<string, unknown>,
+            opts.appId
+          );
           cleanup();
-          resolve({ session: (data as { session: UniIDSession }).session });
+          if (!session) {
+            reject(new Error("Invalid authorize response from embed"));
+            return;
+          }
+          resolve({ session });
         }
         if (data?.type === "uniid_login_cancel") {
           cleanup();

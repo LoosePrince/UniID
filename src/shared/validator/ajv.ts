@@ -18,10 +18,11 @@ export function ajv(): Ajv {
 }
 
 export function compileSchemaCached(schemaId: string, schema: object): ValidateFunction {
-  const cached = cache.get(schemaId);
+  const key = `${schemaId}:${JSON.stringify(schema)}`;
+  const cached = cache.get(key);
   if (cached) return cached;
   const fn = ajv().compile(schema);
-  cache.set(schemaId, fn);
+  cache.set(key, fn);
   return fn;
 }
 

@@ -18,13 +18,19 @@ export default defineConfig([
     target: "es2020"
   },
   {
-    entry: { "uniid.umd": SRC },
+    entry: { uniid: "packages/sdk-core/src/umd-entry.ts" },
     outDir: OUT,
     format: ["iife"],
     globalName: "UniID",
-    sourcemap: false,
+    sourcemap: true,
     minify: true,
     tsconfig: TSCONFIG,
-    target: "es2018"
+    target: "es2018",
+    outExtension() {
+      return { js: ".umd.js" };
+    },
+    footer: {
+      js: "UniID = typeof UniID === \"function\" ? UniID : UniID.default;"
+    }
   }
 ]);

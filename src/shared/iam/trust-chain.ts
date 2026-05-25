@@ -44,6 +44,8 @@ export interface ConsoleAuthContext {
 }
 
 function getBearerToken(req: NextRequest): string | null {
+  const fromQuery = req.nextUrl.searchParams.get("access_token");
+  if (fromQuery) return fromQuery.trim();
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) return auth.slice("Bearer ".length).trim();
   const cookieHeader = req.headers.get("cookie");

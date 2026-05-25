@@ -79,12 +79,29 @@ export class AuthNamespace {
   async refresh(): Promise<UniIDSession | null> {
     if (!this.session) return null;
     try {
-      const res = await request<{ session: UniIDSession }>(this.opts.url, "/api/v1/auth/refresh", {
+      const res = await request<{
+        session?: UniIDSession;
+        token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+      }>(this.opts.url, "/api/v1/auth/refresh", {
         method: "POST",
-        body: { refreshToken: this.session.refreshToken, appId: this.opts.appId }
+        body: { refresh_token: this.session.refreshToken }
       });
-      this.applySession(res.session);
-      return res.session;
+      const next =
+        res.session ??
+        (res.token
+          ? {
+              ...this.session,
+              accessToken: res.token,
+              refreshToken: res.refresh_token ?? this.session.refreshToken,
+              accessTokenExpiresAt:
+                Math.floor(Date.now() / 1000) + (res.expires_in ?? 15 * 60)
+            }
+          : null);
+      if (!next) throw new Error("Invalid refresh response");
+      this.applySession(next);
+      return next;
     } catch (err) {
       this.applySession(null);
       throw err;
