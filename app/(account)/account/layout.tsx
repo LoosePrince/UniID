@@ -37,7 +37,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
               <DropdownMenuItem asChild>
                 <Link href="/console">前往控制台</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild tone="danger">
                 <LogoutButton />
               </DropdownMenuItem>
             </DropdownMenuContent>

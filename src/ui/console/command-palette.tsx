@@ -45,10 +45,10 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-0 max-w-lg">
+      <DialogContent className="max-w-lg p-0">
         <DialogTitle className="sr-only">命令面板</DialogTitle>
         <Command className="flex flex-col">
-          <div className="flex items-center gap-2 px-3 py-2.5 border-b border-ink-100">
+          <div className="flex items-center gap-2 border-b border-ink-100 px-3 py-2.5 pr-14">
             <Search className="h-3.5 w-3.5 text-ink-400" />
             <Command.Input
               autoFocus

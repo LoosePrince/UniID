@@ -38,7 +38,7 @@ export const DialogContent = React.forwardRef<
         ref={ref}
         className={cn(
           "surface-elevated supports-blur-fallback fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/70 shadow-lg",
-          "data-[state=open]:animate-scale-in",
+          "data-[state=open]:animate-dialog-in data-[state=closed]:animate-dialog-out",
           className
         )}
         {...props}

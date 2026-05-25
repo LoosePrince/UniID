@@ -18,14 +18,14 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
   const apps = await AppService.listOwnedOrAdmin(user.id);
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream-50">
+    <div className="flex h-dvh flex-col overflow-hidden bg-cream-50">
       <ConsoleTopbar
         user={{ id: user.id, username: user.username, role: user.role }}
         apps={apps.map((a) => ({ id: a.id, name: a.name, primaryDomain: a.primaryDomain }))}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <ConsoleSidebarShell isSystemAdmin={user.role === "admin"} />
-        <main className="relative flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(119,111,218,0.07),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(251,249,244,0))]">
+        <main className="relative min-w-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(119,111,218,0.07),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(251,249,244,0))]">
           {children}
         </main>
       </div>

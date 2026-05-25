@@ -32,6 +32,8 @@ const config: Config = {
         "fade-in": "fadeIn 200ms ease-out",
         "slide-up": "slideUp 220ms cubic-bezier(0.16,1,0.3,1)",
         "scale-in": "scaleIn 160ms cubic-bezier(0.16,1,0.3,1)",
+        "dialog-in": "dialogIn 180ms cubic-bezier(0.16,1,0.3,1)",
+        "dialog-out": "dialogOut 120ms ease-in",
         sheen: "sheen 7.8s ease-in-out infinite",
         "pulse-glow": "pulseGlow 4.2s ease-in-out infinite",
         "float-subtle": "floatSubtle 5.4s ease-in-out infinite"
@@ -48,6 +50,14 @@ const config: Config = {
         scaleIn: {
           "0%": { opacity: "0", transform: "scale(0.96)" },
           "100%": { opacity: "1", transform: "scale(1)" }
+        },
+        dialogIn: {
+          "0%": { opacity: "0", transform: "translate(-50%, -50%) scale(0.96)" },
+          "100%": { opacity: "1", transform: "translate(-50%, -50%) scale(1)" }
+        },
+        dialogOut: {
+          "0%": { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+          "100%": { opacity: "0", transform: "translate(-50%, -50%) scale(0.98)" }
         },
         sheen: {
           "0%": { transform: "translateX(-120%) rotate(12deg)" },
