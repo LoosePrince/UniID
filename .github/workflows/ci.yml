@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: typecheck + unit
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./data/uniid.db
+      AUTH_JWT_SECRET: dev_jwt_secret_must_be_at_least_32_chars
+      SESSION_COOKIE_SECRET: dev_session_cookie_secret_must_be_32_chars
+      PUBLIC_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run typecheck
+      - run: npm test
+
+  build:
+    name: next build
+    runs-on: ubuntu-latest
+    needs: unit
+    env:
+      DATABASE_URL: file:./data/uniid.db
+      AUTH_JWT_SECRET: dev_jwt_secret_must_be_at_least_32_chars
+      SESSION_COOKIE_SECRET: dev_session_cookie_secret_must_be_32_chars
+      PUBLIC_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+
+  sdk:
+    name: sdk build
+    runs-on: ubuntu-latest
+    needs: unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci
+      - working-directory: packages/sdk-core
+        run: |
+          npm i -D tsup typescript
+          npx tsup

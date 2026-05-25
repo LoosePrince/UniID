@@ -1,3 +1,6 @@
+// UniID v2 schema — clean rewrite
+// 设计参考：plan §5
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,59 +10,154 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
-  passwordHash String
-  email        String?  @unique
-  role         String   @default("user")
-  createdAt    Int
-  updatedAt    Int
-  settings     String? // JSON string
-  deleted      Int      @default(0)
+// ============================================================================
+// Users & Sessions
+// ============================================================================
 
-  sessions     Session[]
-  accounts     Account[]
-  apps         App[]        @relation("UserApps")
-  authorizations Authorization[]
-  recordsOwned  Record[]    @relation("RecordOwner")
-  recordsCreated Record[]   @relation("RecordCreatedBy")
-  recordsUpdated Record[]   @relation("RecordUpdatedBy")
-  schemasCreated DataSchema[] @relation("SchemaCreatedBy")
-  appAdmins     AppAdmin[]
-  filesOwned    FileObject[]    @relation("FileOwner")
-  fileSharesCreated FileShareToken[] @relation("FileShareCreatedBy")
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  email           String?  @unique
+  emailVerifiedAt Int?
+  passwordHash    String
+  displayName     String?
+  avatar          String?
+  role            String   @default("user") // user | admin
+  locale          String   @default("zh-CN")
+  twoFactorSecret String?
+  deletedAt       Int?
+  createdAt       Int
+  updatedAt       Int
+
+  userSessions    UserSession[]
+  appSessions     AppSession[]
+  refreshTokens   RefreshToken[]
+  appsOwned       App[]              @relation("AppOwner")
+  appAdmins       AppAdmin[]
+  appApiKeys      AppApiKey[]        @relation("AppApiKeyCreatedBy")
+  authorizations  Authorization[]
+  policyDocuments PolicyDocument[]   @relation("PolicyCreatedBy")
+  dataSchemas     DataSchema[]       @relation("SchemaCreatedBy")
+  schemaVersions  SchemaVersion[]    @relation("SchemaVersionCreatedBy")
+  recordsOwned    Record[]           @relation("RecordOwner")
+  recordsCreated  Record[]           @relation("RecordCreatedBy")
+  recordsUpdated  Record[]           @relation("RecordUpdatedBy")
+  filesOwned      FileObject[]       @relation("FileOwner")
+  fileShares      FileShareToken[]   @relation("FileShareCreatedBy")
+  functions       FunctionDefinition[] @relation("FnCreatedBy")
+  fnDeployments   FunctionDeployment[] @relation("FnDeploymentBy")
+  cronJobs        CronJob[]          @relation("CronCreatedBy")
+  webhooks        Webhook[]          @relation("HookCreatedBy")
+  auditLogs       AuditLog[]
+
+  @@index([role, deletedAt])
 }
 
-model Session {
+/// 控制台/账号中心使用的浏览器会话（cookie 持有）。
+model UserSession {
   id           String  @id @default(cuid())
   userId       String
-  token        String  @unique
-  refreshToken String? @unique
-  expiresAt    Int
-  createdAt    Int
-  lastActivity Int?
+  csrfToken    String
+  ip           String?
   userAgent    String?
+  expiresAt    Int
+  lastSeenAt   Int
+  createdAt    Int
+  revokedAt    Int?
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
-model App {
-  id          String   @id @default(cuid())
-  name        String
-  domain      String   @unique
-  description String?
-  createdAt   Int
-  ownerId     String
-  status      String   @default("active")
-  apiKey      String?  @unique
-  settings    String? // JSON string
+/// SDK 持有的 (user × app) 会话，承载 access/refresh 颁发与撤销。
+model AppSession {
+  id           String  @id @default(cuid())
+  userId       String
+  appId        String
+  authType     String  // full | restricted
+  scope        String? // JSON
+  ip           String?
+  userAgent    String?
+  lastSeenAt   Int
+  createdAt    Int
+  revokedAt    Int?
 
-  owner          User            @relation("UserApps", fields: [ownerId], references: [id])
-  authorizations Authorization[]
-  records        Record[]
-  dataSchemas    DataSchema[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  app           App            @relation(fields: [appId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@unique([userId, appId])
+  @@index([appId, revokedAt])
+}
+
+/// 不透明 refresh token：每次刷新生成新条目，并把旧条目标记 usedAt；
+/// 若再次见到已用 token，整个会话族 revoke。
+model RefreshToken {
+  id            String  @id @default(cuid())
+  tokenHash     String  @unique // sha-256 of the opaque value
+  userId        String
+  sessionId     String  // AppSession id
+  parentId      String? // 链上前一个 token 的 id
+  rotationCount Int     @default(0)
+  expiresAt     Int
+  createdAt     Int
+  usedAt        Int?
+  revokedAt     Int?
+
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session AppSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, revokedAt])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// Apps & Domains
+// ============================================================================
+
+model App {
+  id             String  @id @default(cuid())
+  name           String
+  description    String?
+  primaryDomain  String  @unique
+  status         String  @default("active") // active | suspended | archived
+  settings       String? // JSON: { theme?, logoUrl?, brand? }
+  createdAt      Int
+  updatedAt      Int
+  ownerId        String
+
+  owner          User                  @relation("AppOwner", fields: [ownerId], references: [id])
+  domains        AppDomain[]
   admins         AppAdmin[]
+  apiKeys        AppApiKey[]
+  appSessions    AppSession[]
+  authorizations Authorization[]
+  policies       PolicyDocument[]
+  schemas        DataSchema[]
+  records        Record[]
+  files          FileObject[]
+  functions      FunctionDefinition[]
+  cronJobs       CronJob[]
+  webhooks       Webhook[]
+  quota          Quota?
+  quotaUsage     QuotaUsage[]
+  auditLogs      AuditLog[]
+
+  @@index([ownerId, status])
+}
+
+/// 额外域名（除 primaryDomain 外，可附加 verified TXT 校验）。
+model AppDomain {
+  id           String  @id @default(cuid())
+  appId        String
+  host         String  @unique
+  verified     Int     @default(0)
+  verifyToken  String? // TXT 验证字符串
+  createdAt    Int
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
 }
 
 model AppAdmin {
@@ -68,120 +166,184 @@ model AppAdmin {
   userId    String
   createdAt Int
 
-  app  App  @relation(fields: [appId], references: [id])
-  user User @relation(fields: [userId], references: [id])
+  app  App  @relation(fields: [appId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([appId, userId])
 }
+
+/// 可选的服务端到服务端 API Key（不影响纯前端理念）。
+model AppApiKey {
+  id          String  @id @default(cuid())
+  appId       String
+  label       String
+  keyHash     String  @unique
+  prefix      String  // 显示用前 8 位
+  scopes      String  // JSON 数组
+  createdById String
+  createdAt   Int
+  lastUsedAt  Int?
+  revokedAt   Int?
+
+  app       App  @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy User @relation("AppApiKeyCreatedBy", fields: [createdById], references: [id])
+}
+
+// ============================================================================
+// Authorization (user × app)
+// ============================================================================
 
 model Authorization {
   id          String  @id @default(cuid())
   userId      String
   appId       String
-  authType    String
+  authType    String  // full | restricted
+  scope       String? // JSON
   grantedAt   Int
   expiresAt   Int?
-  revoked     Int     @default(0)
-  permissions String? // JSON string
+  revokedAt   Int?
 
-  user User @relation(fields: [userId], references: [id])
-  app  App  @relation(fields: [appId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  app  App  @relation(fields: [appId], references: [id], onDelete: Cascade)
 
   @@unique([userId, appId])
+  @@index([appId, revokedAt])
 }
 
-model Record {
-  id                 String  @id @default(cuid())
-  appId              String
-  ownerId            String?
-  dataType           String
-  data               String // JSON string
-  permissionOverride String? // JSON string
-  createdAt          Int
-  updatedAt          Int
-  createdById        String?
-  updatedById        String?
-  deleted            Int     @default(0)
-  schemaVersion      Int?
+// ============================================================================
+// Policy documents (composable: app / dataType / record overrides)
+// ============================================================================
 
-  app       App   @relation(fields: [appId], references: [id])
+model PolicyDocument {
+  id          String  @id @default(cuid())
+  appId       String
+  scope       String  // app | dataType | record
+  target      String? // dataType 名或 recordId，scope=app 时为 null
+  document    String  // JSON
+  description String?
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("PolicyCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, scope, target])
+  @@index([appId, scope])
+}
+
+// ============================================================================
+// Schemas (versioned)
+// ============================================================================
+
+model DataSchema {
+  id          String  @id @default(cuid())
+  appId       String
+  dataType    String
+  description String?
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("SchemaCreatedBy", fields: [createdById], references: [id])
+  versions  SchemaVersion[]
+
+  @@unique([appId, dataType])
+}
+
+model SchemaVersion {
+  id              String  @id @default(cuid())
+  schemaId        String
+  version         Int
+  jsonSchema      String  // JSON Schema (AJV)
+  autoFill        String? // JSON: { "data.createdAt": "$serverTime", ... }
+  validationRules String? // 自定义 JS（QuickJS 沙箱执行）
+  isActive        Int     @default(0)
+  createdAt       Int
+  createdById     String?
+
+  schema    DataSchema @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation("SchemaVersionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([schemaId, version])
+  @@index([schemaId, isActive])
+}
+
+// ============================================================================
+// Records
+// ============================================================================
+
+model Record {
+  id              String  @id @default(cuid())
+  appId           String
+  dataType        String
+  ownerId         String?
+  data            String  // JSON
+  schemaVersionId String?
+  createdAt       Int
+  updatedAt       Int
+  createdById     String?
+  updatedById     String?
+  deletedAt       Int?
+
+  app       App   @relation(fields: [appId], references: [id], onDelete: Cascade)
   owner     User? @relation("RecordOwner", fields: [ownerId], references: [id])
   createdBy User? @relation("RecordCreatedBy", fields: [createdById], references: [id])
   updatedBy User? @relation("RecordUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([appId, dataType, deletedAt])
+  @@index([appId, dataType, ownerId])
+  @@index([appId, dataType, updatedAt])
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model DataSchema {
-  id                 String   @id @default(cuid())
-  appId              String
-  dataType           String
-  schema             String   // JSON Schema 字符串
-  defaultPermissions String?  // JSON: 该 dataType 的默认权限配置
-  version            Int      @default(1)
-  isActive           Int      @default(1) // 1 为活跃，0 为禁用
-  createdAt          Int
-  updatedAt          Int
-  createdById        String?
-  description        String?
-  validationRules    String?  // 预留：自定义验证规则（JS函数字符串）
-
-  app       App   @relation(fields: [appId], references: [id])
-  createdBy User? @relation("SchemaCreatedBy", fields: [createdById], references: [id])
-
-  @@unique([appId, dataType, version])
-}
-
-model GlobalConfig {
-  key   String @id
-  value String
-}
-
-model VerificationToken {
-  identifier String
-  token      String @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
+// ============================================================================
+// Files
+// ============================================================================
 
 model FileObject {
-  id           String  @id @default(cuid())
-  appId        String?
-  ownerId      String
-  bucket       String
-  objectKey    String  @unique
-  originalName String
-  mimeType     String
-  size         Int
-  checksum     String?
-  visibility   String  @default("private")
-  createdAt    Int
-  updatedAt    Int
-  deleted      Int     @default(0)
+  id            String  @id @default(cuid())
+  appId         String?
+  ownerId       String
+  bucket        String
+  objectKey     String  @unique
+  originalName  String
+  mimeType      String
+  size          Int
+  checksum      String?
+  checksumAlgo  String? // md5 | sha256
+  width         Int?
+  height        Int?
+  durationMs    Int?
+  uploadId      String? // multipart in progress
+  visibility    String  @default("private") // private | public
+  storageClass  String  @default("standard")
+  createdAt     Int
+  updatedAt     Int
+  deletedAt     Int?
 
+  app         App?             @relation(fields: [appId], references: [id])
   owner       User             @relation("FileOwner", fields: [ownerId], references: [id])
+  chunks      FileChunk[]
   shareTokens FileShareToken[]
 
-  @@index([ownerId, deleted])
+  @@index([appId, deletedAt])
+  @@index([ownerId, deletedAt])
   @@index([createdAt])
+}
+
+model FileChunk {
+  id         String  @id @default(cuid())
+  fileId     String
+  uploadId   String
+  partNumber Int
+  etag       String
+  size       Int
+  createdAt  Int
+
+  file FileObject @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([uploadId, partNumber])
 }
 
 model FileShareToken {
@@ -190,13 +352,221 @@ model FileShareToken {
   token       String @unique
   expiresAt   Int
   createdById String
-  revoked     Int    @default(0)
+  revokedAt   Int?
   createdAt   Int
 
-  file      FileObject @relation(fields: [fileId], references: [id])
+  file      FileObject @relation(fields: [fileId], references: [id], onDelete: Cascade)
   createdBy User       @relation("FileShareCreatedBy", fields: [createdById], references: [id])
 
-  @@index([fileId, revoked])
-  @@index([token, revoked, expiresAt])
+  @@index([fileId, revokedAt])
+  @@index([token, revokedAt, expiresAt])
 }
 
+// ============================================================================
+// Functions (QuickJS sandbox)
+// ============================================================================
+
+model FunctionDefinition {
+  id          String  @id @default(cuid())
+  appId       String
+  name        String
+  runtime     String  @default("quickjs")
+  env         String? // JSON map
+  memoryMb    Int     @default(64)
+  timeoutMs   Int     @default(5000)
+  isActive    Int     @default(1)
+  description String?
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app          App                  @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy    User?                @relation("FnCreatedBy", fields: [createdById], references: [id])
+  deployments  FunctionDeployment[]
+  activeDeploymentId String?
+  invocations  FunctionInvocation[]
+  cronJobs     CronJob[]
+
+  @@unique([appId, name])
+}
+
+model FunctionDeployment {
+  id           String  @id @default(cuid())
+  fnId         String
+  version      Int
+  sourceHash   String
+  sourceCode   String
+  createdAt    Int
+  deployedById String?
+
+  fn         FunctionDefinition @relation(fields: [fnId], references: [id], onDelete: Cascade)
+  deployedBy User?              @relation("FnDeploymentBy", fields: [deployedById], references: [id])
+  invocations FunctionInvocation[]
+
+  @@unique([fnId, version])
+}
+
+model FunctionInvocation {
+  id            String  @id @default(cuid())
+  fnId          String
+  deploymentId  String?
+  trigger       String  // http | cron | event | sdk
+  status        String  // ok | error | timeout | oom
+  durationMs    Int
+  memoryPeakKb  Int?
+  inputPreview  String? // 截断后的请求载荷
+  output        String? // 截断
+  logs          String? // captured console.log
+  error         String?
+  createdAt     Int
+
+  fn         FunctionDefinition  @relation(fields: [fnId], references: [id], onDelete: Cascade)
+  deployment FunctionDeployment? @relation(fields: [deploymentId], references: [id])
+
+  @@index([fnId, createdAt])
+}
+
+// ============================================================================
+// Cron
+// ============================================================================
+
+model CronJob {
+  id          String  @id @default(cuid())
+  appId       String
+  name        String
+  cronExpr    String
+  fnId        String
+  payload     String? // JSON
+  isActive    Int     @default(1)
+  lastRunAt   Int?
+  lastStatus  String?
+  nextRunAt   Int?
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App                @relation(fields: [appId], references: [id], onDelete: Cascade)
+  fn        FunctionDefinition @relation(fields: [fnId], references: [id], onDelete: Cascade)
+  createdBy User?              @relation("CronCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, name])
+  @@index([isActive, nextRunAt])
+}
+
+// ============================================================================
+// Webhooks
+// ============================================================================
+
+model Webhook {
+  id          String  @id @default(cuid())
+  appId       String
+  name        String
+  url         String
+  secret      String
+  events      String  // JSON 数组 ["record.created", ...]
+  filter      String? // JSON 过滤器（按 dataType / appId 子集等）
+  isActive    Int     @default(1)
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app        App                @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy  User?              @relation("HookCreatedBy", fields: [createdById], references: [id])
+  deliveries WebhookDelivery[]
+
+  @@unique([appId, name])
+}
+
+model WebhookDelivery {
+  id           String  @id @default(cuid())
+  webhookId    String
+  eventId      String
+  eventType    String
+  payload      String  // JSON
+  attempt      Int     @default(0)
+  status       String  @default("pending") // pending | success | failed | dlq
+  statusCode   Int?
+  durationMs   Int?
+  errorMessage String?
+  nextRetryAt  Int?
+  createdAt    Int
+  updatedAt    Int
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextRetryAt])
+  @@index([webhookId, createdAt])
+}
+
+// ============================================================================
+// Audit log
+// ============================================================================
+
+model AuditLog {
+  id           String  @id @default(cuid())
+  appId        String?
+  userId       String?
+  action       String
+  resourceType String
+  resourceId   String?
+  before       String? // JSON
+  after        String? // JSON
+  ip           String?
+  userAgent    String?
+  requestId    String?
+  createdAt    Int
+
+  app  App?  @relation(fields: [appId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([appId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ============================================================================
+// Quota & rate limit
+// ============================================================================
+
+model Quota {
+  id                       String  @id @default(cuid())
+  appId                    String  @unique
+  rpsLimit                 Int
+  dailyApiCalls            Int
+  monthlyStorageBytes      BigInt
+  monthlyEgressBytes       BigInt
+  fnInvocationsDaily       Int
+  updatedAt                Int
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+}
+
+model QuotaUsage {
+  id              String @id @default(cuid())
+  appId           String
+  period          String // "YYYY-MM-DD"
+  apiCalls        Int    @default(0)
+  fnInvocations   Int    @default(0)
+  storageBytes    BigInt @default(0)
+  egressBytes     BigInt @default(0)
+
+  app App @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@unique([appId, period])
+}
+
+model RateLimitBucket {
+  key         String @id // 例如 "app:{id}:ip:{addr}"
+  tokens      Int
+  refilledAt  Int
+}
+
+// ============================================================================
+// Global config (k/v)
+// ============================================================================
+
+model GlobalConfig {
+  key       String @id
+  value     String
+  updatedAt Int
+}

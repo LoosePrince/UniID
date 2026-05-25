@@ -1,1339 +1,213 @@
 <!doctype html>
 <html lang="zh-CN">
-
-<head>
-  <meta charset="utf-8" />
-  <title>UniID Demo Blog - 完整功能演示</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- UnoCSS 运行时（仅使用原子类样式） -->
-  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime/uno.global.js"></script>
-  <style>
-    :root {
-      color-scheme: light;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "SF Pro Display", "Segoe UI", sans-serif;
-      background-color: #f8fafc;
-      color: #0f172a;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-  </style>
-</head>
-
-<body>
-  <div class="min-h-screen bg-slate-50">
-    <header class="border-b bg-white">
-      <div class="max-w-6xl mx-auto px-4 lg:px-6 py-4 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <div class="h-9 w-9 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-600">
-            <i data-lucide="pen-square" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h1 class="m-0 text-lg font-semibold tracking-wide text-slate-900">
-              UniID Demo Blog
-            </h1>
-            <p class="mt-1 mb-0 text-xs text-slate-500">
-              完整功能演示：发帖、查看、编辑、删除、评论、点赞
-            </p>
-          </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>UniID Demo · 米色博客</title>
+    <style>
+      :root {
+        --cream-50: #fbf9f4;
+        --cream-100: #f6f2e9;
+        --sand-200: #e9e1ce;
+        --ink-900: #13110e;
+        --ink-700: #3c3833;
+        --ink-500: #6b645a;
+        --accent: #5b5bd6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Geist", "PingFang SC", "Inter", system-ui, sans-serif;
+        background: var(--cream-50);
+        color: var(--ink-900);
+        -webkit-font-smoothing: antialiased;
+      }
+      header {
+        position: sticky; top: 0; z-index: 10;
+        background: rgba(251, 249, 244, 0.85);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--sand-200);
+      }
+      .container { max-width: 760px; margin: 0 auto; padding: 16px 24px; }
+      .hdr { display: flex; align-items: center; justify-content: space-between; }
+      .brand { font-weight: 600; letter-spacing: -0.01em; }
+      .muted { color: var(--ink-500); font-size: 14px; }
+      main { padding: 32px 24px 96px; }
+      h1 { font-size: 32px; letter-spacing: -0.02em; margin: 0 0 8px; }
+      .card {
+        background: #fff;
+        border: 1px solid var(--sand-200);
+        border-radius: 14px;
+        padding: 20px;
+        margin: 16px 0;
+        box-shadow: 0 1px 2px rgba(20,18,14,0.04);
+      }
+      textarea, input {
+        width: 100%; padding: 10px 12px; border-radius: 10px;
+        border: 1px solid var(--sand-200); background: var(--cream-50);
+        font: inherit; color: inherit; outline: none;
+      }
+      textarea { min-height: 96px; resize: vertical; }
+      button {
+        font: inherit; cursor: pointer; border: 0;
+        border-radius: 10px; padding: 10px 16px; transition: opacity 0.15s;
+      }
+      button:hover { opacity: 0.92; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn-primary { background: var(--ink-900); color: var(--cream-50); }
+      .btn-ghost   { background: transparent; color: var(--ink-700); }
+      .row { display: flex; gap: 8px; align-items: center; }
+      ul.posts { list-style: none; padding: 0; margin: 0; }
+      ul.posts li {
+        padding: 14px 0; border-top: 1px solid var(--sand-200);
+      }
+      ul.posts li:first-child { border-top: 0; }
+      .title { font-weight: 600; margin: 0 0 4px; }
+      .meta { font-size: 12px; color: var(--ink-500); }
+      .pill {
+        display: inline-block; padding: 1px 8px; border-radius: 999px;
+        font-size: 11px; background: var(--cream-100); color: var(--ink-700);
+        border: 1px solid var(--sand-200);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container hdr">
+        <div class="brand">UniID Demo · 米色博客</div>
+        <div class="row">
+          <span id="user" class="muted">未登录</span>
+          <button id="btn-login" class="btn-primary">登录 / 授权</button>
+          <button id="btn-logout" class="btn-ghost" hidden>退出</button>
         </div>
       </div>
     </header>
 
-    <main class="py-6">
-      <div class="max-w-6xl mx-auto px-4 lg:px-6 grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)] items-start">
-        <!-- 左侧：用户信息 + 发帖表单 -->
-        <section class="space-y-4">
-          <!-- 用户信息卡片 -->
-          <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div class="px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between gap-4">
-              <div class="flex items-center gap-3">
-                <div
-                  class="h-10 w-10 rounded-full bg-sky-500/80 flex items-center justify-center text-white text-sm font-semibold">
-                  <span id="userAvatarInitial">
-                    <i data-lucide="user" class="w-4 h-4"></i>
-                  </span>
-                </div>
-                <div>
-                  <div class="text-sm font-medium text-slate-900">
-                    UniID Demo Blog
-                  </div>
-                  <div id="userStatusText" class="text-xs text-slate-500">
-                    请先登录以发帖和互动
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2" id="userSection">
-                <div id="guestView">
-                  <button id="loginButton"
-                    class="inline-flex items-center gap-1 rounded-full bg-sky-500 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-white shadow-sm hover:bg-sky-600 transition">
-                    <i data-lucide="log-in" class="w-4 h-4"></i>
-                    <span>登录 / 授权</span>
-                  </button>
-                </div>
-                <div id="userView" class="hidden flex items-center gap-2">
-                  <div class="text-right text-xs leading-tight">
-                    <div class="font-medium text-slate-900" id="usernameDisplay">-</div>
-                    <div class="text-slate-500">已登录</div>
-                  </div>
-                  <div id="userAvatar"
-                    class="h-8 w-8 rounded-full bg-sky-500/90 flex items-center justify-center text-white text-xs font-semibold">
-                    -
-                  </div>
-                  <button id="logoutButton"
-                    class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition">
-                    退出
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+    <main class="container">
+      <h1>所有文章</h1>
+      <p class="muted">用 UniID 的 Auth + Data + Realtime 跑一个最小博客 demo。</p>
 
-          <!-- 发帖表单 -->
-          <div id="postFormCard" class="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div class="px-4 py-3 sm:px-5 sm:py-4 space-y-4">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <div class="h-7 w-7 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-600">
-                    <i data-lucide="pen-square" class="w-4 h-4"></i>
-                  </div>
-                  <span class="text-sm font-medium text-slate-900">发表新帖子</span>
-                </div>
-              </div>
-              <form id="postForm" class="space-y-3">
-                <div class="space-y-1">
-                  <label for="postTitle" class="block text-xs font-medium text-slate-600">
-                    标题
-                  </label>
-                  <input type="text" id="postTitle" required placeholder="输入帖子标题..."
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
-                </div>
-                <div class="space-y-1">
-                  <label for="postContent" class="block text-xs font-medium text-slate-600">
-                    内容
-                  </label>
-                  <textarea id="postContent" required placeholder="分享你的想法..."
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none min-h-[120px] resize-y focus:border-sky-400 focus:ring-1 focus:ring-sky-200"></textarea>
-                </div>
-                <div class="space-y-1">
-                  <label for="postFiles" class="block text-xs font-medium text-slate-600">
-                    附件（可多选）
-                  </label>
-                  <input type="file" id="postFiles" multiple
-                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
-                  <p class="m-0 text-[11px] text-slate-400">支持图片与文件，发布时自动上传并关联到帖子。</p>
-                </div>
-                <div class="flex items-center justify-end gap-3 pt-2">
-                  <button type="submit" id="submitPostBtn"
-                    class="inline-flex items-center justify-center rounded-full bg-sky-500 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-600 disabled:opacity-60 disabled:cursor-not-allowed transition">
-                    发布帖子
-                  </button>
-                </div>
-              </form>
-              <div id="formMessage" class="hidden"></div>
-            </div>
-          </div>
-          <div id="adminFilesCard" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div class="px-4 py-3 sm:px-5 sm:py-4 space-y-3">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <div class="h-7 w-7 rounded-full bg-violet-500/10 flex items-center justify-center text-violet-600">
-                    <i data-lucide="shield" class="w-4 h-4"></i>
-                  </div>
-                  <span class="text-sm font-medium text-slate-900">管理员文件管理</span>
-                </div>
-                <button id="refreshAdminFilesBtn"
-                  class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition">
-                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                  <span>刷新</span>
-                </button>
-              </div>
-              <div id="adminFilesContainer" class="space-y-2 text-xs text-slate-500">
-                暂无数据
-              </div>
-            </div>
-          </div>
-        </section>
+      <section class="card" id="composer" hidden>
+        <div class="row" style="justify-content: space-between; margin-bottom: 8px;">
+          <strong>写一篇</strong>
+          <span class="pill">需要登录</span>
+        </div>
+        <input id="title" placeholder="标题" />
+        <textarea id="content" placeholder="内容（支持纯文本）"></textarea>
+        <div class="row" style="margin-top: 8px;">
+          <button id="btn-publish" class="btn-primary">发布</button>
+          <span id="composer-msg" class="muted"></span>
+        </div>
+      </section>
 
-        <!-- 右侧：帖子列表 -->
-        <section class="space-y-4">
-          <div class="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div class="px-4 py-3 sm:px-5 sm:py-4 space-y-4">
-              <div class="flex items-center justify-between gap-3">
-                <div class="flex items-center gap-2">
-                  <div class="h-7 w-7 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-600">
-                    <i data-lucide="library" class="w-4 h-4"></i>
-                  </div>
-                  <span class="text-sm font-medium text-slate-900">帖子列表</span>
-                </div>
-                <button
-                  class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
-                  id="refreshBtn">
-                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                  <span>刷新</span>
-                </button>
-              </div>
-              <div id="postsContainer" class="space-y-4">
-                <div
-                  class="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-slate-500">
-                  <div
-                    class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-slate-400">
-                    <i data-lucide="file-text" class="w-6 h-6"></i>
-                  </div>
-                  <div class="text-sm">暂无帖子，快来发表第一篇吧！</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+      <ul class="posts" id="list"></ul>
     </main>
-  </div>
 
-  <!-- 编辑帖子模态框 -->
-  <div id="editModal"
-    class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm px-4">
-    <div class="bg-white rounded-xl border border-slate-200 shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="m-0 flex items-center gap-2 text-base font-semibold text-slate-900">
-          <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/10 text-sky-600">
-            <i data-lucide="edit-3" class="w-4 h-4"></i>
-          </span>
-          <span>编辑帖子</span>
-        </h3>
-        <button
-          class="inline-flex items-center justify-center rounded-full border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 w-7 h-7 text-xs transition"
-          id="closeEditModal" aria-label="关闭">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
-      <form id="editForm" class="space-y-3">
-        <input type="hidden" id="editPostId" />
-        <div class="space-y-1">
-          <label for="editTitle" class="block text-xs font-medium text-slate-600">
-            标题
-          </label>
-          <input type="text" id="editTitle" required
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
-        </div>
-        <div class="space-y-1">
-          <label for="editContent" class="block text-xs font-medium text-slate-600">
-            内容
-          </label>
-          <textarea id="editContent" required
-            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none min-h-[120px] resize-y focus:border-sky-400 focus:ring-1 focus:ring-sky-200"></textarea>
-        </div>
-        <div class="flex items-center justify-end gap-3 pt-2">
-          <button type="button"
-            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition"
-            id="cancelEdit">
-            取消
-          </button>
-          <button type="submit"
-            class="inline-flex items-center justify-center rounded-full bg-sky-500 px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-sky-600 transition">
-            保存修改
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- 授权 iframe（由 SDK 默认样式居中弹出并自适应） -->
-  <div id="uniid-auth-frame"></div>
-
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="http://localhost:3000/sdk/uniid.sdk.js"></script>
-  <script>
-    (function () {
-      // 初始化 AuthSDK
-      const auth = new window.AuthSDK({
-        authServer: "http://localhost:3000",
-        appId: "demo-blog",
-        mountId: "uniid-auth-frame",
-        useDefaultStyle: true
+    <!-- UMD 入口（生产环境从 /sdk/uniid.umd.js 引用） -->
+    <script src="../public/sdk/uniid.umd.js"></script>
+    <script>
+      const uniid = new UniID({
+        url: window.location.origin.replace(/:\d+$/, ":3000"),
+        appId: "app_demo_blog",
+        theme: "light"
       });
 
-      // 状态管理
-      const state = {
-        user: null,
-        posts: [],
-        editingPostId: null,
-        isAdmin: false,
-        adminFiles: []
-      };
+      const userEl = document.getElementById("user");
+      const btnLogin = document.getElementById("btn-login");
+      const btnLogout = document.getElementById("btn-logout");
+      const composer = document.getElementById("composer");
+      const list = document.getElementById("list");
+      const btnPublish = document.getElementById("btn-publish");
+      const titleInput = document.getElementById("title");
+      const contentInput = document.getElementById("content");
+      const msg = document.getElementById("composer-msg");
 
-      // DOM 元素
-      const elements = {
-        loginButton: document.getElementById("loginButton"),
-        logoutButton: document.getElementById("logoutButton"),
-        guestView: document.getElementById("guestView"),
-        userView: document.getElementById("userView"),
-        usernameDisplay: document.getElementById("usernameDisplay"),
-        userAvatar: document.getElementById("userAvatar"),
-        postForm: document.getElementById("postForm"),
-        postFormCard: document.getElementById("postFormCard"),
-        postTitle: document.getElementById("postTitle"),
-        postContent: document.getElementById("postContent"),
-        postFiles: document.getElementById("postFiles"),
-        submitPostBtn: document.getElementById("submitPostBtn"),
-        formMessage: document.getElementById("formMessage"),
-        postsContainer: document.getElementById("postsContainer"),
-        refreshBtn: document.getElementById("refreshBtn"),
-        adminFilesCard: document.getElementById("adminFilesCard"),
-        adminFilesContainer: document.getElementById("adminFilesContainer"),
-        refreshAdminFilesBtn: document.getElementById("refreshAdminFilesBtn"),
-        editModal: document.getElementById("editModal"),
-        editForm: document.getElementById("editForm"),
-        editPostId: document.getElementById("editPostId"),
-        editTitle: document.getElementById("editTitle"),
-        editContent: document.getElementById("editContent"),
-        closeEditModal: document.getElementById("closeEditModal"),
-        cancelEdit: document.getElementById("cancelEdit")
-      };
-
-      // 工具函数
-      function formatTime(timestamp) {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleString("zh-CN");
-      }
-
-      function getAvatarLetter(username) {
-        return username ? username.charAt(0).toUpperCase() : "?";
-      }
-
-      function showMessage(message, type = "error") {
-        const baseClasses = "mt-3 flex items-center gap-2 rounded-md px-3 py-2 text-xs sm:text-sm border";
-        const isSuccess = type === "success";
-        const iconName = isSuccess ? "check-circle-2" : "alert-circle";
-        const classes = isSuccess
-          ? "bg-green-50 border-green-200 text-green-700"
-          : "bg-red-50 border-red-200 text-red-700";
-
-        elements.formMessage.innerHTML = `
-          <span class="inline-flex items-center justify-center w-4 h-4 sm:w-4 sm:h-4">
-            <i data-lucide="${iconName}" class="w-4 h-4"></i>
-          </span>
-          <span>${escapeHtml(message)}</span>
-        `;
-        elements.formMessage.className = baseClasses + " " + classes;
-        elements.formMessage.classList.remove("hidden");
-        setTimeout(() => {
-          elements.formMessage.classList.add("hidden");
-        }, 5000);
-
-        if (window.lucide && typeof window.lucide.createIcons === "function") {
-          window.lucide.createIcons();
-        }
-      }
-
-      async function authFetch(url, options = {}) {
-        const headers = new Headers(options.headers || {});
-        const token = auth.getToken();
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-        const isAbsoluteUrl = /^https?:\/\//i.test(url);
-        const base = (auth.authServer || "").replace(/\/+$/, "");
-        const path = String(url || "");
-        const finalUrl = isAbsoluteUrl
-          ? path
-          : `${base}${path.startsWith("/") ? path : `/${path}`}`;
-        return fetch(finalUrl, { ...options, headers });
-      }
-
-      /** 将 API 返回的相对路径与 authServer 拼成浏览器可用的绝对 URL */
-      function resolveAppUrl(pathOrUrl) {
-        if (!pathOrUrl) return "#";
-        if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-        const base = (auth.authServer || "").replace(/\/+$/, "");
-        return `${base}${pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`}`;
-      }
-
-      function formatFileSize(size) {
-        const units = ["B", "KB", "MB", "GB"];
-        let value = Number(size || 0);
-        let unitIndex = 0;
-        while (value >= 1024 && unitIndex < units.length - 1) {
-          value /= 1024;
-          unitIndex += 1;
-        }
-        return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-      }
-
-      async function uploadFile(file) {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (auth.appId) {
-          formData.append("appId", auth.appId);
-        }
-        const res = await authFetch("/api/files/upload", {
-          method: "POST",
-          body: formData
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data.error || "上传失败");
-        }
-        return data;
-      }
-
-      async function deleteFileById(fileId) {
-        const res = await authFetch(`/api/files/${encodeURIComponent(fileId)}`, {
-          method: "DELETE"
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data.error || "删除文件失败");
-        }
-      }
-
-      function collectPostFileIds(postData) {
-        const ids = new Set();
-        const attachments = Array.isArray(postData.attachments) ? postData.attachments : [];
-        for (const item of attachments) {
-          if (item && item.fileId) {
-            ids.add(item.fileId);
-          }
-        }
-        const comments = postData.comments || {};
-        for (const userComments of Object.values(comments)) {
-          if (!userComments || typeof userComments !== "object") continue;
-          for (const comment of Object.values(userComments)) {
-            if (!comment || typeof comment !== "object") continue;
-            if (comment.image && comment.image.fileId) {
-              ids.add(comment.image.fileId);
-            }
-          }
-        }
-        return Array.from(ids);
-      }
-
-      async function detectAdminStatus() {
-        if (!state.user) {
-          state.isAdmin = false;
-          return false;
-        }
-        try {
-          const appId = auth.appId;
-          const res = await authFetch(`/api/app/${appId}`);
-          const data = await res.json().catch(() => ({}));
-          state.isAdmin = Boolean(data.isAdmin);
-          return state.isAdmin;
-        } catch {
-          state.isAdmin = false;
-          return false;
-        }
-      }
-
-      // 用户状态管理
-      function updateUserUI() {
-        if (state.user) {
-          elements.guestView.classList.add("hidden");
-          elements.userView.classList.remove("hidden");
-          elements.usernameDisplay.textContent = state.user.username;
-          elements.userAvatar.textContent = getAvatarLetter(state.user.username);
-          elements.postFormCard.classList.remove("hidden");
-          const status = document.getElementById("userStatusText");
-          if (status) {
-            status.textContent = "已登录，可发帖与互动";
-          }
-          if (state.isAdmin) {
-            elements.adminFilesCard.classList.remove("hidden");
-          } else {
-            elements.adminFilesCard.classList.add("hidden");
-          }
+      function renderUser(user) {
+        if (user) {
+          userEl.textContent = `${user.displayName ?? user.username}`;
+          btnLogin.hidden = true;
+          btnLogout.hidden = false;
+          composer.hidden = false;
         } else {
-          elements.guestView.classList.remove("hidden");
-          elements.userView.classList.add("hidden");
-          elements.postFormCard.classList.add("hidden");
-          const status = document.getElementById("userStatusText");
-          if (status) {
-            status.textContent = "请先登录以发帖和互动";
-          }
-          elements.adminFilesCard.classList.add("hidden");
+          userEl.textContent = "未登录";
+          btnLogin.hidden = false;
+          btnLogout.hidden = true;
+          composer.hidden = true;
         }
       }
 
-      // 加载帖子列表
-      async function loadPosts() {
+      function renderPosts(records) {
+        list.innerHTML = "";
+        for (const r of records) {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <p class="title"></p>
+            <p class="meta"></p>
+            <p style="margin: 4px 0 0; color: var(--ink-700);"></p>
+          `;
+          li.querySelector(".title").textContent = r.data.title ?? "(无标题)";
+          li.querySelector(".meta").textContent = `${r.ownerId ?? "anonymous"} · ${new Date(r.createdAt * 1000).toLocaleString()}`;
+          li.querySelector("p:last-child").textContent = r.data.content ?? "";
+          list.appendChild(li);
+        }
+      }
+
+      async function reload() {
         try {
-          // 使用 SDK 的 query 方法
-          const result = await auth.query({
-            data_type: "post"
-          });
-          state.posts = result.items || [];
-          renderPosts();
+          const res = await uniid.from("post").orderBy({ createdAt: "desc" }).limit(20).run();
+          renderPosts(res.records);
         } catch (err) {
-          console.error("加载帖子失败:", err);
-          elements.postsContainer.innerHTML = `
-            <div
-              class="flex flex-col items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50/60 px-6 py-10 text-center text-red-600">
-              <div
-                class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-red-500">
-                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-              </div>
-              <div class="text-sm">加载失败，请稍后重试</div>
-            </div>
-          `;
-          if (window.lucide && typeof window.lucide.createIcons === "function") {
-            window.lucide.createIcons();
-          }
+          console.warn("加载文章失败：", err);
         }
       }
 
-      // 渲染帖子列表
-      function renderPosts() {
-        if (state.posts.length === 0) {
-          elements.postsContainer.innerHTML = `
-            <div
-              class="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-slate-500">
-              <div
-                class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm text-slate-400">
-                <i data-lucide="file-text" class="w-6 h-6"></i>
-              </div>
-              <div class="text-sm">暂无帖子，快来发表第一篇吧！</div>
-            </div>
-          `;
-          if (window.lucide && typeof window.lucide.createIcons === "function") {
-            window.lucide.createIcons();
-          }
-          return;
-        }
-
-        elements.postsContainer.innerHTML = state.posts.map(post => {
-          const data = post.data || {};
-          const isOwner = state.user && post.owner_id === state.user.id;
-          const comments = data.comments || {};
-          // 计算嵌套结构的评论数量
-          let commentCount = 0;
-          for (const userComments of Object.values(comments)) {
-            if (userComments && typeof userComments === "object") {
-              commentCount += Object.keys(userComments).length;
-            }
-          }
-          const likes = data.likes || {};
-          const attachments = Array.isArray(data.attachments) ? data.attachments : [];
-          const likeCount = Object.keys(likes).length;
-          const userLiked = state.user && likes[state.user.id];
-
-          return `
-            <div
-              class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition duration-150 p-4 sm:p-5 space-y-3"
-              data-post-id="${post.id}">
-              <div class="flex items-start justify-between gap-3">
-                <div class="space-y-1">
-                  <h3 class="m-0 text-sm sm:text-base font-semibold text-slate-900">
-                    ${escapeHtml(data.title || "无标题")}
-                  </h3>
-                  <div class="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-slate-500">
-                    <span class="font-medium text-sky-600">@${escapeHtml(post.owner_name || "未知用户")}</span>
-                    <span>·</span>
-                    <span>${formatTime(post.created_at)}</span>
-                  </div>
-                </div>
-                ${isOwner ? `
-                  <div class="flex items-center gap-2">
-                    <button
-                      class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] sm:text-xs text-slate-600 hover:bg-slate-50 transition"
-                      onclick="editPost('${post.id}')">
-                      <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                      <span>编辑</span>
-                    </button>
-                    <button
-                      class="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[11px] sm:text-xs text-red-600 hover:bg-red-100 transition"
-                      onclick="deletePost('${post.id}')">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                      <span>删除</span>
-                    </button>
-                  </div>
-                ` : ""}
-              </div>
-              <div class="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                ${escapeHtml(data.content || "")}
-              </div>
-              ${renderPostImages(attachments)}
-              ${renderPostFileAttachments(attachments)}
-              <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 mt-1">
-                <button
-                  class="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] sm:text-xs font-medium border ${userLiked
-              ? "bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
-              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"} transition"
-                  onclick="toggleLike('${post.id}')">
-                  <i data-lucide="heart" class="w-4 h-4"></i>
-                  <span>点赞 (${likeCount})</span>
-                </button>
-                <button
-                  class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] sm:text-xs text-slate-600 hover:bg-slate-50 transition"
-                  onclick="toggleComments('${post.id}')">
-                  <i data-lucide="message-circle" class="w-4 h-4"></i>
-                  <span>评论 (${commentCount})</span>
-                </button>
-              </div>
-              <div
-                id="comments-${post.id}"
-                class="hidden mt-3 border-t border-slate-100 pt-3 space-y-2">
-                <div class="text-[11px] sm:text-xs font-semibold text-slate-500 mb-1">
-                  评论 (${commentCount})
-                </div>
-                ${renderComments(comments)}
-                ${state.user ? `
-                  <div class="space-y-2 mt-1">
-                    <div class="flex items-center gap-2">
-                      <input
-                        type="text"
-                        id="comment-input-${post.id}"
-                        placeholder="写下你的评论..."
-                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
-                      />
-                      <button
-                        class="inline-flex items-center gap-1 rounded-full bg-sky-500 px-3 py-1 text-[11px] sm:text-xs font-medium text-white shadow-sm hover:bg-sky-600 transition"
-                        onclick="addComment('${post.id}')">
-                        <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                        <span>发送</span>
-                      </button>
-                    </div>
-                    <input
-                      type="file"
-                      id="comment-image-${post.id}"
-                      class="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] sm:text-xs text-slate-900 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200"
-                    />
-                  </div>
-                ` : `
-                  <div
-                    class="mt-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] sm:text-xs text-amber-700">
-                    登录后可发表评论
-                  </div>
-                `}
-              </div>
-            </div>
-          `;
-        }).join("");
-
-        if (window.lucide && typeof window.lucide.createIcons === "function") {
-          window.lucide.createIcons();
-        }
-      }
-
-      function isImageAttachment(item) {
-        return item && /^image\//i.test(item.mimeType || "");
-      }
-
-      /** 帖子内图片：附件中的图片在正文下直接渲染 */
-      function renderPostImages(attachments) {
-        if (!Array.isArray(attachments) || attachments.length === 0) {
-          return "";
-        }
-        const images = attachments.filter(isImageAttachment);
-        if (images.length === 0) return "";
-
-        return `
-          <div class="space-y-2 mt-2">
-            <div class="text-[11px] sm:text-xs font-semibold text-slate-500">图片 (${images.length})</div>
-            <div class="flex flex-wrap gap-2">
-              ${images.map(item => {
-                const src = resolveAppUrl(item.url || "");
-                const href = escapeHtml(src);
-                return `
-                <figure class="m-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden max-w-full">
-                  <a href="${href}" target="_blank" rel="noreferrer" class="block">
-                    <img
-                      src="${href}"
-                      alt="${escapeHtml(item.name || "图片")}"
-                      class="max-w-full max-h-96 w-auto object-contain block mx-auto"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </a>
-                  ${item.name ? `
-                    <figcaption class="px-2 py-1 text-[10px] text-slate-500 truncate border-t border-slate-100 bg-white">
-                      ${escapeHtml(item.name)}
-                    </figcaption>
-                  ` : ""}
-                </figure>
-              `;
-              }).join("")}
-            </div>
-          </div>
-        `;
-      }
-
-      /** 非图片附件：列表下载 */
-      function renderPostFileAttachments(attachments) {
-        if (!Array.isArray(attachments) || attachments.length === 0) {
-          return "";
-        }
-        const files = attachments.filter(
-          (item) => item && !isImageAttachment(item)
-        );
-        if (files.length === 0) return "";
-
-        return `
-          <div class="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 mt-2">
-            <div class="text-[11px] sm:text-xs font-semibold text-slate-500">附件 (${files.length})</div>
-            <div class="space-y-1.5">
-              ${files.map(item => `
-                <a
-                  href="${escapeHtml(resolveAppUrl(item.url || ""))}"
-                  target="_blank"
-                  rel="noreferrer"
-                  class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] sm:text-xs text-slate-700 hover:bg-slate-50 transition">
-                  <span class="truncate pr-2">${escapeHtml(item.name || "未命名文件")}</span>
-                  <span class="text-slate-400">${formatFileSize(item.size || 0)}</span>
-                </a>
-              `).join("")}
-            </div>
-          </div>
-        `;
-      }
-
-      function renderComments(comments) {
-        // 处理嵌套结构：comments[userId][commentId] = commentData
-        const flatComments = [];
-        for (const [userId, userComments] of Object.entries(comments)) {
-          if (userComments && typeof userComments === "object") {
-            for (const [commentId, comment] of Object.entries(userComments)) {
-              if (comment && typeof comment === "object") {
-                flatComments.push({
-                  ...comment,
-                  _userId: userId,
-                  _commentId: commentId
-                });
-              }
-            }
-          }
-        }
-
-        // 按时间排序
-        flatComments.sort((a, b) => (a.time || 0) - (b.time || 0));
-
-        if (flatComments.length === 0) {
-          return `
-            <div class="text-[11px] sm:text-xs text-slate-400 py-1">
-              暂无评论
-            </div>
-          `;
-        }
-
-        return flatComments.map(comment => `
-          <div
-            class="bg-slate-50 rounded-md border border-slate-200 px-3 py-2 space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] sm:text-xs font-semibold text-sky-600">
-                @${escapeHtml(comment.username || comment._userId)}
-              </span>
-              <span class="text-[10px] sm:text-[11px] text-slate-400">
-                ${formatTime(comment.time)}
-              </span>
-            </div>
-            <div class="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap">
-              ${escapeHtml(comment.content || "")}
-            </div>
-            ${comment.image ? `
-              <div class="mt-1.5 rounded-md border border-slate-200 bg-white overflow-hidden max-w-[min(100%,20rem)]">
-                <a href="${escapeHtml(resolveAppUrl(comment.image.url || ""))}" target="_blank" rel="noreferrer" class="block">
-                  <img
-                    src="${escapeHtml(resolveAppUrl(comment.image.url || ""))}"
-                    alt="${escapeHtml(comment.image.name || "评论图片")}"
-                    class="w-full max-h-56 object-contain bg-slate-50"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </a>
-                ${comment.image.name ? `
-                  <div class="px-2 py-1 text-[10px] text-slate-500 truncate border-t border-slate-100">
-                    ${escapeHtml(comment.image.name)}
-                  </div>
-                ` : ""}
-              </div>
-            ` : ""}
-          </div>
-        `).join("");
-      }
-
-      function escapeHtml(text) {
-        if (!text) return "";
-        const div = document.createElement("div");
-        div.textContent = text;
-        return div.innerHTML;
-      }
-
-      function renderAdminFiles() {
-        if (!state.isAdmin) {
-          elements.adminFilesCard.classList.add("hidden");
-          return;
-        }
-        elements.adminFilesCard.classList.remove("hidden");
-        if (!Array.isArray(state.adminFiles) || state.adminFiles.length === 0) {
-          elements.adminFilesContainer.innerHTML = `
-            <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-slate-400">
-              暂无文件
-            </div>
-          `;
-          return;
-        }
-
-        elements.adminFilesContainer.innerHTML = state.adminFiles.map(file => `
-          <div class="rounded-lg border border-slate-200 bg-white px-3 py-2.5 space-y-1.5">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-medium text-slate-800 truncate">${escapeHtml(file.originalName || "未命名文件")}</span>
-              <button
-                class="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] text-red-600 hover:bg-red-100 transition"
-                onclick="deleteManagedFile('${file.id}')">
-                <i data-lucide="trash-2" class="w-3 h-3"></i>
-                <span>删除</span>
-              </button>
-            </div>
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-slate-500">
-              <span>用户: @${escapeHtml(file.ownerName || file.ownerId || "-")}</span>
-              <span>大小: ${formatFileSize(file.size || 0)}</span>
-            </div>
-          </div>
-        `).join("");
-
-        if (window.lucide && typeof window.lucide.createIcons === "function") {
-          window.lucide.createIcons();
-        }
-      }
-
-      async function loadAdminFiles() {
-        if (!state.user || !state.isAdmin) return;
+      btnLogin.onclick = async () => {
         try {
-          const res = await authFetch("/api/files?scope=all");
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            throw new Error(data.error || "加载失败");
-          }
-          state.adminFiles = Array.isArray(data.items) ? data.items : [];
-          renderAdminFiles();
+          const u = await uniid.auth.login();
+          renderUser(u);
+          await reload();
         } catch (err) {
-          console.error("加载管理员文件失败:", err);
-          elements.adminFilesContainer.innerHTML = `
-            <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-              文件列表加载失败
-            </div>
-          `;
+          console.warn(err);
         }
-      }
+      };
 
-      // 发帖
-      elements.postForm.onsubmit = async (e) => {
-        e.preventDefault();
-        if (!state.user) {
-          showMessage("请先登录");
-          return;
-        }
+      btnLogout.onclick = async () => {
+        await uniid.auth.logout();
+        renderUser(null);
+      };
 
-        const title = elements.postTitle.value.trim();
-        const content = elements.postContent.value.trim();
-        const selectedFiles = Array.from(elements.postFiles.files || []);
-
-        if (!title || !content) {
-          showMessage("标题和内容不能为空");
-          return;
-        }
-
-        elements.submitPostBtn.disabled = true;
-        elements.submitPostBtn.textContent = "发布中...";
-
+      btnPublish.onclick = async () => {
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!title) { msg.textContent = "标题不能为空"; return; }
+        btnPublish.disabled = true;
+        msg.textContent = "发布中...";
         try {
-          const attachments = [];
-          for (const file of selectedFiles) {
-            const uploaded = await uploadFile(file);
-            attachments.push({
-              fileId: uploaded.id,
-              name: uploaded.originalName,
-              mimeType: uploaded.mimeType,
-              size: uploaded.size,
-              url: uploaded.downloadUrl
-            });
-          }
-
-          const data = {
-            title,
-            content,
-            likes: {},
-            comments: {},
-            attachments
-          };
-
-          // 注意：在新的架构下，permissions 字段现在是可选的覆盖项 (permissionOverride)
-          // 如果不传，将自动使用 DataSchema 中定义的默认权限。
-          // 这里我们传入覆盖项以演示字段级控制。
-          const permissions = {
-            fields: {
-              "title": { read: ["$public"], update: ["$owner"] },
-              "content": { read: ["$public"], update: ["$owner"] },
-              "likes": {
-                read: ["$public"],
-                create: ["$dynamic:likes.$user"],
-                delete: ["$dynamic:likes.$user"]
-              },
-              "comments": {
-                read: ["$public"],
-                create: ["$dynamic:comments.$user"],
-                update: ["$dynamic:comments.$user.userId"]
-              },
-              "attachments": {
-                read: ["$public"],
-                create: ["$owner"],
-                update: ["$owner"]
-              }
-            }
-          };
-
-          await auth.create("post", data, permissions);
-          showMessage("发布成功！", "success");
-          elements.postTitle.value = "";
-          elements.postContent.value = "";
-          elements.postFiles.value = "";
-          await loadPosts();
-          if (state.isAdmin) {
-            await loadAdminFiles();
-          }
+          await uniid.from("post").insert({ title, content });
+          titleInput.value = ""; contentInput.value = "";
+          msg.textContent = "已发布";
+          await reload();
         } catch (err) {
-          console.error("发帖失败:", err);
-          showMessage("发布失败: " + (err.message || "未知错误"));
+          msg.textContent = err?.message ?? "发布失败";
         } finally {
-          elements.submitPostBtn.disabled = false;
-          elements.submitPostBtn.textContent = "发布帖子";
+          btnPublish.disabled = false;
         }
       };
 
-      // 编辑帖子
-      window.editPost = (postId) => {
-        const post = state.posts.find(p => p.id === postId);
-        if (!post) return;
+      // 启动
+      renderUser(uniid.auth.user);
+      uniid.auth.onChange(renderUser);
+      uniid.auth.check().catch(() => {});
+      reload();
 
-        state.editingPostId = postId;
-        elements.editPostId.value = postId;
-        elements.editTitle.value = post.data.title || "";
-        elements.editContent.value = post.data.content || "";
-        elements.editModal.classList.remove("hidden");
-      };
-
-      elements.closeEditModal.onclick = () => {
-        elements.editModal.classList.add("hidden");
-        state.editingPostId = null;
-      };
-
-      elements.cancelEdit.onclick = () => {
-        elements.editModal.classList.add("hidden");
-        state.editingPostId = null;
-      };
-
-      elements.editForm.onsubmit = async (e) => {
-        e.preventDefault();
-        if (!state.editingPostId) return;
-
-        const title = elements.editTitle.value.trim();
-        const content = elements.editContent.value.trim();
-
-        try {
-          await auth.update(state.editingPostId, { title, content });
-          showMessage("修改成功！", "success");
-          elements.editModal.classList.add("hidden");
-          state.editingPostId = null;
-          await loadPosts();
-        } catch (err) {
-          console.error("编辑失败:", err);
-          showMessage("编辑失败: " + (err.message || "未知错误"));
-        }
-      };
-
-      // 删除帖子
-      window.deletePost = async (postId) => {
-        if (!confirm("确定要删除这篇帖子吗？此操作不可恢复。")) return;
-
-        try {
-          const post = state.posts.find((item) => item.id === postId);
-          const fileIds = post ? collectPostFileIds(post.data || {}) : [];
-          const deleteErrors = [];
-          for (const fileId of fileIds) {
-            try {
-              await deleteFileById(fileId);
-            } catch (fileErr) {
-              deleteErrors.push(fileId);
-              console.warn("删除关联文件失败:", fileId, fileErr);
-            }
-          }
-          await auth.delete(postId);
-          if (deleteErrors.length > 0) {
-            showMessage(`帖子已删除，但有 ${deleteErrors.length} 个附件删除失败，请管理员在文件管理中处理`, "error");
-          } else {
-            showMessage("删除成功！", "success");
-          }
-          await loadPosts();
-          if (state.isAdmin) {
-            await loadAdminFiles();
-          }
-        } catch (err) {
-          console.error("删除失败:", err);
-          showMessage("删除失败: " + (err.message || "未知错误"));
-        }
-      };
-
-      // 点赞功能
-      window.toggleLike = async (postId) => {
-        if (!state.user) {
-          showMessage("请先登录");
-          return;
-        }
-
-        try {
-          const post = state.posts.find(p => p.id === postId);
-          if (!post) return;
-
-          const likes = { ...(post.data.likes || {}) };
-          const userId = state.user.id;
-
-          if (likes[userId]) {
-            // 注意：这里删除字段也需要权限校验
-            delete likes[userId];
-          } else {
-            // time 将由后端 autoFill 自动填充，前端传 0 即可
-            likes[userId] = { time: 0 };
-          }
-
-          await auth.update(postId, { likes });
-          await loadPosts();
-        } catch (err) {
-          console.error("点赞失败:", err);
-          showMessage("操作失败: " + (err.message || "未知错误"));
-        }
-      };
-
-      // 评论功能
-      window.toggleComments = (postId) => {
-        const commentsSection = document.getElementById(`comments-${postId}`);
-        if (commentsSection) {
-          commentsSection.classList.toggle("hidden");
-        }
-      };
-
-      window.addComment = async (postId) => {
-        if (!state.user) {
-          showMessage("请先登录");
-          return;
-        }
-
-        const input = document.getElementById(`comment-input-${postId}`);
-        const imageInput = document.getElementById(`comment-image-${postId}`);
-        const content = input.value.trim();
-        const imageFile = imageInput && imageInput.files ? imageInput.files[0] : null;
-
-        if (!content && !imageFile) {
-          showMessage("评论内容和图片至少填写一项");
-          return;
-        }
-
-        try {
-          const post = state.posts.find(p => p.id === postId);
-          if (!post) return;
-
-          // 使用嵌套结构：comments[userId][commentId] = commentData
-          const comments = { ...(post.data.comments || {}) };
-          if (!comments[state.user.id]) {
-            comments[state.user.id] = {};
-          }
-          const commentId = `${Date.now()}`;
-          let image = null;
-          if (imageFile) {
-            const uploaded = await uploadFile(imageFile);
-            image = {
-              fileId: uploaded.id,
-              name: uploaded.originalName,
-              mimeType: uploaded.mimeType,
-              size: uploaded.size,
-              url: uploaded.downloadUrl
-            };
-          }
-
-          // userId, username, time 将由后端 autoFill 自动填充，前端传占位符即可
-          comments[state.user.id][commentId] = {
-            userId: state.user.id,
-            username: state.user.username,
-            content,
-            time: 0,
-            image
-          };
-
-          await auth.update(postId, { comments });
-          input.value = "";
-          if (imageInput) {
-            imageInput.value = "";
-          }
-          await loadPosts();
-          if (state.isAdmin) {
-            await loadAdminFiles();
-          }
-
-          // 保持评论区展开
-          setTimeout(() => {
-            const commentsSection = document.getElementById(`comments-${postId}`);
-            if (commentsSection) commentsSection.classList.remove("hidden");
-          }, 100);
-        } catch (err) {
-          console.error("评论失败:", err);
-          showMessage("评论失败: " + (err.message || "未知错误"));
-        }
-      };
-
-      // 登录/退出
-      elements.loginButton.onclick = async () => {
-        elements.loginButton.disabled = true;
-        elements.loginButton.textContent = "登录中...";
-
-        try {
-          const result = await auth.login();
-          if (result && result.user) {
-            state.user = result.user;
-            localStorage.setItem("demo_user", JSON.stringify(result.user));
-            await detectAdminStatus();
-            updateUserUI();
-
-            // 登录后检查并同步 Schema
-            await syncSchemaIfNeeded();
-
-            await loadPosts();
-            await loadAdminFiles();
-          }
-        } catch (err) {
-          console.error("登录失败:", err);
-          showMessage("登录失败");
-        } finally {
-          elements.loginButton.disabled = false;
-          elements.loginButton.textContent = "登录 / 授权";
-        }
-      };
-
-      // 同步 Schema 逻辑
-      async function syncSchemaIfNeeded() {
-        if (!state.user) return;
-
-        try {
-          // 1. 检查是否是应用管理员
-          const authServer = auth.authServer;
-          const appId = auth.appId;
-
-          if (!authServer || !appId) {
-            console.error("无法获取 SDK 配置信息", { authServer, appId });
-            return;
-          }
-
-          const adminCheck = await fetch(`${authServer}/api/app/${appId}`, {
-            headers: {
-              'Authorization': `Bearer ${auth.getToken()}`
-            }
-          }).then(res => res.json());
-
-          if (!adminCheck.isAdmin) {
-            state.isAdmin = false;
-            return;
-          }
-          state.isAdmin = true;
-
-          console.log("检测到应用管理员身份，正在同步数据验证规则...");
-
-          // 2. 定义 demo 帖子的预期 Schema
-          const expectedSchema = {
-            type: "object",
-            required: ["title", "content"],
-            autoFill: {
-              "likes.$user.time": "$serverTime",
-              "comments.$user.*.time": "$serverTime",
-              "comments.$user.*.userId": "$userId",
-              "comments.$user.*.username": "$username"
-            },
-            properties: {
-              title: { type: "string", minLength: 1, maxLength: 100 },
-              content: { type: "string", minLength: 1, maxLength: 5000 },
-              likes: {
-                type: "object",
-                additionalProperties: {
-                  type: "object",
-                  required: ["time"],
-                  properties: {
-                    time: { type: "integer", minimum: 0 }
-                  }
-                }
-              },
-              comments: {
-                type: "object",
-                additionalProperties: {
-                  type: "object",
-                  additionalProperties: {
-                    type: "object",
-                    required: ["userId", "username", "time"],
-                    properties: {
-                      userId: { type: "string" },
-                      username: { type: "string" },
-                      content: { type: "string", minLength: 0, maxLength: 500 },
-                      image: {
-                        type: ["object", "null"],
-                        required: ["fileId", "name", "mimeType", "size", "url"],
-                        properties: {
-                          fileId: { type: "string" },
-                          name: { type: "string" },
-                          mimeType: { type: "string" },
-                          size: { type: "integer", minimum: 0 },
-                          url: { type: "string" }
-                        }
-                      },
-                      time: { type: "integer", minimum: 0 }
-                    }
-                  }
-                }
-              },
-              attachments: {
-                type: "array",
-                items: {
-                  type: "object",
-                  required: ["fileId", "name", "mimeType", "size", "url"],
-                  properties: {
-                    fileId: { type: "string" },
-                    name: { type: "string" },
-                    mimeType: { type: "string" },
-                    size: { type: "integer", minimum: 0 },
-                    url: { type: "string" }
-                  }
-                }
-              }
-            }
-          };
-
-          // 定义默认权限配置 (新架构：类型级权限)
-          const defaultPermissions = {
-            default: {
-              read: ["$public"],
-              create: ["$public"],
-              update: ["$owner"],
-              delete: ["$owner"]
-            }
-          };
-
-          // 3. 获取当前 Schema 进行比对
-          let currentSchema = null;
-          let currentDefaultPermissions = null;
-          try {
-            const res = await fetch(`${authServer}/api/schema/${appId}/post`, {
-              headers: {
-                'Authorization': `Bearer ${auth.getToken()}`
-              }
-            });
-            if (res.ok) {
-              const data = await res.json();
-              currentSchema = data.schema;
-              currentDefaultPermissions = data.defaultPermissions;
-            }
-          } catch (e) {
-            // 可能尚未定义 Schema
-          }
-
-          // 4. 如果不一致或不存在，则更新
-          const schemaChanged = JSON.stringify(currentSchema) !== JSON.stringify(expectedSchema);
-          const permsChanged = JSON.stringify(currentDefaultPermissions) !== JSON.stringify(defaultPermissions);
-
-          if (schemaChanged || permsChanged) {
-            const updateRes = await fetch(`${authServer}/api/schema/${appId}/post`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${auth.getToken()}`
-              },
-              body: JSON.stringify({
-                schema: expectedSchema,
-                defaultPermissions: defaultPermissions,
-                description: "Demo Blog 帖子的标准验证规则与默认权限 (自动同步)",
-                isActive: true
-              })
-            });
-
-            if (updateRes.ok) {
-              console.log("数据验证规则同步成功");
-              showMessage("已自动同步最新的数据验证规则", "success");
-            } else {
-              const errData = await updateRes.json();
-              console.error("数据验证规则同步失败:", errData);
-            }
-          }
-        } catch (err) {
-          console.error("同步 Schema 出错:", err);
-        }
-      }
-
-      elements.logoutButton.onclick = async () => {
-        try {
-          await auth.revoke();
-          state.user = null;
-          state.isAdmin = false;
-          state.adminFiles = [];
-          localStorage.removeItem("demo_user");
-          updateUserUI();
-          await loadPosts();
-        } catch (err) {
-          console.error("退出失败:", err);
-        }
-      };
-
-      elements.refreshBtn.onclick = loadPosts;
-      elements.refreshAdminFilesBtn.onclick = loadAdminFiles;
-
-      window.deleteManagedFile = async (fileId) => {
-        if (!state.user || !state.isAdmin) return;
-        if (!confirm("确定删除该文件吗？删除后不可恢复。")) return;
-        try {
-          await deleteFileById(fileId);
-          showMessage("文件删除成功", "success");
-          await loadAdminFiles();
-          await loadPosts();
-        } catch (err) {
-          console.error("管理员删除文件失败:", err);
-          showMessage("删除失败: " + (err.message || "未知错误"));
-        }
-      };
-
-      // 初始化
-      function init() {
-        // 从 SDK 恢复用户状态（与 token 同步）
-        state.user = auth.getUser();
-
-        // 调试信息
-        console.log("SDK Token:", auth.getToken());
-        console.log("SDK User:", auth.getUser());
-        console.log("Is Authenticated:", auth.isAuthenticated());
-
-        // 如果 SDK 没有用户，清除 localStorage
-        if (!state.user) {
-          localStorage.removeItem("demo_user");
-        }
-        Promise.resolve()
-          .then(async () => {
-            await detectAdminStatus();
-            updateUserUI();
-            await loadPosts();
-            await loadAdminFiles();
-          })
-          .catch((err) => {
-            console.error("初始化失败:", err);
-            updateUserUI();
-            loadPosts();
-          });
-      }
-
-      init();
-    })();
-  </script>
-</body>
-
+      // Realtime
+      try {
+        const ch = uniid.realtime.channel("records:post");
+        ch.on("insert", reload);
+        ch.on("update", reload);
+        ch.on("delete", reload);
+        ch.subscribe();
+      } catch {}
+    </script>
+  </body>
 </html>

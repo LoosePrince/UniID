@@ -1,437 +1,362 @@
 "use client";
 
-import { PrimaryButton } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+/**
+ * UniID Embed 授权页（米色版）
+ *
+ * 协议（与 SDK 严格同步，不变）：
+ *   parent → iframe : { type: "uniid_authorize_request", appId }
+ *   iframe → parent : { type: "uniid_ready", appId }              // 子端就绪
+ *   iframe → parent : { type: "uniid_login_success", token, ... }
+ *   iframe → parent : { type: "uniid_login_cancel", appId }
+ *   iframe → parent : { type: "uniid_resize", height }
+ *
+ * 可信链：parent_origin 仅取自浏览器生成的 event.origin，不信任 URL/event.data。
+ */
+
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { CheckCircle2, Globe, Lock, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Button, Spinner } from "@/ui/primitives";
 
-type Step = "idle" | "checking" | "authorize" | "done";
+type Step = "boot" | "checking" | "needs_login" | "ready_to_authorize" | "authorizing" | "done" | "cancelled" | "error";
 
-interface EmbedUser {
+interface UserShape {
   id: string;
   username: string;
   role: string;
+  displayName?: string | null;
 }
-
-interface EmbedApp {
+interface AppShape {
   id: string;
   name: string;
   description: string | null;
-  domain: string;
+  primaryDomain: string;
 }
 
-function EmbedPageContent() {
-  const searchParams = useSearchParams();
-  const appId = searchParams.get("app_id") ?? "";
-  // parentOrigin 仅从 postMessage 的 event.origin 获取（浏览器生成，可信），不使用 URL 或 event.data
-  const [parentOrigin, setParentOrigin] = useState<string | null>(null);
+function EmbedView() {
+  const params = useSearchParams();
+  const appId = params.get("app_id") ?? "";
 
-  const [step, setStep] = useState<Step>("idle");
-  const [user, setUser] = useState<EmbedUser | null>(null);
-  const [app, setApp] = useState<EmbedApp | null>(null);
-  const [isAppAdmin, setIsAppAdmin] = useState<boolean>(false);
+  const [parentOrigin, setParentOrigin] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>("boot");
+  const [user, setUser] = useState<UserShape | null>(null);
+  const [app, setApp] = useState<AppShape | null>(null);
   const [authType, setAuthType] = useState<"full" | "restricted">("restricted");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [cancelled, setCancelled] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [showAuthTypeChoice, setShowAuthTypeChoice] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
-  // 始终根据内容实际高度向父页面报告高度，在高度变化后可多次上报
+  // Auto resize broadcast to parent.
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    const content = document.getElementById("auth-content");
-    if (!content) return;
-
-    const reportHeight = () => {
-      const card =
-        (content.querySelector(".rounded-2xl") as HTMLElement | null) ||
-        (content.firstElementChild as HTMLElement | null);
-      const height = card
-        ? card.getBoundingClientRect().height
-        : content.scrollHeight;
-
-      window.parent.postMessage(
-        { type: "uniid_resize", height },
-        "*"
-      );
+    const el = contentRef.current;
+    if (!el) return;
+    const report = () => {
+      const card = el.querySelector("[data-card]") as HTMLElement | null;
+      const height = card ? card.getBoundingClientRect().height : el.scrollHeight;
+      window.parent.postMessage({ type: "uniid_resize", height }, "*");
     };
+    report();
+    const ro = new ResizeObserver(() => requestAnimationFrame(report));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [step]);
 
-    // 首次渲染后立即上报一次
-    reportHeight();
-
-    // 优先使用 ResizeObserver 监听内容尺寸变化
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => {
-        // 使用 rAF 合并同一帧内的多次回调
-        window.requestAnimationFrame(reportHeight);
-      });
-      observer.observe(content);
-
-      return () => {
-        observer.disconnect();
-      };
-    }
-
-    // 降级方案：仅在窗口尺寸变化时重算高度
-    const handleResize = () => {
-      reportHeight();
-    };
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
+  // Initial auth check + listen for SDK handshake.
   useEffect(() => {
-    let isMounted = true;
+    if (!appId) return;
+    let cancelled = false;
 
-    async function checkLoginAndMaybeRedirect(verifiedParentOrigin: string) {
-      console.log("[Embed] checkLoginAndMaybeRedirect started", { appId, verifiedParentOrigin, currentStep: step });
-      if (!appId || !verifiedParentOrigin) {
-        console.warn("[Embed] Missing appId or verifiedParentOrigin", { appId, verifiedParentOrigin });
-        return;
-      }
-
-      if (step !== "idle") {
-        console.log("[Embed] Skipping check, already in progress or done", { step });
-        return;
-      }
-
+    async function check() {
       setStep("checking");
       setError(null);
       try {
-        const checkUrl = `/api/auth/check?app_id=${encodeURIComponent(appId)}`;
-        console.log("[Embed] Fetching auth check", checkUrl);
-        const res = await fetch(checkUrl, {
-          method: "GET",
+        const res = await fetch(`/api/v1/auth/check?app_id=${encodeURIComponent(appId)}`, {
           credentials: "include"
         });
-        console.log("[Embed] Auth check response", { ok: res.ok, status: res.status });
+        const data = await res.json().catch(() => ({}));
+        if (cancelled) return;
 
-        if (!isMounted) {
-          console.log("[Embed] Component unmounted during fetch (but we will proceed if step is checking)");
+        if (data?.app) setApp(data.app);
+
+        if (res.ok && data?.valid && data?.user) {
+          setUser(data.user);
+          // 系统管理员或应用管理员可以选完整授权
+          const showChoice = data.user.role === "admin";
+          // 也可以再请求应用成员列表得知是不是 app admin（M5+ 加），这里简化
+          setShowAuthTypeChoice(showChoice);
+          setStep("ready_to_authorize");
+        } else {
+          setStep("needs_login");
         }
-
-        if (res.ok) {
-          const data = await res.json();
-          console.log("[Embed] Auth check data", data);
-          if (data.valid && data.user) {
-            setUser(data.user);
-            if (data.app) {
-              setApp(data.app);
-            }
-
-            try {
-              const adminUrl = `/api/app/${appId}`;
-              const adminRes = await fetch(adminUrl, {
-                method: "GET",
-                credentials: "include"
-              });
-              if (adminRes.ok) {
-                const adminData = await adminRes.json();
-                setIsAppAdmin(adminData.isAdmin || false);
-                if (adminData.isAdmin || data.user.role === "admin") {
-                  setAuthType("restricted");
-                }
-              }
-            } catch (e) {
-              console.error("[Embed] Admin check failed", e);
-            }
-
-            console.log("[Embed] Setting step to authorize");
-            setStep("authorize");
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("[Embed] Error during auth check", err);
-      }
-
-      console.log("[Embed] Redirecting to login");
-      const redirectTo = `/embed?app_id=${encodeURIComponent(appId)}`;
-      window.location.href = `/login?redirectTo=${encodeURIComponent(redirectTo)}`;
-    }
-
-    // 自动初始化逻辑：如果 URL 中有 appId 且处于 idle，直接开始检查
-    if (appId && step === "idle" && !cancelled) {
-      void checkLoginAndMaybeRedirect("*");
-    }
-
-    function handleMessage(event: MessageEvent) {
-      if (!event.data || typeof event.data !== "object") return;
-      const msgType = event.data.type;
-
-      // 处理 SDK 发来的授权请求
-      if (msgType === "uniid_authorize_request") {
-        console.log("[Embed] Received authorize request from", event.origin);
-        setParentOrigin(event.origin);
-        setIsReady(true);
+      } catch {
+        if (!cancelled) setStep("error");
       }
     }
 
-    window.addEventListener("message", handleMessage);
+    function onMessage(ev: MessageEvent) {
+      if (!ev.data || typeof ev.data !== "object") return;
+      if (ev.data.type === "uniid_authorize_request" && typeof ev.origin === "string") {
+        setParentOrigin(ev.origin);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    check();
     return () => {
-      console.log("[Embed] useEffect cleanup (unmounting)");
-      isMounted = false;
-      window.removeEventListener("message", handleMessage);
+      cancelled = true;
+      window.removeEventListener("message", onMessage);
     };
-  }, [appId, parentOrigin, step]);
+  }, [appId]);
 
+  // 当进入 ready_to_authorize 时，广播 ready
   useEffect(() => {
-    if (step === "authorize") {
-      console.log("[Embed] Step is authorize, broadcasting ready");
-      window.parent.postMessage({ type: "uniid_ready", appId: appId }, "*");
+    if (step === "ready_to_authorize") {
+      window.parent.postMessage({ type: "uniid_ready", appId }, "*");
     }
   }, [step, appId]);
 
-  async function handleAuthorize(e: React.FormEvent) {
-    e.preventDefault();
-    if (!appId || !parentOrigin) {
-      setError(!parentOrigin ? "未获取到父页面来源，请刷新后重试" : "缺少 app_id 参数");
+  function goLogin() {
+    const back = `/embed?app_id=${encodeURIComponent(appId)}`;
+    window.location.href = `/login?redirectTo=${encodeURIComponent(back)}`;
+  }
+
+  async function onAuthorize() {
+    if (!parentOrigin) {
+      setError("未能确认父页面来源，请刷新重试");
       return;
     }
-    setLoading(true);
-    setError(null);
+    setStep("authorizing");
     try {
-      const res = await fetch("/api/auth/authorize", {
+      const res = await fetch("/api/v1/auth/authorize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           app_id: appId,
           auth_type: authType,
           parent_origin: parentOrigin
         })
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "授权失败");
-        setLoading(false);
+        setError(data?.error?.message ?? "授权失败");
+        setStep("ready_to_authorize");
         return;
       }
-      const data = await res.json();
-
-      if (parentOrigin) {
-        window.parent.postMessage(
-          {
-            type: "uniid_login_success",
-            token: data.token,
-            user: data.user,
-            app_id: data.app_id,
-            auth_type: data.auth_type
-          },
-          parentOrigin
-        );
-      }
-
-      setStep("done");
-    } catch (err) {
-      console.error(err);
-      setError("网络错误，请稍后重试");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleCancelAuthorize() {
-    setCancelled(true);
-    setStep("idle");
-    if (parentOrigin) {
       window.parent.postMessage(
         {
-          type: "uniid_login_cancel",
-          app_id: appId
+          type: "uniid_login_success",
+          token: data.token,
+          refresh_token: data.refresh_token,
+          expires_in: data.expires_in,
+          user: data.user,
+          app_id: data.app_id,
+          auth_type: data.auth_type
         },
         parentOrigin
       );
+      setStep("done");
+    } catch {
+      setError("网络错误");
+      setStep("ready_to_authorize");
     }
+  }
+
+  function onCancel() {
+    if (parentOrigin) {
+      window.parent.postMessage({ type: "uniid_login_cancel", app_id: appId }, parentOrigin);
+    }
+    setStep("cancelled");
   }
 
   if (!appId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-50">
-        <main className="w-full max-w-md">
-          <Card className="space-y-2 text-sm">
-            <h1 className="text-base font-semibold text-slate-50">
-              UniID 授权中心
-            </h1>
-            <p className="text-xs text-slate-400">
-              缺少必须的查询参数：<span className="font-mono">app_id</span>。
-            </p>
-          </Card>
-        </main>
+      <div className="h-full bg-cream-50 flex items-center justify-center p-4">
+        <div data-card className="bg-white border border-ink-100 rounded-lg p-6 max-w-sm text-center shadow-sm">
+          <Lock className="h-5 w-5 mx-auto text-ink-400" />
+          <p className="text-sm mt-3 text-ink-700">缺少必须参数 <code className="font-mono text-2xs">app_id</code></p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex w-full h-full min-h-screen items-center justify-center bg-slate-950 text-slate-50 overflow-hidden">
-      <main id="auth-content" className="w-full h-full flex items-center justify-center">
-        <Card className="w-full h-full border-none sm:border-slate-800 bg-slate-950 sm:bg-slate-900/50 shadow-none sm:shadow-2xl backdrop-blur-none sm:backdrop-blur-sm rounded-none sm:rounded-2xl overflow-hidden flex flex-col md:flex-row">
-          {/* 左侧/顶部：应用信息 */}
-          <div className="w-full md:w-2/5 bg-gradient-to-br from-sky-500/10 to-indigo-500/10 p-6 border-b md:border-b-0 md:border-r border-slate-800/50 flex flex-col justify-center shrink-0 rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none md:rounded-br-none">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="h-10 w-10 rounded-xl bg-sky-500/20 flex items-center justify-center border border-sky-500/30 shrink-0">
-                <span className="text-sky-400 font-bold text-lg">U</span>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400/80">
-                  UniID 授权中心
-                </p>
-                <h1 className="text-lg font-bold text-slate-100 tracking-tight">
-                  账号登录授权
-                </h1>
+    <div ref={contentRef} className="min-h-full bg-cream-50 flex items-center justify-center p-0 md:p-4">
+      <div
+        data-card
+        className="w-full md:max-w-3xl bg-white md:rounded-lg md:border md:border-ink-100 md:shadow-md overflow-hidden flex flex-col md:flex-row min-h-full md:min-h-0"
+      >
+        {/* Left: app info */}
+        <aside className="md:w-2/5 bg-cream-100 border-b md:border-b-0 md:border-r border-ink-100 p-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2">
+            <span className="h-7 w-7 rounded-md bg-ink-900 text-cream-50 flex items-center justify-center font-bold text-xs">U</span>
+            <span className="text-2xs uppercase tracking-wider font-medium text-ink-500">UniID 授权</span>
+          </div>
+          {app ? (
+            <div className="space-y-3">
+              <h1 className="text-xl font-semibold text-ink-900 tracking-tight">{app.name}</h1>
+              <p className="text-sm text-ink-600 leading-relaxed line-clamp-4">
+                {app.description || "该应用未提供描述。"}
+              </p>
+              <div className="pt-3 border-t border-ink-200/60 space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-ink-500">
+                  <Globe className="h-3.5 w-3.5" />
+                  <span className="font-mono text-ink-700">{app.primaryDomain}</span>
+                </div>
+                <div className="flex items-center gap-2 text-ink-500">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  <span>由 UniID 验证签发</span>
+                </div>
               </div>
             </div>
+          ) : (
+            <div className="space-y-3 animate-pulse">
+              <div className="h-5 w-2/3 bg-ink-100 rounded" />
+              <div className="h-3 bg-ink-100 rounded" />
+              <div className="h-3 w-3/4 bg-ink-100 rounded" />
+            </div>
+          )}
+        </aside>
 
-            {app ? (
-              <div className="space-y-4">
+        {/* Right: actions */}
+        <section className="flex-1 p-6 flex flex-col justify-center min-h-[260px]">
+          {step === "checking" && (
+            <div className="flex flex-col items-center justify-center gap-3 text-ink-500 py-12">
+              <Spinner />
+              <p className="text-xs">正在校验登录态…</p>
+            </div>
+          )}
+
+          {step === "needs_login" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-md font-semibold text-ink-900">登录以继续</h2>
+                <p className="text-xs text-ink-500 mt-1">该应用请求访问你的 UniID 账户。</p>
+              </div>
+              <Button onClick={goLogin} className="w-full" size="lg">
+                登录 UniID
+              </Button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-full text-xs text-ink-400 hover:text-ink-600 transition-colors"
+              >
+                拒绝并返回
+              </button>
+            </div>
+          )}
+
+          {step === "ready_to_authorize" && user && (
+            <form
+              className="space-y-5"
+              onSubmit={(e) => {
+                e.preventDefault();
+                onAuthorize();
+              }}
+            >
+              <div className="flex items-center gap-3 p-3 rounded-md bg-cream-100 border border-ink-100">
+                <div className="h-9 w-9 rounded-full bg-ink-900 text-cream-50 flex items-center justify-center text-sm font-semibold">
+                  {(user.displayName ?? user.username).charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xs uppercase tracking-wider text-ink-400 font-medium">当前账号</p>
+                  <p className="text-sm font-medium text-ink-900 truncate">{user.displayName ?? user.username}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-ink-600">该应用将获得：</p>
+                <ul className="space-y-1.5 text-xs text-ink-700">
+                  <li className="flex items-center gap-2">
+                    <UserIcon className="h-3.5 w-3.5 text-ink-400" />
+                    访问你的用户名与 ID
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-ink-400" />
+                    在你的授权范围内读写数据与文件
+                  </li>
+                </ul>
+              </div>
+
+              {showAuthTypeChoice && (
                 <div className="space-y-2">
-                  <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                    {app.name}
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 font-medium whitespace-nowrap">
-                      第三方应用
-                    </span>
-                  </h2>
-                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-3 md:line-clamp-none">
-                    {app.description || "该应用暂无描述"}
-                  </p>
-                </div>
-                <div className="pt-4 border-t border-slate-800/50 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-500 uppercase font-medium">域名</span>
-                    <span className="text-[11px] font-mono text-slate-300 truncate max-w-[150px]">{app.domain}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] text-slate-500 uppercase font-medium">应用 ID</span>
-                    <span className="text-[11px] font-mono text-slate-300 truncate max-w-[150px]">{app.id}</span>
+                  <p className="text-2xs uppercase tracking-wider font-medium text-ink-400">授权范围</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["restricted", "full"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setAuthType(t)}
+                        className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
+                          authType === t
+                            ? "border-ink-900 bg-ink-900 text-cream-50"
+                            : "border-ink-200 bg-white text-ink-700 hover:border-ink-300"
+                        }`}
+                      >
+                        {t === "restricted" ? "限制（推荐）" : "完整"}
+                      </button>
+                    ))}
                   </div>
                 </div>
+              )}
+
+              {error && (
+                <p className="text-xs text-danger-600 bg-danger-50 border border-danger-100 rounded-md px-3 py-2">
+                  {error}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <Button type="submit" size="lg" className="w-full" disabled={!parentOrigin}>
+                  同意并授权
+                </Button>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="w-full text-xs text-ink-400 hover:text-ink-600 transition-colors py-1"
+                >
+                  拒绝并返回
+                </button>
               </div>
-            ) : (
-              <div className="space-y-4 animate-pulse">
-                <div className="h-4 w-24 bg-slate-800 rounded"></div>
-                <div className="h-20 bg-slate-800/50 rounded-xl"></div>
+
+              {!parentOrigin && (
+                <p className="text-2xs text-ink-400 text-center">等待父页面建立连接…</p>
+              )}
+            </form>
+          )}
+
+          {step === "authorizing" && (
+            <div className="flex flex-col items-center justify-center gap-3 py-12 text-ink-500">
+              <Spinner />
+              <p className="text-xs">正在签发授权…</p>
+            </div>
+          )}
+
+          {step === "done" && (
+            <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+              <div className="h-10 w-10 rounded-full bg-success-50 border border-success-100 flex items-center justify-center">
+                <CheckCircle2 className="h-5 w-5 text-success-500" />
               </div>
-            )}
-          </div>
+              <p className="text-sm font-medium text-ink-900">授权完成</p>
+              <p className="text-xs text-ink-500">返回应用即可继续。</p>
+            </div>
+          )}
 
-          {/* 右侧/底部：操作区域 */}
-          <div className="flex-1 p-6 flex flex-col justify-center bg-slate-950/20 rounded-b-2xl md:rounded-r-2xl md:rounded-tl-none md:rounded-bl-none">
-            {step === "checking" && (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <div className="h-8 w-8 border-2 border-sky-500/20 border-t-sky-500 rounded-full animate-spin"></div>
-                <p className="text-xs text-slate-400">正在安全检查，请稍候...</p>
-              </div>
-            )}
+          {step === "cancelled" && (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <p className="text-sm text-ink-700">已取消</p>
+              <p className="text-xs text-ink-500">你可以关闭此窗口。</p>
+            </div>
+          )}
 
-            {step === "authorize" && (
-              <form onSubmit={handleAuthorize} className={`space-y-6 transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <div className="space-y-5">
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                    <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold text-slate-300 shrink-0">
-                      {user?.username?.[0]?.toUpperCase() || "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-slate-500 font-medium uppercase">当前登录账号</p>
-                      <p className="text-sm font-medium text-slate-200 truncate">{user?.username}</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-xs font-medium text-slate-400 px-1">申请权限：</p>
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-900/50 border border-slate-800/50">
-                        <div className="h-1.5 w-1.5 rounded-full bg-sky-500"></div>
-                        <p className="text-[11px] text-slate-300">访问基础公开信息（用户名、ID）</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {(user?.role === "admin" || isAppAdmin) && (
-                    <div className="space-y-3">
-                      <p className="text-xs font-medium text-slate-400 px-1">授权范围</p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setAuthType("restricted")}
-                          className={`flex-1 p-2.5 rounded-xl border text-center transition-all ${authType === "restricted"
-                            ? "border-sky-500 bg-sky-500/10 text-sky-400"
-                            : "border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700"
-                            }`}
-                        >
-                          <span className="text-[11px] font-bold">限制</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setAuthType("full")}
-                          className={`flex-1 p-2.5 rounded-xl border text-center transition-all ${authType === "full"
-                            ? "border-sky-500 bg-sky-500/10 text-sky-400"
-                            : "border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700"
-                            }`}
-                        >
-                          <span className="text-[11px] font-bold">完整</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {error && (
-                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                    <p className="text-[11px] text-red-400 flex items-center gap-2">
-                      {error}
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-3">
-                  <PrimaryButton
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-6 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold shadow-lg shadow-sky-500/20 transition-all active:scale-[0.98]"
-                  >
-                    {loading ? "正在授权..." : "同意并授权"}
-                  </PrimaryButton>
-                  <button
-                    type="button"
-                    onClick={handleCancelAuthorize}
-                    disabled={loading}
-                    className="w-full py-2 text-[11px] font-medium text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    拒绝并返回
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {step === "done" && (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
-                <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center border border-green-500/30">
-                  <svg className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-slate-100">授权成功</h3>
-                  <p className="text-xs text-slate-400">正在跳转回应用...</p>
-                </div>
-              </div>
-            )}
-
-            {step === "idle" && (
-              <div className="flex flex-col items-center justify-center py-12 space-y-4 text-center">
-                {cancelled ? (
-                  <p className="text-xs text-slate-400">已取消授权</p>
-                ) : (
-                  <p className="text-xs text-slate-400">请在应用中继续</p>
-                )}
-              </div>
-            )}
-          </div>
-        </Card>
-      </main>
+          {step === "error" && (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <p className="text-sm text-danger-700">出错了</p>
+              <p className="text-xs text-ink-500">请刷新重试。</p>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -440,19 +365,12 @@ export default function EmbedPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-50">
-          <main className="w-full max-w-md p-4">
-            <Card className="space-y-2 text-sm p-6 bg-slate-900 border-slate-800">
-              <h1 className="text-base font-semibold text-slate-50">
-                UniID 授权中心
-              </h1>
-              <p className="text-xs text-slate-400">正在加载授权页面...</p>
-            </Card>
-          </main>
+        <div className="h-full flex items-center justify-center bg-cream-50">
+          <Spinner />
         </div>
       }
     >
-      <EmbedPageContent />
+      <EmbedView />
     </Suspense>
   );
 }

@@ -2,12 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background-color: theme("colors.cream.50");
+    color: theme("colors.ink.900");
+    font-family: theme("fontFamily.sans");
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  *, *::before, *::after {
+    border-color: theme("colors.ink.100");
+  }
+
+  /* selection */
+  ::selection {
+    background-color: theme("colors.accent.100");
+    color: theme("colors.accent.900");
+  }
+
+  /* scrollbar (webkit) */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: theme("colors.ink.200");
+    border-radius: 9999px;
+    border: 2px solid theme("colors.cream.50");
+  }
+  ::-webkit-scrollbar-thumb:hover { background: theme("colors.ink.300"); }
 }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-    "SF Pro Display", "Segoe UI", sans-serif;
+@layer utilities {
+  .container-page {
+    @apply max-w-[1280px] mx-auto px-6;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
 }
-
