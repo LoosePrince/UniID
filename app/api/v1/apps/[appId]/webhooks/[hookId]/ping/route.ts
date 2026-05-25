@@ -1,14 +1,18 @@
-import { defineRoute } from "@/shared/http";
+import { z } from "zod";
+import { defineRoute, idSchema } from "@/shared/http";
 import { withCors } from "@/shared/cors";
 import { requireAppAccess } from "@/shared/iam";
 import { WebhooksService } from "@/modules/webhooks";
 
+const params = z.object({ appId: idSchema, hookId: idSchema });
+
 export const POST = withCors(
   "admin-only",
   defineRoute({
-    handler: async (_input, { params }) => {
-      await requireAppAccess(String(params.appId));
-      const result = await WebhooksService.ping(String(params.hookId));
+    schema: { params },
+    handler: async ({ params: p }) => {
+      const ctx = await requireAppAccess(p.appId);
+      const result = await WebhooksService.ping(ctx.app.id, p.hookId);
       return result;
     }
   })

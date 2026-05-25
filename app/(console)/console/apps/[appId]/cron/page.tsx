@@ -74,8 +74,15 @@ export default async function CronPage({ params }: { params: { appId: string } }
                 </div>
                 <CronJobControls
                   appId={app.id}
-                  jobId={j.id}
-                  isActive={j.isActive === 1}
+                  job={{
+                    id: j.id,
+                    name: j.name,
+                    cronExpr: j.cronExpr,
+                    fnId: j.fnId,
+                    payload: j.payload,
+                    isActive: j.isActive
+                  }}
+                  fns={fns.filter((f) => f.activeDeploymentId !== null).map((f) => ({ id: f.id, name: f.name }))}
                 />
               </CardContent>
             </Card>

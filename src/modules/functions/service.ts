@@ -103,6 +103,44 @@ export class FunctionsService {
     return dep;
   }
 
+  static async update(input: {
+    appId: string;
+    fnId: string;
+    description?: string;
+    isActive?: boolean;
+    memoryMb?: number;
+    timeoutMs?: number;
+    env?: Record<string, string> | null;
+  }) {
+    const fn = await prisma.functionDefinition.findFirst({
+      where: { id: input.fnId, appId: input.appId }
+    });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+    return prisma.functionDefinition.update({
+      where: { id: fn.id },
+      data: {
+        description: input.description,
+        isActive: input.isActive === undefined ? undefined : input.isActive ? 1 : 0,
+        memoryMb: input.memoryMb,
+        timeoutMs: input.timeoutMs,
+        env: input.env === undefined ? undefined : input.env ? JSON.stringify(input.env) : null,
+        updatedAt: now()
+      }
+    });
+  }
+
+  static async deleteOne(appId: string, fnId: string) {
+    const fn = await prisma.functionDefinition.findFirst({ where: { id: fnId, appId } });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+    await prisma.functionDefinition.delete({ where: { id: fn.id } });
+  }
+
+  static async getForApp(appId: string, fnId: string) {
+    const fn = await prisma.functionDefinition.findFirst({ where: { id: fnId, appId } });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+    return fn;
+  }
+
   static async invoke(input: {
     appId: string;
     fnIdOrName: string;
@@ -151,9 +189,11 @@ export class FunctionsService {
     return { invocationId: inv.id, ...result };
   }
 
-  static async listInvocations(fnId: string, limit = 50) {
+  static async listInvocations(appId: string, fnId: string, limit = 50) {
+    const fn = await prisma.functionDefinition.findFirst({ where: { id: fnId, appId } });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
     return prisma.functionInvocation.findMany({
-      where: { fnId },
+      where: { fnId: fn.id },
       orderBy: { createdAt: "desc" },
       take: limit
     });

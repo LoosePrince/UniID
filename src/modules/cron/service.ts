@@ -42,14 +42,18 @@ export class CronService {
     createdById?: string;
   }) {
     if (!cron.validate(input.cronExpr)) throw new ApiError("CRON_INVALID_EXPR");
+    const fn = await prisma.functionDefinition.findFirst({
+      where: { id: input.fnId, appId: input.appId }
+    });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
     const t = now();
     const job = await prisma.cronJob.create({
       data: {
         appId: input.appId,
         name: input.name,
         cronExpr: input.cronExpr,
-        fnId: input.fnId,
-        payload: input.payload ? JSON.stringify(input.payload) : null,
+        fnId: fn.id,
+        payload: input.payload === undefined ? null : JSON.stringify(input.payload),
         createdAt: t,
         updatedAt: t,
         createdById: input.createdById
@@ -59,20 +63,85 @@ export class CronService {
     return job;
   }
 
-  static async setActive(jobId: string, isActive: boolean) {
+  static async setActive(appId: string, jobId: string, isActive: boolean) {
+    const existing = await prisma.cronJob.findFirst({ where: { id: jobId, appId } });
+    if (!existing) throw new ApiError("CRON_NOT_FOUND");
     const t = now();
     const job = await prisma.cronJob.update({
-      where: { id: jobId },
+      where: { id: existing.id },
       data: { isActive: isActive ? 1 : 0, updatedAt: t }
     });
     if (isActive) this.startTask(job);
-    else this.stopTask(jobId);
+    else this.stopTask(job.id);
     return job;
   }
 
-  static async deleteOne(jobId: string) {
-    this.stopTask(jobId);
-    await prisma.cronJob.delete({ where: { id: jobId } });
+  static async update(input: {
+    appId: string;
+    jobId: string;
+    name?: string;
+    cronExpr?: string;
+    fnId?: string;
+    payload?: unknown;
+    isActive?: boolean;
+  }) {
+    if (input.cronExpr && !cron.validate(input.cronExpr)) throw new ApiError("CRON_INVALID_EXPR");
+    const existing = await prisma.cronJob.findFirst({ where: { id: input.jobId, appId: input.appId } });
+    if (!existing) throw new ApiError("CRON_NOT_FOUND");
+    let fnId = input.fnId;
+    if (fnId) {
+      const fn = await prisma.functionDefinition.findFirst({
+        where: { id: fnId, appId: input.appId }
+      });
+      if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+      fnId = fn.id;
+    }
+    const job = await prisma.cronJob.update({
+      where: { id: existing.id },
+      data: {
+        name: input.name,
+        cronExpr: input.cronExpr,
+        fnId,
+        payload: input.payload === undefined ? undefined : JSON.stringify(input.payload),
+        isActive: input.isActive === undefined ? undefined : input.isActive ? 1 : 0,
+        updatedAt: now()
+      }
+    });
+    if (job.isActive) this.startTask(job);
+    else this.stopTask(job.id);
+    return job;
+  }
+
+  static async runNow(appId: string, jobId: string) {
+    const job = await prisma.cronJob.findFirst({ where: { id: jobId, appId } });
+    if (!job) throw new ApiError("CRON_NOT_FOUND");
+    try {
+      const payload = job.payload ? JSON.parse(job.payload) : {};
+      const result = await FunctionsService.invoke({
+        appId: job.appId,
+        fnIdOrName: job.fnId,
+        payload,
+        trigger: "cron"
+      });
+      await prisma.cronJob.update({
+        where: { id: job.id },
+        data: { lastRunAt: now(), lastStatus: result.status }
+      });
+      return result;
+    } catch (err) {
+      await prisma.cronJob.update({
+        where: { id: job.id },
+        data: { lastRunAt: now(), lastStatus: "error" }
+      });
+      throw err;
+    }
+  }
+
+  static async deleteOne(appId: string, jobId: string) {
+    const job = await prisma.cronJob.findFirst({ where: { id: jobId, appId } });
+    if (!job) throw new ApiError("CRON_NOT_FOUND");
+    this.stopTask(job.id);
+    await prisma.cronJob.delete({ where: { id: job.id } });
   }
 
   static async boot() {

@@ -3,6 +3,7 @@ import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/ui/primitives";
+import { RealtimeTester } from "@/ui/console/realtime-tester";
 
 export default async function RealtimePage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();

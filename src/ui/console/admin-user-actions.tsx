@@ -1,7 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Button } from "@/ui/primitives";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Shield, ShieldOff, KeyRound, UserCog } from "lucide-react";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  Input,
+  Select,
+  toast
+} from "@/ui/primitives";
 
 interface UserSummary {
   id: string;
@@ -10,10 +25,13 @@ interface UserSummary {
   disabled: boolean;
 }
 
+type UserActionKind = "role" | "password" | "status";
+
 async function callAdmin(action: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/v1/admin/users/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(body)
   });
   if (!res.ok) {
@@ -23,68 +41,149 @@ async function callAdmin(action: string, body: Record<string, unknown>) {
 }
 
 export function UserActions({ user }: { user: UserSummary }) {
-  const [pending, start] = useTransition();
+  const router = useRouter();
+  const [dialog, setDialog] = useState<UserActionKind | null>(null);
+  const [role, setRole] = useState<"user" | "admin">(user.role === "admin" ? "user" : "admin");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  const doToggleDisable = () => {
-    if (!confirm(user.disabled ? `恢复用户 ${user.username}？` : `禁用用户 ${user.username}？`)) return;
+  const statusAction = user.disabled ? "enable" : "disable";
+  const statusLabel = user.disabled ? "恢复" : "禁用";
+
+  const dialogCopy = useMemo(() => {
+    if (dialog === "role") {
+      return {
+        title: "修改用户角色",
+        description: "角色会影响系统管理权限，请确认后再保存。",
+        submit: "保存角色"
+      };
+    }
+    if (dialog === "password") {
+      return {
+        title: "重置用户密码",
+        description: "重置后该用户所有控制台和 SDK 会话都会被注销。",
+        submit: "确认重置"
+      };
+    }
+    return {
+      title: `${statusLabel}用户`,
+      description: user.disabled ? "恢复后该用户可以重新登录控制台。" : "禁用后该用户的所有会话都会被注销。",
+      submit: `确认${statusLabel}`
+    };
+  }, [dialog, statusLabel, user.disabled]);
+
+  function openDialog(kind: UserActionKind) {
+    setDialog(kind);
     setError(null);
-    start(async () => {
+    setPassword("");
+    setRole(user.role === "admin" ? "user" : "admin");
+  }
+
+  function closeDialog() {
+    if (pending) return;
+    setDialog(null);
+    setError(null);
+  }
+
+  function submit() {
+    if (!dialog) return;
+    setError(null);
+
+    startTransition(async () => {
       try {
-        await callAdmin(user.disabled ? "enable" : "disable", { userId: user.id });
-        location.reload();
+        if (dialog === "role") {
+          await callAdmin("set-role", { userId: user.id, role });
+          toast.success("角色已更新");
+        } else if (dialog === "password") {
+          if (password.length < 8) throw new Error("密码至少 8 位");
+          await callAdmin("reset-password", { userId: user.id, newPassword: password });
+          toast.success("密码已重置", { description: "该用户所有会话已注销" });
+        } else {
+          await callAdmin(statusAction, { userId: user.id });
+          toast.success(user.disabled ? "用户已恢复" : "用户已禁用");
+        }
+        setDialog(null);
+        router.refresh();
       } catch (err) {
-        setError((err as Error).message);
+        const message = err instanceof Error ? err.message : "操作失败";
+        setError(message);
+        toast.error("操作失败", { description: message });
       }
     });
-  };
-
-  const doSetRole = () => {
-    const next = user.role === "admin" ? "user" : "admin";
-    if (!confirm(`把 ${user.username} 设为 ${next}？`)) return;
-    setError(null);
-    start(async () => {
-      try {
-        await callAdmin("set-role", { userId: user.id, role: next });
-        location.reload();
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    });
-  };
-
-  const doResetPassword = () => {
-    const password = prompt(`为 ${user.username} 设置新密码（≥ 8 位）：`);
-    if (!password) return;
-    if (password.length < 8) { alert("密码至少 8 位"); return; }
-    setError(null);
-    start(async () => {
-      try {
-        await callAdmin("reset-password", { userId: user.id, newPassword: password });
-        alert("已重置；该用户所有会话已注销");
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    });
-  };
+  }
 
   return (
-    <div className="inline-flex gap-1 items-center">
-      <Button variant="ghost" size="sm" onClick={doSetRole} disabled={pending}>
-        改角色
-      </Button>
-      <Button variant="ghost" size="sm" onClick={doResetPassword} disabled={pending}>
-        改密
-      </Button>
-      <Button
-        variant={user.disabled ? "secondary" : "danger"}
-        size="sm"
-        onClick={doToggleDisable}
-        disabled={pending}
-      >
-        {user.disabled ? "恢复" : "禁用"}
-      </Button>
-      {error && <span className="ml-2 text-xs text-danger-700">{error}</span>}
-    </div>
+    <>
+      <div className="inline-flex flex-wrap justify-end gap-1">
+        <Button variant="ghost" size="sm" onClick={() => openDialog("role")}>
+          <UserCog /> 改角色
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => openDialog("password")}>
+          <KeyRound /> 改密
+        </Button>
+        <Button variant={user.disabled ? "secondary" : "danger"} size="sm" onClick={() => openDialog("status")}>
+          {user.disabled ? <Shield /> : <ShieldOff />} {statusLabel}
+        </Button>
+      </div>
+
+      <Dialog open={dialog !== null} onOpenChange={(value) => (value ? null : closeDialog())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogCopy.title}</DialogTitle>
+            <DialogDescription>{dialogCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm">
+              <span className="text-ink-500">目标用户：</span>
+              <span className="font-mono text-ink-900">@{user.username}</span>
+            </div>
+
+            {dialog === "role" ? (
+              <Field label="新角色" htmlFor={`role-${user.id}`}>
+                <Select id={`role-${user.id}`} value={role} onChange={(event) => setRole(event.target.value as "user" | "admin")} disabled={pending}>
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </Select>
+              </Field>
+            ) : null}
+
+            {dialog === "password" ? (
+              <Field label="新密码" htmlFor={`password-${user.id}`} required error={password.length > 0 && password.length < 8 ? "密码至少 8 位" : undefined}>
+                <Input
+                  id={`password-${user.id}`}
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={pending}
+                  minLength={8}
+                  invalid={password.length > 0 && password.length < 8}
+                  autoComplete="new-password"
+                  placeholder="至少 8 位"
+                />
+              </Field>
+            ) : null}
+
+            {error ? (
+              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="ghost" onClick={closeDialog} disabled={pending}>取消</Button>
+            <Button
+              variant={dialog === "status" && !user.disabled ? "danger" : "primary"}
+              onClick={submit}
+              loading={pending}
+              loadingText="处理中..."
+              disabled={dialog === "password" && password.length < 8}
+            >
+              {dialogCopy.submit}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

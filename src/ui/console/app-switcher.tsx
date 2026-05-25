@@ -55,7 +55,7 @@ export function AppSwitcher({ apps, currentAppId }: { apps: AppOption[]; current
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/console/apps?new=1" className="flex items-center gap-2 text-accent-600">
+          <Link href="/console/apps/new" className="flex items-center gap-2 text-accent-600">
             <Plus className="h-3.5 w-3.5" />
             新建应用
           </Link>

@@ -1,18 +1,28 @@
 /**
  * RealtimeNamespace — SSE 长连接 + 频道订阅。
  *
- * 设计：所有频道复用同一个 EventSource 连接，channels 在 URL query 中表达。
- * 切换订阅会重建连接（简化实现；满足 v2 SDK 使用场景）。
+ * 所有频道复用一个 EventSource 连接；订阅变化会重建连接。
  */
+import { request } from "./http";
 import type { AuthNamespace } from "./auth";
 import type { UniIDOptions } from "./types";
 
-type RealtimeEvent =
-  | { type: "insert"; channel: string; payload: unknown }
-  | { type: "update"; channel: string; payload: unknown }
-  | { type: "delete"; channel: string; payload: unknown }
-  | { type: "broadcast"; channel: string; payload: unknown }
-  | { type: "presence"; channel: string; payload: unknown };
+type RealtimeEventType = "insert" | "update" | "delete" | "broadcast" | "presence";
+type RealtimeEventName =
+  | RealtimeEventType
+  | "record.created"
+  | "record.updated"
+  | "record.deleted"
+  | string;
+
+export interface RealtimeEvent {
+  id: string;
+  event: string;
+  type: RealtimeEventType;
+  channel: string;
+  payload: unknown;
+  at: number;
+}
 
 type Listener = (ev: RealtimeEvent) => void;
 
@@ -91,12 +101,12 @@ class RealtimeConnection {
 
 export class RealtimeChannel {
   private unsubscribers: Array<() => void> = [];
-  private listeners = new Map<string, Set<(payload: unknown) => void>>();
+  private listeners = new Map<string, Set<(payload: unknown, event: RealtimeEvent) => void>>();
 
   constructor(private readonly conn: RealtimeConnection, private readonly channel: string) {}
 
-  on(event: "insert" | "update" | "delete" | "broadcast" | "presence", cb: (payload: unknown) => void): this {
-    const set = this.listeners.get(event) ?? new Set<(payload: unknown) => void>();
+  on(event: RealtimeEventName, cb: (payload: unknown, event: RealtimeEvent) => void): this {
+    const set = this.listeners.get(event) ?? new Set<(payload: unknown, event: RealtimeEvent) => void>();
     set.add(cb);
     this.listeners.set(event, set);
     return this;
@@ -107,10 +117,13 @@ export class RealtimeChannel {
     this.unsubscribers.push(
       this.conn.on((ev) => {
         if (ev.channel !== this.channel) return;
-        const set = this.listeners.get(ev.type);
-        if (!set) return;
-        for (const cb of set) {
-          try { cb(ev.payload); } catch {}
+        const targets = new Set<string>([ev.type, ev.event]);
+        for (const target of targets) {
+          const set = this.listeners.get(target);
+          if (!set) continue;
+          for (const cb of set) {
+            try { cb(ev.payload, ev); } catch {}
+          }
         }
       })
     );
@@ -140,6 +153,19 @@ export class RealtimeNamespace {
       this.conn = new RealtimeConnection(this.opts.url, this.opts.appId, () => this.auth.accessToken);
     }
     return new RealtimeChannel(this.conn, name);
+  }
+
+  async broadcast(channel: string, payload: unknown, event = "broadcast"): Promise<{ channel: string | null; delivered: number }> {
+    await this.auth.ensureFreshToken();
+    return request<{ channel: string | null; delivered: number }>(
+      this.opts.url,
+      "/api/v1/realtime/broadcast",
+      {
+        method: "POST",
+        body: { channel, event, payload },
+        headers: this.auth.authHeader()
+      }
+    );
   }
 
   close(): void {

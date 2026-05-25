@@ -4,7 +4,7 @@ import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
 import { FunctionsService } from "@/modules/functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge } from "@/ui/primitives";
-import { CreateFunctionForm, DeployButton } from "@/ui/console/functions-actions";
+import { CreateFunctionForm, FunctionRowActions } from "@/ui/console/functions-actions";
 
 export default async function FunctionsPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
@@ -17,6 +17,9 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
     await AppService.requireOwnerOrAdmin(app.ownerId, app.admins, auth.user.id);
   }
   const fns = await FunctionsService.listForApp(app.id);
+  const invocationsByFn = new Map(
+    await Promise.all(fns.map(async (fn) => [fn.id, await FunctionsService.listInvocations(app.id, fn.id, 5)] as const))
+  );
 
   return (
     <div className="container-page py-8 space-y-6">
@@ -69,7 +72,31 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
                   </span>
                   <span>更新于 {new Date(fn.updatedAt * 1000).toLocaleString()}</span>
                 </div>
-                <DeployButton appId={app.id} fnId={fn.id} />
+                <FunctionRowActions appId={app.id} fn={fn} />
+                <div className="rounded-md border border-ink-100 bg-cream-50">
+                  <div className="border-b border-ink-100 px-3 py-2 text-xs font-medium text-ink-700">
+                    最近调用
+                  </div>
+                  {(invocationsByFn.get(fn.id) ?? []).length === 0 ? (
+                    <div className="px-3 py-3 text-xs text-ink-500">暂无调用记录。</div>
+                  ) : (
+                    <div className="divide-y divide-ink-100">
+                      {(invocationsByFn.get(fn.id) ?? []).map((inv) => (
+                        <div key={inv.id} className="grid gap-2 px-3 py-2 text-xs sm:grid-cols-[1fr_auto]">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge tone={inv.status === "ok" ? "success" : "danger"}>{inv.status}</Badge>
+                              <span className="font-mono text-ink-700">{inv.trigger}</span>
+                              <span>{inv.durationMs}ms</span>
+                            </div>
+                            {inv.error ? <p className="mt-1 truncate text-danger-700">{inv.error}</p> : null}
+                          </div>
+                          <span className="text-ink-400">{new Date(inv.createdAt * 1000).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

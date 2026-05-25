@@ -158,6 +158,16 @@ export class FileService {
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== createdById) throw new ApiError("FILE_FORBIDDEN");
+    return this.createShareTokenForAuthorizedFile(fileId, createdById, ttlSeconds);
+  }
+
+  static async createShareTokenForAuthorizedFile(
+    fileId: string,
+    createdById: string,
+    ttlSeconds?: number
+  ): Promise<string> {
+    const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
+    if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     const c = config();
     const token = randomBytes(24).toString("base64url");
     const t = now();
@@ -171,6 +181,33 @@ export class FileService {
       }
     });
     return token;
+  }
+
+  static async getActiveShareToken(fileId: string): Promise<{ token: string; expiresAt: number } | null> {
+    return prisma.fileShareToken.findFirst({
+      where: {
+        fileId,
+        revokedAt: null,
+        expiresAt: { gt: now() }
+      },
+      orderBy: { createdAt: "desc" },
+      select: { token: true, expiresAt: true }
+    });
+  }
+
+  static async revokeShareTokens(fileId: string, actorId: string): Promise<number> {
+    const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
+    if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
+    if (file.ownerId !== actorId) throw new ApiError("FILE_FORBIDDEN");
+    return this.revokeShareTokensForAuthorizedFile(fileId);
+  }
+
+  static async revokeShareTokensForAuthorizedFile(fileId: string): Promise<number> {
+    const result = await prisma.fileShareToken.updateMany({
+      where: { fileId, revokedAt: null },
+      data: { revokedAt: now() }
+    });
+    return result.count;
   }
 
   static async resolveShareToken(token: string): Promise<string> {
@@ -193,6 +230,12 @@ export class FileService {
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== actorId) throw new ApiError("FILE_FORBIDDEN");
+    await this.deleteAuthorizedFile(fileId);
+  }
+
+  static async deleteAuthorizedFile(fileId: string): Promise<void> {
+    const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
+    if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     try {
       await getS3InternalClient().send(
         new DeleteObjectCommand({ Bucket: file.bucket, Key: file.objectKey })

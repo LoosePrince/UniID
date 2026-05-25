@@ -195,28 +195,59 @@ export class WebhooksService {
     });
   }
 
-  static async rotateSecret(hookId: string) {
+  static async rotateSecret(appId: string, hookId: string) {
+    const hook = await prisma.webhook.findFirst({ where: { id: hookId, appId } });
+    if (!hook) throw new ApiError("HOOK_NOT_FOUND");
     const t = now();
     return prisma.webhook.update({
-      where: { id: hookId },
+      where: { id: hook.id },
       data: { secret: generateSecret(), updatedAt: t }
     });
   }
 
-  static async setActive(hookId: string, isActive: boolean) {
+  static async setActive(appId: string, hookId: string, isActive: boolean) {
+    const hook = await prisma.webhook.findFirst({ where: { id: hookId, appId } });
+    if (!hook) throw new ApiError("HOOK_NOT_FOUND");
     return prisma.webhook.update({
-      where: { id: hookId },
+      where: { id: hook.id },
       data: { isActive: isActive ? 1 : 0, updatedAt: now() }
     });
   }
 
-  static async deleteOne(hookId: string) {
-    await prisma.webhook.delete({ where: { id: hookId } });
+  static async update(input: {
+    appId: string;
+    hookId: string;
+    name?: string;
+    url?: string;
+    events?: string[];
+    isActive?: boolean;
+  }) {
+    const hook = await prisma.webhook.findFirst({ where: { id: input.hookId, appId: input.appId } });
+    if (!hook) throw new ApiError("HOOK_NOT_FOUND");
+    if (input.url && !/^https?:\/\//.test(input.url)) throw new ApiError("HOOK_INVALID_URL");
+    return prisma.webhook.update({
+      where: { id: hook.id },
+      data: {
+        name: input.name,
+        url: input.url,
+        events: input.events ? JSON.stringify(input.events) : undefined,
+        isActive: input.isActive === undefined ? undefined : input.isActive ? 1 : 0,
+        updatedAt: now()
+      }
+    });
   }
 
-  static async listDeliveries(hookId: string, limit = 50) {
+  static async deleteOne(appId: string, hookId: string) {
+    const hook = await prisma.webhook.findFirst({ where: { id: hookId, appId } });
+    if (!hook) throw new ApiError("HOOK_NOT_FOUND");
+    await prisma.webhook.delete({ where: { id: hook.id } });
+  }
+
+  static async listDeliveries(appId: string, hookId: string, limit = 50) {
+    const hook = await prisma.webhook.findFirst({ where: { id: hookId, appId } });
+    if (!hook) throw new ApiError("HOOK_NOT_FOUND");
     return prisma.webhookDelivery.findMany({
-      where: { webhookId: hookId },
+      where: { webhookId: hook.id },
       orderBy: { createdAt: "desc" },
       take: limit
     });
@@ -234,9 +265,17 @@ export class WebhooksService {
     attemptDelivery(deliveryId).catch(() => {});
   }
 
+  static async retryDeliveryForHook(appId: string, hookId: string, deliveryId: string) {
+    const delivery = await prisma.webhookDelivery.findFirst({
+      where: { id: deliveryId, webhookId: hookId, webhook: { appId } }
+    });
+    if (!delivery) throw new ApiError("HOOK_NOT_FOUND");
+    await this.retryDelivery(delivery.id);
+  }
+
   /** 发起 test ping。 */
-  static async ping(hookId: string) {
-    const hook = await prisma.webhook.findUnique({ where: { id: hookId } });
+  static async ping(appId: string, hookId: string) {
+    const hook = await prisma.webhook.findFirst({ where: { id: hookId, appId } });
     if (!hook) throw new ApiError("HOOK_NOT_FOUND");
     const t = now();
     const payload = { id: randomUUID(), type: "uniid.ping", payload: { at: t }, at: t };

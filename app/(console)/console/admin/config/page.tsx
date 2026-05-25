@@ -2,12 +2,13 @@
  * 系统管理 · 全局配置
  *
  * - 默认配额（rps / 每日 API / 每月存储 / 每日函数调用）
- * - 任意 k/v 文本配置（控制台显示当前快照）
+ * - 任意 k/v 配置表单化编辑
  */
 import { redirect } from "next/navigation";
 import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
-import { Card, CardContent, CardHeader, CardTitle } from "@/ui/primitives";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
+import { ConfigEntryActions } from "@/ui/console/admin-config-entry-actions";
 import { DefaultQuotaForm } from "@/ui/console/admin-config-form";
 
 export const dynamic = "force-dynamic";
@@ -23,17 +24,21 @@ export default async function AdminConfigPage() {
     AdminService.getDefaultQuota(),
     AdminService.listConfig()
   ]);
+  const entries = Object.entries(all)
+    .map(([key, value]) => ({ key, value }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 
   return (
-    <div className="container-page py-8 space-y-6">
+    <div className="container-page space-y-6 py-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">全局配置</h1>
-        <p className="mt-1 text-sm text-ink-500">默认配额、全局开关、文件策略等</p>
+        <p className="mt-1 text-sm text-ink-500">默认配额、全局开关、文件策略等。</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>默认配额</CardTitle>
+          <CardDescription>用于新应用的默认资源上限，已创建应用不会自动回写。</CardDescription>
         </CardHeader>
         <CardContent>
           <DefaultQuotaForm initial={defaults} />
@@ -42,12 +47,11 @@ export default async function AdminConfigPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>当前配置快照</CardTitle>
+          <CardTitle>配置项</CardTitle>
+          <CardDescription>支持新增和编辑任意全局配置；Value 支持 JSON 或普通字符串。</CardDescription>
         </CardHeader>
         <CardContent>
-          <pre className="text-xs font-mono bg-cream-50 border border-sand-200 rounded-md p-4 overflow-auto max-h-96">
-            {JSON.stringify(all, null, 2)}
-          </pre>
+          <ConfigEntryActions entries={entries} />
         </CardContent>
       </Card>
     </div>

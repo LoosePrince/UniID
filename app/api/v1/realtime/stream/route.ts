@@ -7,7 +7,7 @@
 import type { NextRequest } from "next/server";
 import { withCors } from "@/shared/cors";
 import { requireSdkAuth } from "@/shared/iam";
-import { RealtimeService, type Subscriber } from "@/modules/realtime";
+import { RealtimeService, normalizeRealtimeChannels, type Subscriber } from "@/modules/realtime";
 import { randomUUID } from "node:crypto";
 import { config } from "@/shared/config";
 import { ApiError, toErrorResponse } from "@/shared/errors";
@@ -18,10 +18,11 @@ export const runtime = "nodejs";
 async function handler(req: NextRequest): Promise<Response> {
   try {
     const auth = await requireSdkAuth(req);
-    const channels = (req.nextUrl.searchParams.get("channels") || "")
+    const requestedChannels = (req.nextUrl.searchParams.get("channels") || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
+    const channels = normalizeRealtimeChannels(auth.app.id, requestedChannels);
 
     if (channels.length === 0) {
       throw new ApiError("DATA_QUERY_INVALID", { details: { hint: "channels required" } });

@@ -68,7 +68,7 @@ export default async function ConsoleOverviewPage() {
         {apps.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center text-sm text-ink-500">
-              你还没有应用。<Link href="/console/apps?new=1" className="text-accent-600 hover:underline">创建第一个 →</Link>
+              你还没有应用。<Link href="/console/apps/new" className="text-accent-600 hover:underline">创建第一个 →</Link>
             </CardContent>
           </Card>
         ) : (

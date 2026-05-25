@@ -5,8 +5,10 @@ import { Trash2, Save, Plus, Search } from "lucide-react";
 import { colors as colorTokens } from "@/ui/tokens";
 import {
   Button,
+  Field,
   Input,
   Textarea,
+  Select,
   Label,
   Card,
   CardHeader,
@@ -78,6 +80,7 @@ export default function DesignSystemPage() {
               <Button size="md">MD</Button>
               <Button size="lg">LG</Button>
               <Button size="icon"><Search /></Button>
+              <Button loading loadingText="Saving">Saving</Button>
               <Button disabled>Disabled</Button>
               <Button><Save /> 保存</Button>
             </div>
@@ -85,22 +88,28 @@ export default function DesignSystemPage() {
 
           <Section title="Inputs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
-              <div className="space-y-1.5">
-                <Label htmlFor="ex-username">用户名</Label>
+              <Field label="用户名" htmlFor="ex-username" help="Field 会统一 label、help 和错误提示。">
                 <Input id="ex-username" placeholder="my-handle" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ex-pw">密码</Label>
+              </Field>
+              <Field label="密码" htmlFor="ex-pw" required>
                 <Input id="ex-pw" type="password" placeholder="••••••••" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ex-bad">无效输入</Label>
+              </Field>
+              <Field label="状态" htmlFor="ex-status">
+                <Select id="ex-status" defaultValue="active">
+                  <option value="active">active</option>
+                  <option value="suspended">suspended</option>
+                  <option value="archived">archived</option>
+                </Select>
+              </Field>
+              <Field label="无效输入" htmlFor="ex-bad" error="该字段格式不正确。">
                 <Input id="ex-bad" invalid defaultValue="invalid@" />
-              </div>
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="ex-desc">应用描述</Label>
+              </Field>
+              <Field className="md:col-span-2" label="应用描述" htmlFor="ex-desc" help="Textarea 继承相同 focus、disabled 和 invalid 状态。">
                 <Textarea id="ex-desc" placeholder="一句话描述这个应用..." />
-              </div>
+              </Field>
+              <Field label="禁用态" htmlFor="ex-disabled" help="disabled 态不可聚焦提交。">
+                <Input id="ex-disabled" disabled defaultValue="只读内容" />
+              </Field>
             </div>
           </Section>
 

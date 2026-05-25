@@ -14,6 +14,7 @@ export const POST = withCors(
     schema: { body: bodySchema },
     handler: async ({ body }, { params }) => {
       const ctx = await requireAppAccess(String(params.appId));
+      await FunctionsService.getForApp(ctx.app.id, String(params.fnId));
       const dep = await FunctionsService.deploy({
         fnId: String(params.fnId),
         sourceCode: body.sourceCode,

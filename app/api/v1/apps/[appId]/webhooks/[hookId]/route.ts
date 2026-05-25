@@ -1,10 +1,14 @@
 import { z } from "zod";
-import { defineRoute } from "@/shared/http";
+import { defineRoute, idSchema } from "@/shared/http";
 import { withCors } from "@/shared/cors";
 import { requireAppAccess } from "@/shared/iam";
 import { WebhooksService } from "@/modules/webhooks";
 
+const params = z.object({ appId: idSchema, hookId: idSchema });
 const patchSchema = z.object({
+  name: z.string().min(1).max(64).optional(),
+  url: z.string().url().optional(),
+  events: z.array(z.string().min(1)).min(1).max(20).optional(),
   isActive: z.boolean().optional(),
   rotateSecret: z.boolean().optional()
 });
@@ -12,16 +16,19 @@ const patchSchema = z.object({
 export const PATCH = withCors(
   "admin-only",
   defineRoute({
-    schema: { body: patchSchema },
-    handler: async ({ body }, { params }) => {
-      await requireAppAccess(String(params.appId));
-      const hookId = String(params.hookId);
-      let hook;
-      if (body.isActive !== undefined) {
-        hook = await WebhooksService.setActive(hookId, body.isActive);
-      }
+    schema: { params, body: patchSchema },
+    handler: async ({ params: p, body }) => {
+      const ctx = await requireAppAccess(p.appId);
+      let hook = await WebhooksService.update({
+        appId: ctx.app.id,
+        hookId: p.hookId,
+        name: body.name,
+        url: body.url,
+        events: body.events,
+        isActive: body.isActive
+      });
       if (body.rotateSecret) {
-        hook = await WebhooksService.rotateSecret(hookId);
+        hook = await WebhooksService.rotateSecret(ctx.app.id, p.hookId);
       }
       return { hook };
     }
@@ -31,9 +38,10 @@ export const PATCH = withCors(
 export const DELETE = withCors(
   "admin-only",
   defineRoute({
-    handler: async (_input, { params }) => {
-      await requireAppAccess(String(params.appId));
-      await WebhooksService.deleteOne(String(params.hookId));
+    schema: { params },
+    handler: async ({ params: p }) => {
+      const ctx = await requireAppAccess(p.appId);
+      await WebhooksService.deleteOne(ctx.app.id, p.hookId);
       return { success: true };
     }
   })
