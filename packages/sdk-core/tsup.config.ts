@@ -1,10 +1,11 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsup";
 
-// 注意：paths 相对当前工作目录，而 npm run sdk:build 在仓库根目录执行，
-// 所以这里要写出完整相对路径 packages/sdk-core/...。
-const SRC = "packages/sdk-core/src/index.ts";
-const OUT = "packages/sdk-core/dist";
-const TSCONFIG = "packages/sdk-core/tsconfig.json";
+const pkgRoot = path.dirname(fileURLToPath(import.meta.url));
+const SRC = path.join(pkgRoot, "src/index.ts");
+const OUT = path.join(pkgRoot, "dist");
+const TSCONFIG = path.join(pkgRoot, "tsconfig.json");
 
 export default defineConfig([
   {
@@ -18,7 +19,7 @@ export default defineConfig([
     target: "es2020"
   },
   {
-    entry: { uniid: "packages/sdk-core/src/umd-entry.ts" },
+    entry: { uniid: path.join(pkgRoot, "src/umd-entry.ts") },
     outDir: OUT,
     format: ["iife"],
     globalName: "UniID",
@@ -30,7 +31,7 @@ export default defineConfig([
       return { js: ".umd.js" };
     },
     footer: {
-      js: "UniID = typeof UniID === \"function\" ? UniID : UniID.default;"
+      js: 'UniID = typeof UniID === "function" ? UniID : UniID.default;'
     }
   }
 ]);
