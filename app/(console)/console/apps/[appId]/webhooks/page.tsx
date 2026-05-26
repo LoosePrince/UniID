@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
@@ -8,6 +9,7 @@ import { CreateWebhookForm, DeliveryRetryButton, WebhookControls } from "@/ui/co
 
 export default async function WebhooksPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -24,17 +26,15 @@ export default async function WebhooksPage({ params }: { params: { appId: string
   return (
     <div className="container-page py-8 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">Webhooks</h1>
-        <p className="text-sm text-ink-500 mt-1">
-          领域事件触发时，POST 到目标 URL。带 HMAC-SHA256 签名头，失败指数退避重试，6 次后入 DLQ。
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">{t("common.webhooks")}</h1>
+        <p className="text-sm text-ink-500 mt-1">{t("appWebhooks.description")}</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">新建 Webhook</CardTitle>
-            <CardDescription>secret 自动生成，可后续轮换。</CardDescription>
+            <CardTitle className="text-base">{t("page.webhooks.newTitle")}</CardTitle>
+            <CardDescription>{t("page.webhooks.newDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <CreateWebhookForm appId={app.id} />
@@ -45,7 +45,7 @@ export default async function WebhooksPage({ params }: { params: { appId: string
           {hooks.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center text-sm text-ink-500">
-                尚未创建任何 Webhook。
+                {t("page.webhooks.empty")}
               </CardContent>
             </Card>
           )}
@@ -58,7 +58,7 @@ export default async function WebhooksPage({ params }: { params: { appId: string
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm">{h.name}</CardTitle>
                     <Badge tone={h.isActive ? "success" : "neutral"}>
-                      {h.isActive ? "active" : "paused"}
+                      {h.isActive ? t("common.active") : t("common.paused")}
                     </Badge>
                   </div>
                   <CardDescription className="font-mono truncate">{h.url}</CardDescription>
@@ -70,8 +70,8 @@ export default async function WebhooksPage({ params }: { params: { appId: string
                     ))}
                   </div>
                   <div className="flex items-center justify-between">
-                    <span>投递记录：{h._count.deliveries}</span>
-                    <span>创建于 {new Date(h.createdAt * 1000).toLocaleString()}</span>
+                    <span>{t("page.webhooks.deliveryCount", { count: formatNumber(h._count.deliveries) })}</span>
+                    <span>{t("page.webhooks.createdAt", { time: formatDateTime(h.createdAt) })}</span>
                   </div>
                   <WebhookControls
                     appId={app.id}
@@ -85,10 +85,10 @@ export default async function WebhooksPage({ params }: { params: { appId: string
                   />
                   <div className="rounded-md border border-ink-100 bg-cream-50">
                     <div className="border-b border-ink-100 px-3 py-2 text-xs font-medium text-ink-700">
-                      最近投递
+                      {t("page.webhooks.deliveries")}
                     </div>
                     {(deliveriesByHook.get(h.id) ?? []).length === 0 ? (
-                      <div className="px-3 py-3 text-xs text-ink-500">暂无投递记录。</div>
+                      <div className="px-3 py-3 text-xs text-ink-500">{t("page.webhooks.noDeliveries")}</div>
                     ) : (
                       <div className="divide-y divide-ink-100">
                         {(deliveriesByHook.get(h.id) ?? []).map((delivery) => (
@@ -114,7 +114,7 @@ export default async function WebhooksPage({ params }: { params: { appId: string
                               {delivery.errorMessage ? <p className="truncate text-danger-700">{delivery.errorMessage}</p> : null}
                             </div>
                             <div className="flex items-center justify-between gap-2 lg:justify-end">
-                              <span className="text-ink-400">{new Date(delivery.createdAt * 1000).toLocaleString()}</span>
+                              <span className="text-ink-400">{formatDateTime(delivery.createdAt)}</span>
                               <DeliveryRetryButton
                                 appId={app.id}
                                 hookId={h.id}

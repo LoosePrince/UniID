@@ -33,7 +33,7 @@ export const POST = withCors("admin-only", async (req: NextRequest, ctx) => {
 
     return NextResponse.json({ file: result });
   } catch (err) {
-    return toErrorResponse(err);
+    return await toErrorResponse(err, undefined, req);
   }
 });
 

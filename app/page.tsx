@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ArrowUpRight, ShieldCheck, Database, Files, Radio, Code2, Clock, User as UserIcon } from "lucide-react";
 import { getCurrentUserSession } from "@/shared/iam";
+import { getServerI18n } from "@/shared/i18n";
 import { Button } from "@/ui/primitives";
 import { ThemeToggle } from "@/ui/theme";
 
 export default async function Home() {
   const session = await getCurrentUserSession();
+  const { t } = await getServerI18n();
 
   return (
     <main className="min-h-screen overflow-hidden bg-cream-50 text-ink-900 dark:bg-slate-950 dark:text-slate-100">
@@ -20,9 +22,9 @@ export default async function Home() {
             <span className="text-md font-semibold tracking-tight">UniID</span>
           </Link>
           <nav className="hidden items-center gap-1 rounded-full border border-ink-200/70 bg-white/40 p-1 text-sm text-ink-600 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300 md:flex">
-            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/docs">文档</Link>
-            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/console">控制台</Link>
-            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/account">我的账号</Link>
+            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/docs">{t("home.docs")}</Link>
+            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/console">{t("home.console")}</Link>
+            <Link className="rounded-full px-3.5 py-2 hover:bg-white/70 hover:text-ink-900 dark:hover:bg-slate-800/70 dark:hover:text-slate-100" href="/account">{t("home.myAccount")}</Link>
           </nav>
           <div className="flex items-center gap-2">
             <ThemeToggle compact className="hidden sm:inline-flex" />
@@ -31,14 +33,14 @@ export default async function Home() {
                 <div className="hidden items-center gap-2 rounded-full border border-ink-200/70 bg-white/50 px-3 py-1.5 text-sm text-ink-600 shadow-xs sm:flex dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
                   <UserIcon className="h-3.5 w-3.5" />
                   <span className="max-w-28 truncate">@{session.username}</span>
-                  <span className="rounded-full bg-success-50 px-2 py-0.5 text-2xs font-medium text-success-700">已登录</span>
+                  <span className="rounded-full bg-success-50 px-2 py-0.5 text-2xs font-medium text-success-700">{t("home.signedIn")}</span>
                 </div>
-                <Button asChild variant="hero" size="sm"><Link href="/console">进入控制台 <ArrowUpRight /></Link></Button>
+                <Button asChild variant="hero" size="sm"><Link href="/console">{t("home.enterConsole")} <ArrowUpRight /></Link></Button>
               </>
             ) : (
               <>
-                <Button asChild variant="ghost" size="sm"><Link href="/login">登录</Link></Button>
-                <Button asChild variant="hero" size="sm"><Link href="/register">开始使用 <ArrowUpRight /></Link></Button>
+                <Button asChild variant="ghost" size="sm"><Link href="/login">{t("auth.login.submit")}</Link></Button>
+                <Button asChild variant="hero" size="sm"><Link href="/register">{t("home.getStarted")} <ArrowUpRight /></Link></Button>
               </>
             )}
           </div>
@@ -52,18 +54,17 @@ export default async function Home() {
           <div className="relative max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-ink-200/70 bg-white/60 px-3.5 py-1.5 text-2xs font-medium tracking-wide text-ink-600 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
               <span className="h-1.5 w-1.5 rounded-full bg-accent-500 shadow-[0_0_18px_rgba(91,91,214,0.7)]" />
-              v2.0 · 认证 · 数据 · 文件 · 实时 · 函数
+              {t("home.heroBadge")}
             </div>
             <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-ink-900 text-balance dark:text-slate-100 md:text-6xl">
-              把后端能力，<br />嵌入静态站点。
+              {t("home.heroTitle1")}<br />{t("home.heroTitle2")}
             </h1>
             <p className="mt-6 max-w-2xl text-md leading-relaxed text-ink-600 dark:text-slate-300 md:text-lg">
-              UniID 通过 iframe + SDK 给纯静态站点提供统一身份、数据库、文件存储、实时订阅和云函数。
-              只要域名匹配 + 用户授权，所有能力即可在浏览器侧直接使用——无需任何后端。
+              {t("home.heroDescription")}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" variant="hero"><Link href="/register">免费开始 <ArrowUpRight /></Link></Button>
-              <Button asChild size="lg" variant="outline"><Link href="/docs">阅读文档</Link></Button>
+              <Button asChild size="lg" variant="hero"><Link href="/register">{t("home.freeStart")} <ArrowUpRight /></Link></Button>
+              <Button asChild size="lg" variant="outline"><Link href="/docs">{t("home.readDocs")}</Link></Button>
             </div>
           </div>
         </div>
@@ -71,12 +72,12 @@ export default async function Home() {
 
       <section className="container-page pb-24">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Feature icon={ShieldCheck} title="Auth" desc="iframe + postMessage 信任链，浏览器 Origin 是唯一可信身份。" />
-          <Feature icon={Database} title="Data" desc="JSON Schema 强制校验，字段级权限，原子增量与追加。" />
-          <Feature icon={Files} title="Files" desc="S3 预签名直链下载，分片上传，分享 token。" />
-          <Feature icon={Radio} title="Realtime" desc="SSE 通道：records / query / broadcast / presence。" />
-          <Feature icon={Code2} title="Functions" desc="QuickJS 沙箱执行用户代码，HTTP / Cron / Event 触发。" />
-          <Feature icon={Clock} title="Cron & Webhooks" desc="定时调度与可观测的 webhook 投递重试。" />
+          <Feature icon={ShieldCheck} title="Auth" desc={t("home.feature.auth")} />
+          <Feature icon={Database} title="Data" desc={t("home.feature.data")} />
+          <Feature icon={Files} title="Files" desc={t("home.feature.files")} />
+          <Feature icon={Radio} title="Realtime" desc={t("home.feature.realtime")} />
+          <Feature icon={Code2} title="Functions" desc={t("home.feature.functions")} />
+          <Feature icon={Clock} title="Cron & Webhooks" desc={t("home.feature.cronWebhooks")} />
         </div>
       </section>
     </main>

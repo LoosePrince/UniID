@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
@@ -8,6 +9,7 @@ import { CreateFunctionForm, FunctionRowActions } from "@/ui/console/functions-a
 
 export default async function FunctionsPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -24,17 +26,15 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
   return (
     <div className="container-page py-8 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">函数 (Edge Functions)</h1>
-        <p className="text-sm text-ink-500 mt-1">
-          上传 JavaScript 源码，运行在 QuickJS 沙箱里。可通过 SDK / Cron / Webhooks 调用。
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight">{t("common.functions")}</h1>
+        <p className="text-sm text-ink-500 mt-1">{t("appFunctions.description")}</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">新建函数</CardTitle>
-            <CardDescription>函数名作为外部调用的标识。</CardDescription>
+            <CardTitle className="text-base">{t("page.functions.newTitle")}</CardTitle>
+            <CardDescription>{t("page.functions.newCardDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <CreateFunctionForm appId={app.id} />
@@ -45,7 +45,7 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
           {fns.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center text-sm text-ink-500">
-                尚未创建任何函数。
+                {t("page.functions.empty")}
               </CardContent>
             </Card>
           )}
@@ -56,10 +56,10 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
                   <CardTitle className="font-mono text-sm">{fn.name}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Badge tone={fn.activeDeploymentId ? "success" : "warning"}>
-                      {fn.activeDeploymentId ? "已部署" : "无部署"}
+                      {fn.activeDeploymentId ? t("page.functions.deployed") : t("page.functions.notDeployed")}
                     </Badge>
                     <Badge tone={fn.isActive ? "success" : "neutral"}>
-                      {fn.isActive ? "active" : "disabled"}
+                      {fn.isActive ? t("common.active") : t("common.disabled")}
                     </Badge>
                   </div>
                 </div>
@@ -70,15 +70,15 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
                   <span>
                     {fn.memoryMb}MB / {fn.timeoutMs}ms
                   </span>
-                  <span>更新于 {new Date(fn.updatedAt * 1000).toLocaleString()}</span>
+                  <span>{t("page.functions.updatedAt", { time: formatDateTime(fn.updatedAt) })}</span>
                 </div>
                 <FunctionRowActions appId={app.id} fn={fn} />
                 <div className="rounded-md border border-ink-100 bg-cream-50">
                   <div className="border-b border-ink-100 px-3 py-2 text-xs font-medium text-ink-700">
-                    最近调用
+                    {t("page.functions.recentInvocations")}
                   </div>
                   {(invocationsByFn.get(fn.id) ?? []).length === 0 ? (
-                    <div className="px-3 py-3 text-xs text-ink-500">暂无调用记录。</div>
+                    <div className="px-3 py-3 text-xs text-ink-500">{t("page.functions.noInvocations")}</div>
                   ) : (
                     <div className="divide-y divide-ink-100">
                       {(invocationsByFn.get(fn.id) ?? []).map((inv) => (
@@ -91,7 +91,7 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
                             </div>
                             {inv.error ? <p className="mt-1 truncate text-danger-700">{inv.error}</p> : null}
                           </div>
-                          <span className="text-ink-400">{new Date(inv.createdAt * 1000).toLocaleString()}</span>
+                          <span className="text-ink-400">{formatDateTime(inv.createdAt)}</span>
                         </div>
                       ))}
                     </div>

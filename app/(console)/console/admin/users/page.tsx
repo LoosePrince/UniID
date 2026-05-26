@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Select } from "@/ui/primitives";
@@ -23,8 +24,13 @@ type SearchParams = {
 };
 
 export default async function AdminUsersPage({ searchParams }: { searchParams?: SearchParams }) {
+  let t: ReturnType<typeof createI18n>["t"];
+  let formatNumber: ReturnType<typeof createI18n>["formatNumber"];
   try {
-    await requireSystemAdmin();
+    const auth = await requireSystemAdmin();
+    const i18n = createI18n(normalizeLocale(auth.user.locale));
+    t = i18n.t;
+    formatNumber = i18n.formatNumber;
   } catch {
     redirect("/console");
   }
@@ -56,27 +62,29 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
   return (
     <div className="container-page space-y-6 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">用户管理</h1>
-        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">共 {filtered.length} 个匹配用户，当前显示 {users.length} 个。</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("admin.users.title")}</h1>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">
+          {t("admin.users.summary", { total: formatNumber(filtered.length), shown: formatNumber(users.length) })}
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>筛选</CardTitle>
-          <CardDescription>搜索、角色、状态筛选在服务端渲染后生效。</CardDescription>
+          <CardTitle>{t("admin.filterTitle")}</CardTitle>
+          <CardDescription>{t("admin.filterUsersDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_160px_auto]" action="/console/admin/users">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400 dark:text-slate-500" />
-              <Input name="q" defaultValue={q} className="pl-9" placeholder="搜索用户名或邮箱" />
+              <Input name="q" defaultValue={q} className="pl-9" placeholder={t("admin.searchUsers")} />
             </div>
             <Select
               name="role"
               defaultValue={role}
-              aria-label="角色筛选"
+              aria-label={t("admin.roleFilter")}
               options={[
-                { value: "all", label: "全部角色" },
+                { value: "all", label: t("admin.roleAll") },
                 { value: "admin", label: "admin" },
                 { value: "user", label: "user" }
               ]}
@@ -84,34 +92,34 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
             <Select
               name="status"
               defaultValue={status}
-              aria-label="状态筛选"
+              aria-label={t("admin.statusFilter")}
               options={[
-                { value: "all", label: "全部状态" },
-                { value: "active", label: "活跃" },
-                { value: "disabled", label: "已禁用" }
+                { value: "all", label: t("admin.statusAll") },
+                { value: "active", label: t("admin.statusActive") },
+                { value: "disabled", label: t("admin.statusDisabled") }
               ]}
             />
-            <Button type="submit">筛选</Button>
+            <Button type="submit">{t("admin.filterSubmit")}</Button>
           </form>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>全部用户</CardTitle>
-          <CardDescription>第 {safePage} / {totalPages} 页</CardDescription>
+          <CardTitle>{t("admin.userList")}</CardTitle>
+          <CardDescription>{t("admin.pageOf", { page: safePage, total: totalPages })}</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[820px] text-sm">
             <thead className="border-b border-sand-200 bg-cream-50 dark:border-slate-700/70 dark:bg-slate-900/70">
               <tr>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">用户名</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">邮箱</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">角色</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">状态</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">会话</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">记录/文件</th>
-                <th className="px-4 py-2 text-right font-medium text-ink-500 dark:text-slate-300">操作</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.username")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.email")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.role")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.status")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.sessions")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.userStats")}</th>
+                <th className="px-4 py-2 text-right font-medium text-ink-500 dark:text-slate-300">{t("admin.col.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -126,7 +134,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
                     <Badge tone={u.role === "admin" ? "accent" : "neutral"}>{u.role === "admin" ? "admin" : "user"}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {u.deletedAt ? <Badge tone="danger">已禁用</Badge> : <Badge tone="success">活跃</Badge>}
+                    {u.deletedAt ? <Badge tone="danger">{t("admin.statusDisabled")}</Badge> : <Badge tone="success">{t("admin.statusActive")}</Badge>}
                   </td>
                   <td className="px-4 py-3 text-ink-700 dark:text-slate-300">{u._count.appSessions}</td>
                   <td className="px-4 py-3 text-ink-700 dark:text-slate-300">{u._count.recordsOwned} / {u._count.filesOwned}</td>
@@ -147,7 +155,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
               ))}
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-400 dark:text-slate-500">暂无匹配用户</td>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-400 dark:text-slate-500">{t("admin.noMatchUsers")}</td>
                 </tr>
               ) : null}
             </tbody>
@@ -157,10 +165,10 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
 
       <div className="flex items-center justify-end gap-2">
         <Button asChild variant="outline" size="sm" disabled={safePage <= 1}>
-          <Link href={makeHref(Math.max(1, safePage - 1))}>上一页</Link>
+          <Link href={makeHref(Math.max(1, safePage - 1))}>{t("admin.prevPage")}</Link>
         </Button>
         <Button asChild variant="outline" size="sm" disabled={safePage >= totalPages}>
-          <Link href={makeHref(Math.min(totalPages, safePage + 1))}>下一页</Link>
+          <Link href={makeHref(Math.min(totalPages, safePage + 1))}>{t("admin.nextPage")}</Link>
         </Button>
       </div>
     </div>

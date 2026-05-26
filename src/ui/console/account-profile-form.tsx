@@ -95,8 +95,8 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
           onValueChange={(value) => update("locale", value)}
           disabled={pending}
           options={[
-            { value: "zh-CN", label: "简体中文" },
-            { value: "en-US", label: "English" }
+            { value: "zh-CN", label: t("profile.locale.zhCN") },
+            { value: "en-US", label: t("profile.locale.enUS") }
           ]}
         />
       </Field>

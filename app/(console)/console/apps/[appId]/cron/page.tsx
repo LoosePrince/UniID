@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
@@ -9,6 +10,7 @@ import { CreateCronForm, CronJobControls } from "@/ui/console/cron-actions";
 
 export default async function CronPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -26,15 +28,15 @@ export default async function CronPage({ params }: { params: { appId: string } }
   return (
     <div className="container-page py-8 space-y-6">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">定时任务 (Cron)</h1>
-        <p className="text-sm text-ink-500 mt-1">基于 5 字段 cron 表达式触发指定函数。</p>
+        <h1 className="text-xl font-semibold tracking-tight">{t("common.cron")}</h1>
+        <p className="text-sm text-ink-500 mt-1">{t("appCron.description")}</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle className="text-base">新建任务</CardTitle>
-            <CardDescription>挑选已部署的函数并设置触发频率。</CardDescription>
+            <CardTitle className="text-base">{t("page.cron.newCardTitle")}</CardTitle>
+            <CardDescription>{t("page.cron.newCardDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <CreateCronForm
@@ -48,7 +50,7 @@ export default async function CronPage({ params }: { params: { appId: string } }
           {jobs.length === 0 && (
             <Card>
               <CardContent className="py-12 text-center text-sm text-ink-500">
-                尚未创建任何定时任务。
+                {t("page.cron.empty")}
               </CardContent>
             </Card>
           )}
@@ -58,18 +60,19 @@ export default async function CronPage({ params }: { params: { appId: string } }
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm">{j.name}</CardTitle>
                   <Badge tone={j.isActive ? "success" : "neutral"}>
-                    {j.isActive ? "active" : "paused"}
+                    {j.isActive ? t("common.active") : t("common.paused")}
                   </Badge>
                 </div>
                 <CardDescription className="font-mono">{j.cronExpr}</CardDescription>
               </CardHeader>
               <CardContent className="text-xs text-ink-500 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span>函数：{fnMap.get(j.fnId) ?? j.fnId}</span>
+                  <span>{t("page.cron.functionLabel", { name: fnMap.get(j.fnId) ?? j.fnId })}</span>
                   <span>
-                    最近执行：
-                    {j.lastRunAt ? new Date(j.lastRunAt * 1000).toLocaleString() : "—"}
-                    {j.lastStatus ? ` (${j.lastStatus})` : ""}
+                    {t("page.cron.lastRun", {
+                      time: j.lastRunAt ? formatDateTime(j.lastRunAt) : "—",
+                      status: j.lastStatus ? ` (${j.lastStatus})` : ""
+                    })}
                   </span>
                 </div>
                 <CronJobControls

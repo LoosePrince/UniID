@@ -18,6 +18,7 @@ import {
   Textarea,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface ConfigEntry {
   key: string;
@@ -39,6 +40,8 @@ function parseValue(value: string) {
 }
 
 export function ConfigEntryActions({ entries }: { entries: ConfigEntry[] }) {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -50,7 +53,7 @@ export function ConfigEntryActions({ entries }: { entries: ConfigEntry[] }) {
             <tr>
               <th className="px-4 py-2 text-left text-xs font-medium text-ink-500 dark:text-slate-300">Key</th>
               <th className="px-4 py-2 text-left text-xs font-medium text-ink-500 dark:text-slate-300">Value</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-ink-500 dark:text-slate-300">操作</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-ink-500 dark:text-slate-300">{t("schema.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +72,9 @@ export function ConfigEntryActions({ entries }: { entries: ConfigEntry[] }) {
             ))}
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-10 text-center text-sm text-ink-400 dark:text-slate-500">暂无配置</td>
+                <td colSpan={3} className="px-4 py-10 text-center text-sm text-ink-400 dark:text-slate-500">
+                  {t("admin.config.empty")}
+                </td>
               </tr>
             ) : null}
           </tbody>
@@ -86,6 +91,7 @@ function ConfigEntryDialog({
   mode: "create" | "edit";
   entry?: ConfigEntry;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(entry?.key ?? "");
@@ -117,15 +123,15 @@ function ConfigEntryDialog({
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data?.error?.message ?? `保存失败 (${res.status})`);
+          throw new Error(data?.error?.message ?? t("http.status", { status: res.status }));
         }
-        toast.success(mode === "create" ? "配置已创建" : "配置已保存");
+        toast.success(mode === "create" ? t("admin.config.created") : t("admin.config.saved"));
         setOpen(false);
         router.refresh();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "保存失败";
+        const message = err instanceof Error ? err.message : t("common.saveFailed");
         setError(message);
-        toast.error("保存失败", { description: message });
+        toast.error(t("common.saveFailed"), { description: message });
       }
     });
   }
@@ -134,16 +140,14 @@ function ConfigEntryDialog({
     <Dialog open={open} onOpenChange={(value) => (value ? setOpen(true) : close())}>
       <DialogTrigger asChild>
         <Button variant={mode === "create" ? "primary" : "ghost"} size="sm">
-          {mode === "create" ? <Plus /> : <Save />} {mode === "create" ? "新增配置" : "编辑"}
+          {mode === "create" ? <Plus /> : <Save />} {mode === "create" ? t("admin.config.create") : t("common.edit")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <form onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{mode === "create" ? "新增配置" : "编辑配置"}</DialogTitle>
-            <DialogDescription>
-              Value 会优先按 JSON 解析；解析失败时保存为普通字符串。
-            </DialogDescription>
+            <DialogTitle>{mode === "create" ? t("admin.config.createTitle") : t("admin.config.editTitle")}</DialogTitle>
+            <DialogDescription>{t("admin.config.valueHelp")}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
             <Field label="Key" htmlFor="config-key" required>
@@ -174,9 +178,11 @@ function ConfigEntryDialog({
             ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button variant="ghost" onClick={close} disabled={pending}>取消</Button>
-            <Button type="submit" loading={pending} loadingText="保存中..." disabled={!key.trim()}>
-              <Save /> 保存
+            <Button variant="ghost" onClick={close} disabled={pending}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" loading={pending} loadingText={t("common.saving")} disabled={!key.trim()}>
+              <Save /> {t("common.save")}
             </Button>
           </DialogFooter>
         </form>

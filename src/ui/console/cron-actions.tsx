@@ -18,6 +18,7 @@ import {
   Textarea,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface ApiErrorResponse {
   error?: { message?: string; details?: unknown };
@@ -49,17 +50,21 @@ function apiMessage(json: ApiErrorResponse, fallback: string) {
   return json.error?.message ?? fallback;
 }
 
-function parseJsonObject(source: string, emptyValue: Record<string, unknown> | undefined = undefined) {
+function parseJsonObject(
+  source: string,
+  emptyValue: Record<string, unknown> | undefined,
+  t: (key: string, values?: Record<string, string>) => string
+) {
   const trimmed = source.trim();
   if (!trimmed) return emptyValue;
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    throw new Error("请输入合法 JSON。");
+    throw new Error(t("common.jsonInvalid"));
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Payload 必须是 JSON object。");
+    throw new Error(t("common.payloadMustBeObject"));
   }
   return parsed as Record<string, unknown>;
 }
@@ -88,6 +93,7 @@ function formatRunResult(result: RunResponse) {
 }
 
 export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [cronExpr, setCronExpr] = React.useState("*/5 * * * *");
@@ -105,7 +111,7 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
     setBusy(true);
     setError(null);
     try {
-      const parsedPayload = parseJsonObject(payload, undefined);
+      const parsedPayload = parseJsonObject(payload, undefined, t);
       const res = await fetch(`/api/v1/apps/${appId}/cron`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,27 +124,27 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
         })
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("定时任务已创建", { description: name.trim() });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("cron.jobCreated"), { description: name.trim() });
       setName("");
       setPayload("{\n  \n}");
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("创建失败", { description: message });
+      toast.error(t("common.createFailed"), { description: message });
     } finally {
       setBusy(false);
     }
   }
 
   if (fns.length === 0) {
-    return <p className="text-sm text-ink-500">请先在「函数」页面创建并部署函数，才能为它建立定时任务。</p>;
+    return <p className="text-sm text-ink-500">{t("cron.noFunctions")}</p>;
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field htmlFor="cron-name" label="名称" required>
+      <Field htmlFor="cron-name" label={t("common.name")} required>
         <Input
           id="cron-name"
           required
@@ -149,7 +155,7 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
           disabled={busy}
         />
       </Field>
-      <Field htmlFor="cron-expr" label="表达式" required help="5 字段标准 cron：分 时 日 月 周。">
+      <Field htmlFor="cron-expr" label={t("common.expression")} required help={t("cron.exprHelp")}>
         <Input
           id="cron-expr"
           required
@@ -159,7 +165,7 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
           disabled={busy}
         />
       </Field>
-      <Field htmlFor="cron-fn" label="函数" required>
+      <Field htmlFor="cron-fn" label={t("common.function")} required>
         <Select
           id="cron-fn"
           value={fnId}
@@ -168,7 +174,7 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
           options={fns.map((fn) => ({ value: fn.id, label: fn.name }))}
         />
       </Field>
-      <Field htmlFor="cron-payload" label="Payload JSON" error={error}>
+      <Field htmlFor="cron-payload" label={t("cron.payloadJson")} error={error}>
         <Textarea
           id="cron-payload"
           className="min-h-[160px] font-mono text-xs"
@@ -179,8 +185,8 @@ export function CreateCronForm({ appId, fns }: { appId: string; fns: FnOption[] 
           invalid={Boolean(error)}
         />
       </Field>
-      <Button type="submit" loading={busy} loadingText="创建中…" disabled={!name.trim() || !fnId}>
-        创建任务
+      <Button type="submit" loading={busy} loadingText={t("common.creating")} disabled={!name.trim() || !fnId}>
+        {t("cron.createJob")}
       </Button>
     </form>
   );
@@ -195,6 +201,7 @@ export function CronJobControls({
   job: CronJobSummary;
   fns: FnOption[];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -223,7 +230,7 @@ export function CronJobControls({
       body: JSON.stringify(body)
     });
     const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
+    if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
     toast.success(successTitle, { description: job.name });
     router.refresh();
   }
@@ -232,11 +239,11 @@ export function CronJobControls({
     setBusy("toggle");
     setError(null);
     try {
-      await patchJob({ isActive: job.isActive !== 1 }, job.isActive === 1 ? "任务已暂停" : "任务已启用");
+      await patchJob({ isActive: job.isActive !== 1 }, job.isActive === 1 ? t("cron.jobPaused") : t("cron.jobEnabled"));
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("操作失败", { description: message });
+      toast.error(t("common.operationFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -252,14 +259,14 @@ export function CronJobControls({
         credentials: "include"
       });
       const json = (await res.json().catch(() => ({}))) as RunResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
       setRunResult(formatRunResult(json));
-      toast.success("任务已执行", { description: json.status ?? json.invocationId });
+      toast.success(t("cron.jobRan"), { description: json.status ?? json.invocationId });
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("执行失败", { description: message });
+      toast.error(t("cron.runFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -275,16 +282,16 @@ export function CronJobControls({
           name: name.trim(),
           cronExpr: cronExpr.trim(),
           fnId,
-          payload: parseJsonObject(payload, undefined),
+          payload: parseJsonObject(payload, undefined, t),
           isActive: isActive === "true"
         },
-        "任务已保存"
+        t("cron.jobSaved")
       );
       setEditOpen(false);
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("保存失败", { description: message });
+      toast.error(t("common.saveFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -299,14 +306,14 @@ export function CronJobControls({
         credentials: "include"
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("任务已删除", { description: job.name });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("cron.jobDeleted"), { description: job.name });
       setDeleteOpen(false);
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("删除失败", { description: message });
+      toast.error(t("common.deleteFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -316,16 +323,16 @@ export function CronJobControls({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="ghost" onClick={runNow} loading={busy === "run"}>
-          <Play /> 立即运行
+          <Play /> {t("common.runNow")}
         </Button>
         <Button size="sm" variant="ghost" onClick={toggle} loading={busy === "toggle"}>
-          {job.isActive === 1 ? "暂停" : "启用"}
+          {job.isActive === 1 ? t("common.pause") : t("common.enable")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setEditOpen(true)} disabled={busy !== null}>
-          <Pencil /> 编辑
+          <Pencil /> {t("common.edit")}
         </Button>
         <Button size="sm" variant="danger" onClick={() => setDeleteOpen(true)} disabled={busy !== null}>
-          <Trash2 /> 删除
+          <Trash2 /> {t("common.delete")}
         </Button>
       </div>
       {error ? <p className="text-xs text-danger-700">{error}</p> : null}
@@ -339,18 +346,18 @@ export function CronJobControls({
         <DialogContent className="max-w-2xl">
           <form onSubmit={save}>
             <DialogHeader>
-              <DialogTitle>编辑定时任务</DialogTitle>
-              <DialogDescription>保存后调度器会按最新表达式重新注册。</DialogDescription>
+              <DialogTitle>{t("cron.editTitle")}</DialogTitle>
+              <DialogDescription>{t("cron.editDescription")}</DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4">
-              <Field htmlFor={`cron-name-${job.id}`} label="名称" required>
+              <Field htmlFor={`cron-name-${job.id}`} label={t("common.name")} required>
                 <Input id={`cron-name-${job.id}`} value={name} onChange={(e) => setName(e.target.value)} disabled={busy === "edit"} />
               </Field>
-              <Field htmlFor={`cron-expr-${job.id}`} label="表达式" required help="5 字段标准 cron：分 时 日 月 周。">
+              <Field htmlFor={`cron-expr-${job.id}`} label={t("common.expression")} required help={t("cron.exprHelp")}>
                 <Input id={`cron-expr-${job.id}`} value={cronExpr} onChange={(e) => setCronExpr(e.target.value)} disabled={busy === "edit"} />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field htmlFor={`cron-fn-${job.id}`} label="函数" required>
+                <Field htmlFor={`cron-fn-${job.id}`} label={t("common.function")} required>
                   <Select
                     id={`cron-fn-${job.id}`}
                     value={fnId}
@@ -359,20 +366,20 @@ export function CronJobControls({
                     options={fns.map((fn) => ({ value: fn.id, label: fn.name }))}
                   />
                 </Field>
-                <Field htmlFor={`cron-active-${job.id}`} label="状态">
+                <Field htmlFor={`cron-active-${job.id}`} label={t("common.status")}>
                   <Select
                     id={`cron-active-${job.id}`}
                     value={isActive}
                     onValueChange={setIsActive}
                     disabled={busy === "edit"}
                     options={[
-                      { value: "true", label: "active" },
-                      { value: "false", label: "paused" }
+                      { value: "true", label: t("common.active") },
+                      { value: "false", label: t("common.paused") }
                     ]}
                   />
                 </Field>
               </div>
-              <Field htmlFor={`cron-payload-${job.id}`} label="Payload JSON" error={editOpen ? error : undefined}>
+              <Field htmlFor={`cron-payload-${job.id}`} label={t("cron.payloadJson")} error={editOpen ? error : undefined}>
                 <Textarea
                   id={`cron-payload-${job.id}`}
                   className="min-h-[180px] font-mono text-xs"
@@ -386,10 +393,10 @@ export function CronJobControls({
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setEditOpen(false)} disabled={busy === "edit"}>
-                取消
+                {t("common.cancel")}
               </Button>
-              <Button type="submit" loading={busy === "edit"} loadingText="保存中…" disabled={!name.trim() || !fnId}>
-                保存
+              <Button type="submit" loading={busy === "edit"} loadingText={t("common.saving")} disabled={!name.trim() || !fnId}>
+                {t("common.save")}
               </Button>
             </DialogFooter>
           </form>
@@ -399,20 +406,20 @@ export function CronJobControls({
       <Dialog open={deleteOpen} onOpenChange={(next) => busy !== "delete" && setDeleteOpen(next)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除定时任务</DialogTitle>
-            <DialogDescription>删除后不会再触发关联函数。</DialogDescription>
+            <DialogTitle>{t("cron.deleteTitle")}</DialogTitle>
+            <DialogDescription>{t("cron.deleteDescription")}</DialogDescription>
           </DialogHeader>
           <DialogBody>
             <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-800">
-              确认删除任务 <span className="font-mono">{job.name}</span>？
+              {t("cron.confirmDeleteJob", { name: job.name })}
             </div>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={busy === "delete"}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button type="button" variant="danger" loading={busy === "delete"} loadingText="删除中…" onClick={remove}>
-              删除
+            <Button type="button" variant="danger" loading={busy === "delete"} loadingText={t("common.deleting")} onClick={remove}>
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

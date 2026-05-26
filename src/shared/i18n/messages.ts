@@ -1,7 +1,10 @@
+import { consoleMessageDictionaries } from "./console-messages";
+import { errorMessageDictionaries } from "./error-messages";
+import { publicMessageDictionaries } from "./public-messages";
+
 export type MessageDictionary = Record<string, string>;
 
-export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
-  "zh-CN": {
+const uiMessagesZh: MessageDictionary = {
     "app.name": "UniID",
     "app.consoleName": "UniID Console",
     "app.tagline": "统一认证、数据与文件服务",
@@ -31,6 +34,7 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "common.cancel": "取消",
     "common.confirm": "确认",
     "common.cron": "定时",
+    "common.webhooks": "Webhooks",
 
     "http.status": "状态 {status}",
 
@@ -98,6 +102,103 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "console.overview.records": "{count} 条记录",
     "console.overview.files": "{count} 个文件",
     "console.overview.sessions": "{count} 会话",
+    "console.overview.sessionsLabel": "会话",
+
+    "accountCenter.title": "账号中心",
+    "accountCenter.description": "管理授权、会话、文件和个人资料；账号系统现在统一在控制台内使用。",
+    "accountNav.authorizations": "授权应用",
+    "accountNav.sessions": "会话",
+    "accountNav.files": "我的文件",
+    "accountNav.settings": "账号设置",
+
+    "apps.title": "应用",
+    "apps.description": "你管理的所有应用都在这里。",
+    "apps.empty": "你还没有任何应用。",
+    "apps.createFirst": "创建第一个应用",
+    "apps.noDescription": "未填写描述。",
+    "apps.new.title": "新建应用",
+    "apps.new.description": "仅 UniID 系统管理员可创建应用，并可在创建时指定 owner 与管理员。",
+    "apps.new.back": "返回应用列表",
+    "apps.new.noPermission": "当前账号没有创建应用权限。请联系 UniID 系统管理员创建，并将你设为 owner 或管理员。",
+    "apps.new.info.domain.title": "先绑定主域名",
+    "apps.new.info.domain.text": "主域名会成为 SDK 请求来源校验的默认边界。附加域名只能由系统管理员继续添加。",
+    "apps.new.info.permission.title": "默认最小权限",
+    "apps.new.info.permission.text": "创建时可指定应用 owner，并可同时分配多个应用管理员。",
+    "apps.new.info.quota.title": "配额自动初始化",
+    "apps.new.info.quota.text": "创建时会写入默认 RPS、API 调用、存储、出站和函数调用配额。",
+
+    "createApp.name": "应用名称",
+    "createApp.nameHelp": "控制台内展示的名称，创建后仍可修改。",
+    "createApp.domain": "主域名",
+    "createApp.domainHelp": "SDK 只允许从该域名或已验证附加域名访问。开发环境可使用 localhost:3000。",
+    "createApp.owner": "应用 owner",
+    "createApp.ownerHelp": "owner 具备该应用最高管理权限。",
+    "createApp.admins": "应用管理员",
+    "createApp.adminsHelp": "可选，填写用户 ID，多个 ID 用逗号或空格分隔。owner 不需要重复填写。",
+    "createApp.description": "描述",
+    "createApp.descriptionHelp": "可选，用于说明应用用途。",
+    "createApp.descriptionPlaceholder": "例如：官网、文档站或客户门户的身份与数据后端。",
+    "createApp.back": "返回",
+    "createApp.submit": "创建应用",
+    "createApp.submitting": "创建中…",
+    "createApp.success": "应用已创建",
+    "createApp.failed": "创建失败",
+
+    "authorizations.revoke": "撤销",
+    "authorizations.revokeTitle": "撤销 {appName} 的访问",
+    "authorizations.revokeDescription": "撤销后该应用将立即失去对你账号数据的访问。",
+    "authorizations.revokeBody": "此操作会撤销所有 (你 × {appName}) 的会话与刷新令牌。",
+    "authorizations.revokeConfirm": "确认撤销",
+    "authorizations.revokeSuccess": "已撤销 {appName} 的访问",
+    "authorizations.revokeFailed": "撤销失败",
+    "authorizations.networkError": "网络错误",
+
+    "profile.locale.zhCN": "简体中文",
+    "profile.locale.enUS": "English",
+
+    "visibility.private": "private",
+    "visibility.public": "public",
+
+    "appFiles.description": "该应用的所有上传文件（最多展示 200 个）。",
+    "appFiles.owner": "所有者",
+    "appFiles.visibility": "可见性",
+    "appFiles.uploadedAt": "上传时间",
+    "appFiles.empty": "暂无文件",
+
+    "appDetail.metric.records": "记录",
+    "appDetail.metric.files": "文件",
+    "appDetail.metric.sessions": "活跃会话",
+    "appDetail.metric.schemas": "Schemas",
+    "appDetail.domains.title": "域名",
+    "appDetail.domains.description": "仅以下域名可访问该应用的 UniID API。",
+    "appDetail.domains.primary": "主域名",
+    "appDetail.domains.verified": "已校验",
+    "appDetail.domains.pending": "待校验",
+    "appDetail.quota.title": "配额",
+    "appDetail.quota.description": "限制超出后请求会被节流。",
+    "appDetail.quota.rps": "RPS",
+    "appDetail.quota.dailyApi": "每日 API 调用",
+    "appDetail.quota.storage": "存储 (字节)",
+    "appDetail.quota.egress": "出站 (字节)",
+    "appDetail.quota.functions": "函数 / 日",
+
+    "appData.title": "数据浏览器",
+    "appData.description": "按 Schema 浏览与编辑记录。",
+    "appSettings.title": "应用设置",
+    "appSettings.description": "域名、配额与危险操作。",
+    "appMembers.description": "管理可访问该应用控制台的用户。",
+    "appFunctions.description": "部署与管理 Edge Functions。",
+    "appCron.description": "按计划触发函数。",
+    "appWebhooks.description": "向外部服务投递事件。",
+    "appRealtime.description": "测试频道订阅与广播。",
+
+    "admin.users.title": "用户管理",
+    "admin.users.description": "系统级用户、角色与状态。",
+    "admin.users.summary": "共 {total} 个匹配用户，当前显示 {shown} 个。",
+    "admin.apps.title": "全部应用",
+    "admin.apps.description": "查看并管理所有注册应用。",
+    "admin.apps.summary": "共 {total} 个匹配应用，当前显示 {shown} 个。",
+    "admin.config.description": "全局默认配额与配置项。",
 
     "sessions.title": "会话",
     "sessions.description": "管理所有登录设备与 SDK 会话。",
@@ -221,8 +322,9 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "fileActions.deleteSuccess": "文件已删除",
     "fileActions.deleteFailed": "删除失败",
     "fileActions.deleting": "删除中…"
-  },
-  "en-US": {
+};
+
+const uiMessagesEn: MessageDictionary = {
     "app.name": "UniID",
     "app.consoleName": "UniID Console",
     "app.tagline": "Unified auth, data, and file services",
@@ -252,6 +354,7 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "common.cancel": "Cancel",
     "common.confirm": "Confirm",
     "common.cron": "Cron",
+    "common.webhooks": "Webhooks",
 
     "http.status": "Status {status}",
 
@@ -319,6 +422,103 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "console.overview.records": "{count} records",
     "console.overview.files": "{count} files",
     "console.overview.sessions": "{count} sessions",
+    "console.overview.sessionsLabel": "Sessions",
+
+    "accountCenter.title": "Account Center",
+    "accountCenter.description": "Manage authorizations, sessions, files, and profile. Account features now live inside the console.",
+    "accountNav.authorizations": "Authorized apps",
+    "accountNav.sessions": "Sessions",
+    "accountNav.files": "My files",
+    "accountNav.settings": "Account settings",
+
+    "apps.title": "Apps",
+    "apps.description": "All apps you manage are listed here.",
+    "apps.empty": "You don’t have any apps yet.",
+    "apps.createFirst": "Create your first app",
+    "apps.noDescription": "No description provided.",
+    "apps.new.title": "Create app",
+    "apps.new.description": "Only UniID system admins can create apps and assign an owner and admins during creation.",
+    "apps.new.back": "Back to apps",
+    "apps.new.noPermission": "Your account cannot create apps. Ask a UniID system admin to create one and assign you as owner or admin.",
+    "apps.new.info.domain.title": "Bind the primary domain first",
+    "apps.new.info.domain.text": "The primary domain is the default boundary for SDK origin checks. Additional domains can only be added by system admins.",
+    "apps.new.info.permission.title": "Least privilege by default",
+    "apps.new.info.permission.text": "Choose an app owner during creation and optionally assign multiple app admins.",
+    "apps.new.info.quota.title": "Quotas initialized automatically",
+    "apps.new.info.quota.text": "Default RPS, API calls, storage, egress, and function invocation quotas are written on create.",
+
+    "createApp.name": "App name",
+    "createApp.nameHelp": "Shown in the console. You can change it later.",
+    "createApp.domain": "Primary domain",
+    "createApp.domainHelp": "The SDK may only be used from this domain or verified additional domains. Use localhost:3000 in development.",
+    "createApp.owner": "App owner",
+    "createApp.ownerHelp": "The owner has full management access to this app.",
+    "createApp.admins": "App admins",
+    "createApp.adminsHelp": "Optional user IDs, separated by commas or spaces. Do not repeat the owner.",
+    "createApp.description": "Description",
+    "createApp.descriptionHelp": "Optional. Explain what this app is for.",
+    "createApp.descriptionPlaceholder": "e.g. marketing site, docs, or customer portal backend.",
+    "createApp.back": "Back",
+    "createApp.submit": "Create app",
+    "createApp.submitting": "Creating…",
+    "createApp.success": "App created",
+    "createApp.failed": "Failed to create app",
+
+    "authorizations.revoke": "Revoke",
+    "authorizations.revokeTitle": "Revoke access for {appName}",
+    "authorizations.revokeDescription": "The app will immediately lose access to your account data.",
+    "authorizations.revokeBody": "This revokes all sessions and refresh tokens for (you × {appName}).",
+    "authorizations.revokeConfirm": "Confirm revoke",
+    "authorizations.revokeSuccess": "Revoked access for {appName}",
+    "authorizations.revokeFailed": "Failed to revoke",
+    "authorizations.networkError": "Network error",
+
+    "profile.locale.zhCN": "简体中文",
+    "profile.locale.enUS": "English",
+
+    "visibility.private": "private",
+    "visibility.public": "public",
+
+    "appFiles.description": "All files uploaded to this app (showing up to 200).",
+    "appFiles.owner": "Owner",
+    "appFiles.visibility": "Visibility",
+    "appFiles.uploadedAt": "Uploaded at",
+    "appFiles.empty": "No files yet",
+
+    "appDetail.metric.records": "Records",
+    "appDetail.metric.files": "Files",
+    "appDetail.metric.sessions": "Active sessions",
+    "appDetail.metric.schemas": "Schemas",
+    "appDetail.domains.title": "Domains",
+    "appDetail.domains.description": "Only these domains may access this app’s UniID API.",
+    "appDetail.domains.primary": "Primary",
+    "appDetail.domains.verified": "Verified",
+    "appDetail.domains.pending": "Pending",
+    "appDetail.quota.title": "Quota",
+    "appDetail.quota.description": "Requests are throttled after limits are exceeded.",
+    "appDetail.quota.rps": "RPS",
+    "appDetail.quota.dailyApi": "Daily API calls",
+    "appDetail.quota.storage": "Storage (bytes)",
+    "appDetail.quota.egress": "Egress (bytes)",
+    "appDetail.quota.functions": "Functions / day",
+
+    "appData.title": "Data browser",
+    "appData.description": "Browse and edit records by schema.",
+    "appSettings.title": "App settings",
+    "appSettings.description": "Domains, quotas, and destructive actions.",
+    "appMembers.description": "Manage users who can access this app in the console.",
+    "appFunctions.description": "Deploy and manage edge functions.",
+    "appCron.description": "Run functions on a schedule.",
+    "appWebhooks.description": "Deliver events to external services.",
+    "appRealtime.description": "Test channel subscriptions and broadcasts.",
+
+    "admin.users.title": "User management",
+    "admin.users.description": "System users, roles, and status.",
+    "admin.users.summary": "{total} matching users, showing {shown}.",
+    "admin.apps.title": "All apps",
+    "admin.apps.description": "View and manage every registered app.",
+    "admin.apps.summary": "{total} matching apps, showing {shown}.",
+    "admin.config.description": "Default quotas and global configuration entries.",
 
     "sessions.title": "Sessions",
     "sessions.description": "Manage all signed-in devices and SDK sessions.",
@@ -442,5 +642,19 @@ export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
     "fileActions.deleteSuccess": "File deleted",
     "fileActions.deleteFailed": "Failed to delete file",
     "fileActions.deleting": "Deleting…"
+};
+
+export const messages: Record<"zh-CN" | "en-US", MessageDictionary> = {
+  "zh-CN": {
+    ...uiMessagesZh,
+    ...publicMessageDictionaries["zh-CN"],
+    ...consoleMessageDictionaries["zh-CN"],
+    ...errorMessageDictionaries["zh-CN"]
+  },
+  "en-US": {
+    ...uiMessagesEn,
+    ...publicMessageDictionaries["en-US"],
+    ...consoleMessageDictionaries["en-US"],
+    ...errorMessageDictionaries["en-US"]
   }
 };

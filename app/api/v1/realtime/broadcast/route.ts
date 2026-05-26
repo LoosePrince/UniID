@@ -23,7 +23,7 @@ export const POST = withCors(
         b.event,
         b.payload ?? null
       );
-      if (!result.channel) throw new ApiError("DATA_QUERY_INVALID", { message: "频道不合法" });
+      if (!result.channel) throw new ApiError("DATA_QUERY_INVALID", { message: "validation.channelInvalid" });
       return result;
     }
   })

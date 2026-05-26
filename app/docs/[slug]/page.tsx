@@ -3,6 +3,7 @@ import path from "node:path";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { getServerI18n } from "@/shared/i18n";
 import { Badge, Button, Card, CardContent } from "@/ui/primitives";
 import { ThemeToggle } from "@/ui/theme";
 
@@ -42,11 +43,11 @@ const bulletListRe = /^[-*]\s+(.+)$/;
 const indentedCodeRe = /^( {4}|\t)/;
 
 const docs = {
-  api: { title: "API 概览", file: "api.md" },
-  sdk: { title: "SDK 接入", file: "sdk.md" },
-  policy: { title: "权限策略", file: "policy.md" },
-  functions: { title: "Edge Functions", file: "functions.md" },
-  architecture: { title: "架构总览", file: "architecture.md" }
+  api: { file: "api.md" },
+  sdk: { file: "sdk.md" },
+  policy: { file: "policy.md" },
+  functions: { file: "functions.md" },
+  architecture: { file: "architecture.md" }
 } as const;
 
 function parseTableRow(line: string) {
@@ -317,6 +318,7 @@ export default async function DocDetailPage({ params }: { params: { slug: string
   const doc = docs[params.slug as keyof typeof docs];
   if (!doc) notFound();
 
+  const { t } = await getServerI18n();
   const markdown = await readFile(path.join(process.cwd(), "docs", doc.file), "utf8").catch(() => null);
   if (!markdown) notFound();
 
@@ -325,7 +327,7 @@ export default async function DocDetailPage({ params }: { params: { slug: string
       <header className="border-b border-ink-100 bg-white/80 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/90 dark:shadow-[0_1px_0_rgba(129,148,163,0.12)]">
         <div className="container-page flex h-14 items-center justify-between">
           <Button asChild variant="outline" size="sm">
-            <Link href="/docs"><ArrowLeft /> 返回文档</Link>
+            <Link href="/docs"><ArrowLeft /> {t("docs.back")}</Link>
           </Button>
           <div className="flex items-center gap-2">
             <ThemeToggle compact />

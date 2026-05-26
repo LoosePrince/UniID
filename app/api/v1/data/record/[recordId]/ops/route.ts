@@ -16,7 +16,7 @@ const params = z.object({ recordId: idSchema });
 
 // 注意：`z.unknown()` 默认会推断成 optional（key?: unknown）。
 // 服务端要求 push/set 必填 value，所以用 `z.any().refine(...)` 排除 undefined。
-const requiredAny = z.any().refine((v) => v !== undefined, { message: "value 必填" });
+const requiredAny = z.any().refine((v) => v !== undefined, { message: "validation.valueRequired" });
 
 const incomingOpSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("increment"), path: z.string(), value: z.number().optional() }),

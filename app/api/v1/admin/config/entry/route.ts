@@ -9,7 +9,7 @@ const keySchema = z
   .trim()
   .min(1)
   .max(120)
-  .regex(/^[A-Za-z0-9_.:-]+$/, "配置 key 只能包含字母、数字、_、.、:、-");
+  .regex(/^[A-Za-z0-9_.:-]+$/, "validation.configKey");
 
 const body = z.object({
   key: keySchema,

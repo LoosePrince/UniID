@@ -5,8 +5,12 @@ import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 
 const profileBody = z.object({
-  displayName: z.string().trim().min(1, "显示名不能为空").max(64, "显示名最多 64 个字符"),
-  email: z.union([z.string().trim().email("邮箱格式不正确"), z.literal("")]).optional(),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "validation.displayNameRequired")
+    .max(64, "validation.displayNameMax"),
+  email: z.union([z.string().trim().email("validation.emailInvalid"), z.literal("")]).optional(),
   locale: z.string().trim().min(2).max(16).optional()
 });
 

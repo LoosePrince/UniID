@@ -111,7 +111,7 @@ export function defineRoute<S extends SchemaShape, TResponse>(
       res.headers.set("x-request-id", requestId);
       return res;
     } catch (err) {
-      const res = toErrorResponse(err, requestId);
+      const res = await toErrorResponse(err, requestId, req);
       res.headers.set("x-request-id", requestId);
       if (!(err instanceof ApiError)) {
         log.error({ err }, "route handler crashed");

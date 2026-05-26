@@ -29,7 +29,7 @@ async function handler(req: NextRequest): Promise<Response> {
     });
     return NextResponse.json({ file: result });
   } catch (err) {
-    return toErrorResponse(err);
+    return await toErrorResponse(err, undefined, req);
   }
 }
 

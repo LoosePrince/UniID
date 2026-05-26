@@ -1,3 +1,5 @@
+import type { ErrorCode } from "@/shared/errors/codes";
+import { ErrorCodes } from "@/shared/errors/codes";
 import { DEFAULT_LOCALE, type SupportedLocale, type TranslationValues } from "./config";
 import { messages, type MessageDictionary } from "./messages";
 
@@ -78,5 +80,23 @@ export function createI18n(locale: SupportedLocale): I18nShape {
 }
 
 export function getErrorMessage(locale: SupportedLocale, code: string): string {
-  return translate(locale, `error.${code}`);
+  return resolveErrorMessage(locale, code);
+}
+
+export function localizeMessage(locale: SupportedLocale, message: string): string {
+  const localized = translate(locale, message);
+  return localized !== message ? localized : message;
+}
+
+export function resolveErrorMessage(
+  locale: SupportedLocale,
+  code: ErrorCode | string,
+  override?: string
+): string {
+  if (override) return localizeMessage(locale, override);
+  const key = `error.${code}`;
+  const localized = translate(locale, key);
+  if (localized !== key) return localized;
+  const fallback = ErrorCodes[code as ErrorCode]?.message;
+  return fallback ?? key;
 }

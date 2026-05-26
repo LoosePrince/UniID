@@ -52,6 +52,8 @@ import {
   schemaFieldsToJsonSchema,
   validateSchemaFields
 } from "./schema-builder";
+import { useI18n } from "@/ui/i18n";
+import type { TranslationValues } from "@/shared/i18n/config";
 
 export interface SchemaVersionSummary {
   id: string;
@@ -102,20 +104,28 @@ function formatStoredJson(source: string | null | undefined, fallback = "") {
   }
 }
 
-function parseJsonObject(source: string, label: string) {
+function parseJsonObject(
+  source: string,
+  label: string,
+  translate: (key: string, values?: TranslationValues) => string
+) {
   try {
     return parseJsonRecord(source);
   } catch (err) {
     const message = String((err as Error).message ?? err);
-    if (message.includes("JSON")) throw new Error(`${label} 必须是合法 JSON object。`);
-    throw new Error(`${label} 必须是 JSON object。`);
+    if (message.includes("JSON")) throw new Error(translate("common.jsonInvalidLabel", { label }));
+    throw new Error(translate("common.jsonMustBeObjectLabel", { label }));
   }
 }
 
-function parseOptionalJsonObject(source: string, label: string) {
+function parseOptionalJsonObject(
+  source: string,
+  label: string,
+  translate: (key: string, values?: TranslationValues) => string
+) {
   const trimmed = source.trim();
   if (!trimmed) return undefined;
-  const parsed = parseJsonObject(trimmed, label);
+  const parsed = parseJsonObject(trimmed, label, translate);
   return Object.keys(parsed).length > 0 ? parsed : undefined;
 }
 
@@ -137,10 +147,6 @@ function apiMessage(json: ApiErrorResponse, fallback: string) {
   const details = describeDetails(json.error?.details);
   if (json.error?.message && details) return `${json.error.message}: ${details}`;
   return json.error?.message ?? details ?? fallback;
-}
-
-function formatTime(epochSeconds: number) {
-  return new Date(epochSeconds * 1000).toLocaleString();
 }
 
 function activeVersionOf(schema: DataSchemaSummary) {
@@ -210,13 +216,15 @@ function formatJsonValue(value: Record<string, unknown> | undefined, fallback = 
 }
 
 export function SchemaManagementPanel({ appId, schemas }: { appId: string; schemas: DataSchemaSummary[] }) {
+  const { t } = useI18n();
+
   return (
     <div className="container-page space-y-6 py-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Schemas</h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t("common.schemas")}</h1>
           <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">
-            管理 dataType 写入约束、版本切换和数据浏览入口。
+            {t("schema.panelDescription")}
           </p>
         </div>
         <SchemaEditorDialog appId={appId} mode="create" />
@@ -225,9 +233,9 @@ export function SchemaManagementPanel({ appId, schemas }: { appId: string; schem
       {schemas.length === 0 ? (
         <Card>
           <CardContent className="py-14 text-center">
-            <p className="text-sm font-medium text-ink-800 dark:text-slate-200">尚未定义任何 Schema</p>
+            <p className="text-sm font-medium text-ink-800 dark:text-slate-200">{t("schema.emptyTitle")}</p>
             <p className="mt-1 text-xs text-ink-500 dark:text-slate-400">
-              创建第一个 Schema 后，就可以写入受校验的记录。
+              {t("schema.emptyDescription")}
             </p>
             <div className="mt-5 flex justify-center">
               <SchemaEditorDialog appId={appId} mode="create" variant="outline" />
@@ -246,6 +254,7 @@ export function SchemaManagementPanel({ appId, schemas }: { appId: string; schem
 }
 
 function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummary }) {
+  const { t, formatDateTime } = useI18n();
   const activeVersion = activeVersionOf(schema);
   const seedVersion = activeVersion ?? schema.versions[0];
 
@@ -257,16 +266,18 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="font-mono text-sm">{schema.dataType}</CardTitle>
               {activeVersion ? (
-                <Badge tone="success">active v{activeVersion.version}</Badge>
+                <Badge tone="success">{t("common.active")} v{activeVersion.version}</Badge>
               ) : (
-                <Badge tone="warning">未激活</Badge>
+                <Badge tone="warning">{t("schema.inactive")}</Badge>
               )}
-              <Badge tone="neutral">{schema.versions.length} 个版本</Badge>
+              <Badge tone="neutral">{t("schema.versionCount", { count: schema.versions.length })}</Badge>
             </div>
             <CardDescription className="max-w-3xl">
-              {schema.description || "未填写 schema 级描述。"}
+              {schema.description || t("schema.noDescription")}
             </CardDescription>
-            <p className="text-xs text-ink-400 dark:text-slate-500">更新于 {formatTime(schema.updatedAt)}</p>
+            <p className="text-xs text-ink-400 dark:text-slate-500">
+              {t("schema.updatedAt", { time: formatDateTime(schema.updatedAt) })}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {seedVersion ? (
@@ -280,7 +291,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
             ) : null}
             <Button asChild variant="secondary" size="sm">
               <Link href={`/console/apps/${appId}/data/${encodeURIComponent(schema.dataType)}`}>
-                <Database /> 浏览数据
+                <Database /> {t("schema.browseData")}
               </Link>
             </Button>
           </div>
@@ -291,12 +302,12 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>版本</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>结构</TableHead>
-                <TableHead>配置</TableHead>
-                <TableHead>创建时间</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead>{t("schema.version")}</TableHead>
+                <TableHead>{t("common.status")}</TableHead>
+                <TableHead>{t("schema.structure")}</TableHead>
+                <TableHead>{t("schema.config")}</TableHead>
+                <TableHead>{t("schema.createdAt")}</TableHead>
+                <TableHead className="text-right">{t("schema.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -304,7 +315,11 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
                 <TableRow key={version.id} className="align-top">
                   <TableCell className="font-mono text-xs text-ink-700 dark:text-slate-200">v{version.version}</TableCell>
                   <TableCell>
-                    {version.isActive === 1 ? <Badge tone="success">active</Badge> : <Badge>draft</Badge>}
+                    {version.isActive === 1 ? (
+                      <Badge tone="success">{t("common.active")}</Badge>
+                    ) : (
+                      <Badge>draft</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="min-w-52">
                     <VersionStructureSummary version={version} />
@@ -313,7 +328,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
                     <VersionPreview version={version} />
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-xs text-ink-500 dark:text-slate-400">
-                    {formatTime(version.createdAt)}
+                    {formatDateTime(version.createdAt)}
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
@@ -339,28 +354,35 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
 }
 
 function VersionStructureSummary({ version }: { version: SchemaVersionSummary }) {
+  const { t } = useI18n();
   const stats = versionStats(version);
   return (
     <div className="flex flex-wrap gap-1.5 text-xs">
-      <Badge tone="neutral">{stats.fieldCount} fields</Badge>
-      <Badge tone={stats.requiredCount > 0 ? "accent" : "neutral"}>{stats.requiredCount} required</Badge>
-      {stats.nestedCount > 0 ? <Badge tone="neutral">{stats.nestedCount} nested</Badge> : null}
+      <Badge tone="neutral">{stats.fieldCount} {t("schema.fieldCount")}</Badge>
+      <Badge tone={stats.requiredCount > 0 ? "accent" : "neutral"}>
+        {stats.requiredCount} {t("schema.requiredCount")}
+      </Badge>
+      {stats.nestedCount > 0 ? (
+        <Badge tone="neutral">{stats.nestedCount} {t("schema.nestedCount")}</Badge>
+      ) : null}
     </div>
   );
 }
 
 function VersionPreview({ version }: { version: SchemaVersionSummary }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <Badge tone="neutral">JSON Schema</Badge>
-      {version.autoFill ? <Badge tone="accent">AutoFill</Badge> : null}
-      {version.validationRules ? <Badge tone="warning">Rules</Badge> : null}
+      {version.autoFill ? <Badge tone="accent">{t("schema.tabAutoFill")}</Badge> : null}
+      {version.validationRules ? <Badge tone="warning">{t("schema.tabValidation")}</Badge> : null}
       <SchemaVersionDetailDialog version={version} />
     </div>
   );
 }
 
 function SchemaVersionDetailDialog({ version }: { version: SchemaVersionSummary }) {
+  const { t, formatDateTime } = useI18n();
   const schema = parseStoredRecord(version.jsonSchema);
   const autoFill = parseStoredRecord(version.autoFill);
   const stats = schema ? countSchemaStats(schema) : null;
@@ -368,37 +390,40 @@ function SchemaVersionDetailDialog({ version }: { version: SchemaVersionSummary 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button type="button" variant="ghost" size="xs">查看详情</Button>
+        <Button type="button" variant="ghost" size="xs">{t("schema.viewDetails")}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Schema v{version.version}</DialogTitle>
+          <DialogTitle>{t("common.schemas")} v{version.version}</DialogTitle>
           <DialogDescription>
-            创建于 {formatTime(version.createdAt)}，{version.isActive === 1 ? "当前为 active 版本。" : "当前为 draft 版本。"}
+            {t("schema.versionCreatedAt", {
+              time: formatDateTime(version.createdAt),
+              status: version.isActive === 1 ? t("schema.versionActive") : t("schema.versionDraft")
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="max-h-[74vh] overflow-y-auto">
           <Tabs defaultValue="summary">
             <TabsList className="flex w-full flex-wrap justify-start">
-              <TabsTrigger value="summary">结构摘要</TabsTrigger>
+              <TabsTrigger value="summary">{t("schema.tabSummary")}</TabsTrigger>
               <TabsTrigger value="schema">JSON Schema</TabsTrigger>
-              <TabsTrigger value="autofill">AutoFill</TabsTrigger>
-              <TabsTrigger value="rules">Rules</TabsTrigger>
+              <TabsTrigger value="autofill">{t("schema.tabAutoFill")}</TabsTrigger>
+              <TabsTrigger value="rules">{t("schema.tabValidation")}</TabsTrigger>
             </TabsList>
             <TabsContent value="summary">
               {schema && stats ? (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <MetricCard label="字段数" value={stats.fieldCount} />
-                    <MetricCard label="必填字段" value={stats.requiredCount} />
-                    <MetricCard label="嵌套结构" value={stats.nestedCount} />
+                    <MetricCard label={t("schema.fieldCount")} value={stats.fieldCount} />
+                    <MetricCard label={t("schema.requiredCount")} value={stats.requiredCount} />
+                    <MetricCard label={t("schema.nestedCount")} value={stats.nestedCount} />
                   </div>
                   <FieldTree schema={schema} />
                 </div>
               ) : (
                 <Callout tone="warning">
-                  <CalloutTitle>无法解析结构摘要</CalloutTitle>
-                  <CalloutDescription>该版本内容不是标准 JSON object，请查看原始 JSON。</CalloutDescription>
+                  <CalloutTitle>{t("schema.parseSummaryFailed")}</CalloutTitle>
+                  <CalloutDescription>{t("schema.parseSummaryHint")}</CalloutDescription>
                 </Callout>
               )}
             </TabsContent>
@@ -410,8 +435,8 @@ function SchemaVersionDetailDialog({ version }: { version: SchemaVersionSummary 
                 <CodeBlock title="autoFill" language="json" value={formatJsonValue(autoFill, formatStoredJson(version.autoFill))} maxHeight="28rem" />
               ) : (
                 <Callout tone="info">
-                  <CalloutTitle>未配置 AutoFill</CalloutTitle>
-                  <CalloutDescription>该版本不会在写入前自动补充服务端字段。</CalloutDescription>
+                  <CalloutTitle>{t("schema.noAutoFill")}</CalloutTitle>
+                  <CalloutDescription>{t("schema.noAutoFillHint")}</CalloutDescription>
                 </Callout>
               )}
             </TabsContent>
@@ -420,8 +445,8 @@ function SchemaVersionDetailDialog({ version }: { version: SchemaVersionSummary 
                 <CodeBlock title="validationRules" language="text" value={version.validationRules} maxHeight="28rem" />
               ) : (
                 <Callout tone="info">
-                  <CalloutTitle>未配置 Validation Rules</CalloutTitle>
-                  <CalloutDescription>该版本只使用 JSON Schema 和 AutoFill。</CalloutDescription>
+                  <CalloutTitle>{t("schema.noValidation")}</CalloutTitle>
+                  <CalloutDescription>{t("schema.noValidationHint")}</CalloutDescription>
                 </Callout>
               )}
             </TabsContent>
@@ -442,6 +467,7 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 }
 
 function FieldTree({ schema }: { schema: Record<string, unknown> }) {
+  const { t } = useI18n();
   const properties = schema.properties && typeof schema.properties === "object" && !Array.isArray(schema.properties)
     ? schema.properties as Record<string, unknown>
     : {};
@@ -450,8 +476,8 @@ function FieldTree({ schema }: { schema: Record<string, unknown> }) {
   if (Object.keys(properties).length === 0) {
     return (
       <Callout tone="info">
-        <CalloutTitle>根结构未定义字段</CalloutTitle>
-        <CalloutDescription>该 Schema 可能允许自由字段，或仍处于初始状态。</CalloutDescription>
+        <CalloutTitle>{t("schema.noRootFields")}</CalloutTitle>
+        <CalloutDescription>{t("schema.noRootFieldsHint")}</CalloutDescription>
       </Callout>
     );
   }
@@ -476,6 +502,7 @@ function FieldTreeNode({
   required: boolean;
   depth: number;
 }) {
+  const { t } = useI18n();
   const record = schema && typeof schema === "object" && !Array.isArray(schema) ? schema as Record<string, unknown> : {};
   const type = Array.isArray(record.enum) ? "enum" : typeof record.type === "string" ? record.type : "unknown";
   const childProperties = record.properties && typeof record.properties === "object" && !Array.isArray(record.properties)
@@ -489,9 +516,11 @@ function FieldTreeNode({
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-medium text-ink-800 dark:text-slate-100">{name}</span>
         <Badge tone="neutral">{type}</Badge>
-        {required ? <Badge tone="accent">required</Badge> : null}
+        {required ? <Badge tone="accent">{t("schemaBuilder.required")}</Badge> : null}
         {typeof record.format === "string" ? <Badge tone="neutral">{record.format}</Badge> : null}
-        {Array.isArray(record.enum) ? <Badge tone="neutral">{record.enum.length} options</Badge> : null}
+        {Array.isArray(record.enum) ? (
+          <Badge tone="neutral">{record.enum.length} {t("schemaBuilder.enumOptions")}</Badge>
+        ) : null}
       </div>
       {typeof record.description === "string" ? (
         <p className="mt-2 text-xs leading-5 text-ink-500 dark:text-slate-400">{record.description}</p>
@@ -533,6 +562,7 @@ function SchemaEditorDialog({
   variant?: React.ComponentProps<typeof Button>["variant"];
   size?: React.ComponentProps<typeof Button>["size"];
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [dataType, setDataType] = React.useState("");
@@ -591,7 +621,7 @@ function SchemaEditorDialog({
   function tryEnterBuilder() {
     setError(null);
     try {
-      const parsedSchema = parseJsonObject(jsonSchema, "JSON Schema");
+      const parsedSchema = parseJsonObject(jsonSchema, "JSON Schema", t);
       const visual = jsonSchemaToFields(parsedSchema);
       if (!visual.ok) {
         setCompatibilityNote(visual.reason);
@@ -612,9 +642,11 @@ function SchemaEditorDialog({
     let parsedAutoFill: Record<string, unknown> | undefined;
     try {
       if (editorMode === "builder") validateSchemaFields(builderFields);
-      parsedSchema = editorMode === "builder" ? schemaFieldsToJsonSchema(builderFields) : parseJsonObject(jsonSchema, "JSON Schema");
+      parsedSchema = editorMode === "builder"
+        ? schemaFieldsToJsonSchema(builderFields)
+        : parseJsonObject(jsonSchema, "JSON Schema", t);
       parsedAutoFill = autoFillSource === "json"
-        ? parseOptionalJsonObject(autoFillJson, "AutoFill")
+        ? parseOptionalJsonObject(autoFillJson, "AutoFill", t)
         : autoFillRulesToObject(autoFillRules);
     } catch (err) {
       setError(String((err as Error).message ?? err));
@@ -623,7 +655,7 @@ function SchemaEditorDialog({
 
     const normalizedDataType = dataType.trim();
     if (!/^[a-z][a-z0-9_-]*$/.test(normalizedDataType)) {
-      setError("dataType 只能以小写字母开头，并包含小写字母、数字、_ 或 -。");
+      setError(t("schema.dataTypeInvalid"));
       return;
     }
 
@@ -643,22 +675,27 @@ function SchemaEditorDialog({
         })
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success(mode === "create" ? "Schema 已创建" : "Schema 新版本已创建", {
-        description: `${normalizedDataType}${intent === "active" ? " 已设为 active" : " 已保存为 draft"}`
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: res.status })));
+      toast.success(mode === "create" ? t("schema.created") : t("schema.versionCreated"), {
+        description: t("schema.createdDescription", {
+          dataType: normalizedDataType,
+          suffix: intent === "active" ? t("schema.createdActiveSuffix") : t("schema.createdDraftSuffix")
+        })
       });
       setOpen(false);
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("保存失败", { description: message });
+      toast.error(t("common.saveFailed"), { description: message });
     } finally {
       setBusyIntent(null);
     }
   }
 
-  const title = mode === "create" ? "创建 Schema" : `创建 ${schema?.dataType ?? "Schema"} 新版本`;
+  const title = mode === "create"
+    ? t("schema.createTitle")
+    : t("schema.newVersionTitle", { dataType: schema?.dataType ?? t("common.schemas") });
   const submitDisabled = busy || !dataType.trim();
 
   return (
@@ -666,19 +703,23 @@ function SchemaEditorDialog({
       <DialogTrigger asChild>
         <Button variant={variant} size={size}>
           {mode === "create" ? <Plus /> : <GitBranch />}
-          {mode === "create" ? "创建 Schema" : size === "sm" ? "从此版本创建" : "编辑 / 新版本"}
+          {mode === "create"
+            ? t("schema.createButton")
+            : size === "sm"
+              ? t("schema.fromVersionCreate")
+              : t("schema.editNewVersion")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Schema 采用版本化管理；编辑会创建新版本，不会覆盖历史版本。
+            {t("schema.editorDescription")}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="max-h-[74vh] space-y-5 overflow-y-auto">
           <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
-            <Field htmlFor={`${formId}-data-type`} label="dataType" required help="只能包含小写字母、数字、_、-。">
+            <Field htmlFor={`${formId}-data-type`} label={t("schema.dataType")} required help={t("schema.dataTypeHelp")}>
               <Input
                 id={`${formId}-data-type`}
                 value={dataType}
@@ -689,33 +730,33 @@ function SchemaEditorDialog({
                 placeholder="posts"
               />
             </Field>
-            <Field label="保存动作">
+            <Field label={t("schema.saveIntent")}>
               <div className="rounded-xl border border-ink-200/70 bg-white/50 px-3 py-2 text-xs leading-5 text-ink-500 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
-                可保存草稿，也可创建后立即激活。
+                {t("schema.saveIntentHelp")}
               </div>
             </Field>
-            <Field htmlFor={`${formId}-description`} label="Schema 级描述" className="lg:col-span-2">
+            <Field htmlFor={`${formId}-description`} label={t("schema.schemaDescription")} className="lg:col-span-2">
               <Input
                 id={`${formId}-description`}
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 disabled={busy}
                 maxLength={500}
-                placeholder="记录用途、字段约定或迁移说明"
+                placeholder={t("schema.schemaDescriptionPlaceholder")}
               />
             </Field>
           </div>
 
           {error ? (
             <Callout tone="danger" icon={AlertTriangle}>
-              <CalloutTitle>保存前需要处理</CalloutTitle>
+              <CalloutTitle>{t("schema.fixBeforeSave")}</CalloutTitle>
               <CalloutDescription>{error}</CalloutDescription>
             </Callout>
           ) : null}
 
           {compatibilityNote ? (
             <Callout tone="warning" icon={AlertTriangle}>
-              <CalloutTitle>已切换到高级 JSON 模式</CalloutTitle>
+              <CalloutTitle>{t("schema.advancedMode")}</CalloutTitle>
               <CalloutDescription>{compatibilityNote}</CalloutDescription>
             </Callout>
           ) : null}
@@ -726,10 +767,10 @@ function SchemaEditorDialog({
           }}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <TabsList>
-                <TabsTrigger value="builder">可视化 Builder</TabsTrigger>
-                <TabsTrigger value="advanced">高级 JSON</TabsTrigger>
+                <TabsTrigger value="builder">{t("schema.tabBuilder")}</TabsTrigger>
+                <TabsTrigger value="advanced">{t("schema.tabAdvanced")}</TabsTrigger>
               </TabsList>
-              <p className="text-xs text-ink-500 dark:text-slate-400">复杂 schema 可留在高级 JSON 模式，保存协议不变。</p>
+              <p className="text-xs text-ink-500 dark:text-slate-400">{t("schema.builderHint")}</p>
             </div>
             <TabsContent value="builder">
               <SchemaBuilder fields={builderFields} onChange={setBuilderFields} disabled={busy} />
@@ -751,9 +792,9 @@ function SchemaEditorDialog({
 
           <Tabs defaultValue="rules">
             <TabsList>
-              <TabsTrigger value="rules">AutoFill Builder</TabsTrigger>
-              <TabsTrigger value="json">AutoFill JSON</TabsTrigger>
-              <TabsTrigger value="validation">Validation Rules</TabsTrigger>
+              <TabsTrigger value="rules">{t("schema.tabAutoFill")}</TabsTrigger>
+              <TabsTrigger value="json">{t("schema.autoFillJson")}</TabsTrigger>
+              <TabsTrigger value="validation">{t("schema.validationRules")}</TabsTrigger>
             </TabsList>
             <TabsContent value="rules">
               <AutoFillBuilder
@@ -771,7 +812,7 @@ function SchemaEditorDialog({
               />
             </TabsContent>
             <TabsContent value="json">
-              <Field htmlFor={`${formId}-auto-fill`} label="AutoFill JSON" help="可选；留空表示不启用。">
+              <Field htmlFor={`${formId}-auto-fill`} label={t("schema.autoFillJson")} help={t("schema.autoFillHelp")}>
                 <Textarea
                   id={`${formId}-auto-fill`}
                   className="min-h-44 font-mono text-xs"
@@ -787,7 +828,11 @@ function SchemaEditorDialog({
               </Field>
             </TabsContent>
             <TabsContent value="validation">
-              <Field htmlFor={`${formId}-validation-rules`} label="Validation Rules" help="可选；保留自定义规则文本。">
+              <Field
+                htmlFor={`${formId}-validation-rules`}
+                label={t("schema.validationRules")}
+                help={t("schema.validationHelp")}
+              >
                 <Textarea
                   id={`${formId}-validation-rules`}
                   className="min-h-44 font-mono text-xs"
@@ -803,13 +848,26 @@ function SchemaEditorDialog({
         </DialogBody>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
-            取消
+            {t("common.cancel")}
           </Button>
-          <Button type="button" variant="outline" loading={busyIntent === "draft"} loadingText="保存中…" disabled={submitDisabled} onClick={() => submit("draft")}>
-            保存草稿
+          <Button
+            type="button"
+            variant="outline"
+            loading={busyIntent === "draft"}
+            loadingText={t("common.saving")}
+            disabled={submitDisabled}
+            onClick={() => submit("draft")}
+          >
+            {t("schema.saveDraft")}
           </Button>
-          <Button type="button" loading={busyIntent === "active"} loadingText="激活中…" disabled={submitDisabled} onClick={() => submit("active")}>
-            创建并激活
+          <Button
+            type="button"
+            loading={busyIntent === "active"}
+            loadingText={t("schema.activating")}
+            disabled={submitDisabled}
+            onClick={() => submit("active")}
+          >
+            {t("schema.createAndActivate")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -826,6 +884,7 @@ function ActivateSchemaVersionButton({
   dataType: string;
   version: SchemaVersionSummary;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   const active = version.isActive === 1;
@@ -844,12 +903,12 @@ function ActivateSchemaVersionButton({
         }
       );
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("Schema 版本已激活", { description: `${dataType} v${version.version}` });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: res.status })));
+      toast.success(t("schema.versionActivated"), { description: `${dataType} v${version.version}` });
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
-      toast.error("激活失败", { description: message });
+      toast.error(t("schema.activateFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -860,13 +919,17 @@ function ActivateSchemaVersionButton({
       size="sm"
       variant={active ? "secondary" : "outline"}
       loading={busy}
-      loadingText="激活中…"
+      loadingText={t("schema.activating")}
       disabled={active}
       onClick={activate}
-      aria-label={active ? `v${version.version} 已激活` : `激活 v${version.version}`}
-      title={active ? undefined : "激活会切换线上写入约束"}
+      aria-label={
+        active
+          ? `v${version.version} ${t("schema.activated")}`
+          : `${t("schema.activate")} v${version.version}`
+      }
+      title={active ? undefined : t("schema.activateTitle")}
     >
-      <CheckCircle2 /> {active ? "已激活" : "激活"}
+      <CheckCircle2 /> {active ? t("schema.activated") : t("schema.activate")}
     </Button>
   );
 }

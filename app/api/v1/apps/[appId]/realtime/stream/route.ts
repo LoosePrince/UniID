@@ -85,7 +85,7 @@ async function handler(req: NextRequest, ctx: { params: Record<string, string | 
       }
     });
   } catch (err) {
-    return toErrorResponse(err);
+    return await toErrorResponse(err, undefined, req);
   }
 }
 

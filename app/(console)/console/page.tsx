@@ -53,7 +53,7 @@ export default async function ConsoleOverviewPage() {
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label={t("common.apps")} value={formatNumber(stats.appsCount)} icon={Database} />
-        <StatCard label={t("console.overview.sessions").replace("{count} ", "").replace("{count}", "")} value={formatNumber(stats.sessionsCount)} icon={KeyRound} />
+        <StatCard label={t("console.overview.sessionsLabel")} value={formatNumber(stats.sessionsCount)} icon={KeyRound} />
         <StatCard label={t("common.files")} value={formatNumber(stats.filesCount)} icon={Files} />
         {auth.user.role === "admin" && (
           <StatCard label={t("common.users")} value={formatNumber(stats.usersCount)} icon={Globe} />

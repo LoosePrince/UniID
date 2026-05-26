@@ -5,6 +5,7 @@
  * - 任意 k/v 配置表单化编辑
  */
 import { redirect } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
@@ -14,8 +15,10 @@ import { DefaultQuotaForm } from "@/ui/console/admin-config-form";
 export const dynamic = "force-dynamic";
 
 export default async function AdminConfigPage() {
+  let t: ReturnType<typeof createI18n>["t"];
   try {
-    await requireSystemAdmin();
+    const auth = await requireSystemAdmin();
+    t = createI18n(normalizeLocale(auth.user.locale)).t;
   } catch {
     redirect("/console");
   }
@@ -31,14 +34,14 @@ export default async function AdminConfigPage() {
   return (
     <div className="container-page space-y-6 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">全局配置</h1>
-        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">默认配额、全局开关、文件策略等。</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("common.globalConfig")}</h1>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">{t("admin.config.description")}</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>默认配额</CardTitle>
-          <CardDescription>用于新应用的默认资源上限，已创建应用不会自动回写。</CardDescription>
+          <CardTitle>{t("admin.config.defaultQuotaTitle")}</CardTitle>
+          <CardDescription>{t("admin.config.defaultQuotaDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <DefaultQuotaForm initial={defaults} />
@@ -47,8 +50,8 @@ export default async function AdminConfigPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>配置项</CardTitle>
-          <CardDescription>支持新增和编辑任意全局配置；Value 支持 JSON 或普通字符串。</CardDescription>
+          <CardTitle>{t("admin.config.entriesTitle")}</CardTitle>
+          <CardDescription>{t("admin.config.entriesDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ConfigEntryActions entries={entries} />

@@ -17,6 +17,7 @@ import {
   Select,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface UserSummary {
   id: string;
@@ -44,6 +45,7 @@ async function callAdmin(action: string, body: Record<string, unknown>) {
 }
 
 export function UserActions({ user }: { user: UserSummary }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [dialog, setDialog] = useState<UserActionKind | null>(null);
   const [role, setRole] = useState<"user" | "admin">(user.role === "admin" ? "user" : "admin");
@@ -56,43 +58,43 @@ export function UserActions({ user }: { user: UserSummary }) {
   const [pending, startTransition] = useTransition();
 
   const statusAction = user.disabled ? "enable" : "disable";
-  const statusLabel = user.disabled ? "恢复" : "禁用";
+  const statusLabel = user.disabled ? t("admin.user.enable") : t("admin.user.disable");
 
   const dialogCopy = useMemo(() => {
     if (dialog === "edit") {
       return {
-        title: "编辑用户",
-        description: "修改用户基础资料，不会影响登录会话。",
-        submit: "保存用户"
+        title: t("admin.user.editTitle"),
+        description: t("admin.user.editDescription"),
+        submit: t("admin.user.saveUser")
       };
     }
     if (dialog === "role") {
       return {
-        title: "修改用户角色",
-        description: "角色会影响系统管理权限，请确认后再保存。",
-        submit: "保存角色"
+        title: t("admin.user.roleTitle"),
+        description: t("admin.user.roleDescription"),
+        submit: t("admin.user.saveRole")
       };
     }
     if (dialog === "password") {
       return {
-        title: "重置用户密码",
-        description: "重置后该用户所有控制台和 SDK 会话都会被注销。",
-        submit: "确认重置"
+        title: t("admin.user.passwordTitle"),
+        description: t("admin.user.passwordDescription"),
+        submit: t("admin.user.confirmReset")
       };
     }
     if (dialog === "delete") {
       return {
-        title: "删除用户",
-        description: "仅允许删除没有关联资产的用户。该操作不可恢复。",
-        submit: "确认删除"
+        title: t("admin.user.deleteTitle"),
+        description: t("admin.user.deleteDescription"),
+        submit: t("admin.user.confirmDelete")
       };
     }
     return {
-      title: `${statusLabel}用户`,
-      description: user.disabled ? "恢复后该用户可以重新登录控制台。" : "禁用后该用户的所有会话都会被注销。",
-      submit: `确认${statusLabel}`
+      title: user.disabled ? t("admin.user.statusEnableTitle") : t("admin.user.statusDisableTitle"),
+      description: user.disabled ? t("admin.user.statusEnableDescription") : t("admin.user.statusDisableDescription"),
+      submit: t("common.confirmAction", { action: statusLabel })
     };
-  }, [dialog, statusLabel, user.disabled]);
+  }, [dialog, statusLabel, t, user.disabled]);
 
   function openDialog(kind: UserActionKind) {
     setDialog(kind);
@@ -125,48 +127,51 @@ export function UserActions({ user }: { user: UserSummary }) {
             displayName: displayName.trim() || null,
             locale: locale.trim() || "zh-CN"
           });
-          toast.success("用户已更新");
+          toast.success(t("admin.user.updated"));
         } else if (dialog === "role") {
           await callAdmin("set-role", { userId: user.id, role });
-          toast.success("角色已更新");
+          toast.success(t("admin.user.roleUpdated"));
         } else if (dialog === "password") {
-          if (password.length < 8) throw new Error("密码至少 8 位");
+          if (password.length < 8) throw new Error(t("validation.passwordMin"));
           await callAdmin("reset-password", { userId: user.id, newPassword: password });
-          toast.success("密码已重置", { description: "该用户所有会话已注销" });
+          toast.success(t("admin.user.passwordReset"), { description: t("admin.user.passwordResetDescription") });
         } else if (dialog === "delete") {
           await callAdmin("delete", { userId: user.id });
-          toast.success("用户已删除");
+          toast.success(t("admin.user.deleted"));
         } else {
           await callAdmin(statusAction, { userId: user.id });
-          toast.success(user.disabled ? "用户已恢复" : "用户已禁用");
+          toast.success(user.disabled ? t("admin.user.enabled") : t("admin.user.disabled"));
         }
         setDialog(null);
         router.refresh();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "操作失败";
+        const message = err instanceof Error ? err.message : t("common.operationFailed");
         setError(message);
-        toast.error("操作失败", { description: message });
+        toast.error(t("common.operationFailed"), { description: message });
       }
     });
   }
+
+  const passwordError =
+    password.length > 0 && password.length < 8 ? t("validation.passwordMin") : undefined;
 
   return (
     <>
       <div className="inline-flex flex-wrap justify-end gap-1">
         <Button variant="ghost" size="sm" onClick={() => openDialog("edit")}>
-          <Pencil /> 编辑
+          <Pencil /> {t("admin.user.edit")}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => openDialog("role")}>
-          <UserCog /> 改角色
+          <UserCog /> {t("admin.user.changeRole")}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => openDialog("password")}>
-          <KeyRound /> 改密
+          <KeyRound /> {t("admin.user.changePassword")}
         </Button>
         <Button variant={user.disabled ? "secondary" : "danger"} size="sm" onClick={() => openDialog("status")}>
           {user.disabled ? <Shield /> : <ShieldOff />} {statusLabel}
         </Button>
         <Button variant="danger" size="sm" onClick={() => openDialog("delete")}>
-          <Trash2 /> 删除
+          <Trash2 /> {t("common.delete")}
         </Button>
       </div>
 
@@ -178,13 +183,13 @@ export function UserActions({ user }: { user: UserSummary }) {
           </DialogHeader>
           <DialogBody className="space-y-4">
             <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm dark:border-slate-700/70 dark:bg-slate-900/50">
-              <span className="text-ink-500 dark:text-slate-400">目标用户：</span>
+              <span className="text-ink-500 dark:text-slate-400">{t("common.targetUser")}</span>
               <span className="font-mono text-ink-900 dark:text-slate-100">@{user.username}</span>
             </div>
 
             {dialog === "edit" ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="用户名" htmlFor={`username-${user.id}`} required>
+                <Field label={t("accountSettings.username")} htmlFor={`username-${user.id}`} required>
                   <Input
                     id={`username-${user.id}`}
                     value={username}
@@ -194,7 +199,7 @@ export function UserActions({ user }: { user: UserSummary }) {
                     required
                   />
                 </Field>
-                <Field label="显示名" htmlFor={`display-${user.id}`}>
+                <Field label={t("admin.user.displayName")} htmlFor={`display-${user.id}`}>
                   <Input
                     id={`display-${user.id}`}
                     value={displayName}
@@ -203,7 +208,7 @@ export function UserActions({ user }: { user: UserSummary }) {
                     maxLength={80}
                   />
                 </Field>
-                <Field label="邮箱" htmlFor={`email-${user.id}`}>
+                <Field label={t("profile.email")} htmlFor={`email-${user.id}`}>
                   <Input
                     id={`email-${user.id}`}
                     type="email"
@@ -212,7 +217,7 @@ export function UserActions({ user }: { user: UserSummary }) {
                     disabled={pending}
                   />
                 </Field>
-                <Field label="语言" htmlFor={`locale-${user.id}`}>
+                <Field label={t("profile.locale")} htmlFor={`locale-${user.id}`}>
                   <Input
                     id={`locale-${user.id}`}
                     value={locale}
@@ -226,7 +231,7 @@ export function UserActions({ user }: { user: UserSummary }) {
             ) : null}
 
             {dialog === "role" ? (
-              <Field label="新角色" htmlFor={`role-${user.id}`}>
+              <Field label={t("admin.user.newRole")} htmlFor={`role-${user.id}`}>
                 <Select
                   id={`role-${user.id}`}
                   value={role}
@@ -241,7 +246,7 @@ export function UserActions({ user }: { user: UserSummary }) {
             ) : null}
 
             {dialog === "password" ? (
-              <Field label="新密码" htmlFor={`password-${user.id}`} required error={password.length > 0 && password.length < 8 ? "密码至少 8 位" : undefined}>
+              <Field label={t("admin.user.newPassword")} htmlFor={`password-${user.id}`} required error={passwordError}>
                 <Input
                   id={`password-${user.id}`}
                   type="password"
@@ -251,14 +256,14 @@ export function UserActions({ user }: { user: UserSummary }) {
                   minLength={8}
                   invalid={password.length > 0 && password.length < 8}
                   autoComplete="new-password"
-                  placeholder="至少 8 位"
+                  placeholder={t("validation.passwordMin")}
                 />
               </Field>
             ) : null}
 
             {dialog === "delete" ? (
               <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100">
-                确认删除 <span className="font-mono">@{user.username}</span>？如该用户仍有关联资产，系统会拒绝删除。
+                {t("admin.user.confirmDeleteBody", { username: user.username })}
               </div>
             ) : null}
 
@@ -269,12 +274,14 @@ export function UserActions({ user }: { user: UserSummary }) {
             ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button variant="ghost" onClick={closeDialog} disabled={pending}>取消</Button>
+            <Button variant="ghost" onClick={closeDialog} disabled={pending}>
+              {t("common.cancel")}
+            </Button>
             <Button
               variant={(dialog === "status" && !user.disabled) || dialog === "delete" ? "danger" : "primary"}
               onClick={submit}
               loading={pending}
-              loadingText="处理中..."
+              loadingText={t("common.processing")}
               disabled={(dialog === "password" && password.length < 8) || (dialog === "edit" && !username.trim())}
             >
               {dialogCopy.submit}

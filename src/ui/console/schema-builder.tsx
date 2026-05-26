@@ -2,6 +2,9 @@
 
 import * as React from "react";
 import { Braces, Copy, Plus, Trash2 } from "lucide-react";
+import { DEFAULT_LOCALE } from "@/shared/i18n/config";
+import type { TranslationValues } from "@/shared/i18n/config";
+import { translate } from "@/shared/i18n/core";
 import {
   Badge,
   Button,
@@ -14,6 +17,13 @@ import {
   Select,
   Textarea
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
+
+type TranslateFn = (key: string, values?: TranslationValues) => string;
+
+function tr(t: TranslateFn | undefined, key: string, values?: TranslationValues) {
+  return t ? t(key, values) : translate(DEFAULT_LOCALE, key, values);
+}
 
 export type SchemaFieldType = "string" | "number" | "integer" | "boolean" | "object" | "array" | "enum";
 
@@ -145,54 +155,54 @@ function parseNumber(value: string) {
   return Number.isFinite(n) ? n : undefined;
 }
 
-function assertNumberLike(value: string, label: string) {
+function assertNumberLike(value: string, label: string, t: TranslateFn | undefined) {
   const trimmed = value.trim();
   if (!trimmed) return;
-  if (!Number.isFinite(Number(trimmed))) throw new Error(`${label} 必须是有效数字。`);
+  if (!Number.isFinite(Number(trimmed))) throw new Error(tr(t, "schemaBuilder.invalidNumber", { label }));
 }
 
-function assertPattern(value: string, label: string) {
+function assertPattern(value: string, label: string, t: TranslateFn | undefined) {
   const trimmed = value.trim();
   if (!trimmed) return;
   try {
     new RegExp(trimmed);
   } catch {
-    throw new Error(`${label} 不是有效正则表达式。`);
+    throw new Error(tr(t, "schemaBuilder.invalidRegex", { label }));
   }
 }
 
-function assertUniqueFieldNames(fields: SchemaFieldModel[], scope = "root") {
+function assertUniqueFieldNames(fields: SchemaFieldModel[], scope: string, t: TranslateFn | undefined) {
   const names = new Set<string>();
   for (const field of fields) {
     const name = field.name.trim();
-    if (!name) throw new Error(`${scope} 存在空字段名。`);
-    if (names.has(name)) throw new Error(`${scope} 存在重复字段名：${name}。`);
+    if (!name) throw new Error(tr(t, "schemaBuilder.emptyFieldName", { scope }));
+    if (names.has(name)) throw new Error(tr(t, "schemaBuilder.duplicateField", { scope, name }));
     names.add(name);
-    validateSchemaField(field, `${scope}.${name}`);
+    validateSchemaField(field, `${scope}.${name}`, t);
   }
 }
 
-function validateSchemaField(field: SchemaFieldModel, path: string) {
-  assertNumberLike(field.minimum, `${path}.minimum`);
-  assertNumberLike(field.maximum, `${path}.maximum`);
-  assertNumberLike(field.minLength, `${path}.minLength`);
-  assertNumberLike(field.maxLength, `${path}.maxLength`);
-  assertPattern(field.pattern, `${path}.pattern`);
+function validateSchemaField(field: SchemaFieldModel, path: string, t: TranslateFn | undefined) {
+  assertNumberLike(field.minimum, `${path}.minimum`, t);
+  assertNumberLike(field.maximum, `${path}.maximum`, t);
+  assertNumberLike(field.minLength, `${path}.minLength`, t);
+  assertNumberLike(field.maxLength, `${path}.maxLength`, t);
+  assertPattern(field.pattern, `${path}.pattern`, t);
 
   if (field.type === "enum") {
     const values = field.enumValues
       .split(/[\n,]/)
       .map((item) => item.trim())
       .filter(Boolean);
-    if (values.length === 0) throw new Error(`${path}.enum 至少需要一个选项。`);
+    if (values.length === 0) throw new Error(tr(t, "schemaBuilder.enumMinOne", { path }));
   }
 
-  if (field.type === "object") assertUniqueFieldNames(field.fields, path);
-  if (field.type === "array" && field.arrayItem) validateSchemaField(field.arrayItem, `${path}[]`);
+  if (field.type === "object") assertUniqueFieldNames(field.fields, path, t);
+  if (field.type === "array" && field.arrayItem) validateSchemaField(field.arrayItem, `${path}[]`, t);
 }
 
-export function validateSchemaFields(fields: SchemaFieldModel[]) {
-  assertUniqueFieldNames(fields);
+export function validateSchemaFields(fields: SchemaFieldModel[], t?: TranslateFn) {
+  assertUniqueFieldNames(fields, "root", t);
 }
 
 function parseDefaultValue(value: string) {
@@ -349,10 +359,13 @@ function fieldFromSchema(name: string, schema: Record<string, unknown>, required
   return field;
 }
 
-export function jsonSchemaToFields(schema: Record<string, unknown>): { ok: true; fields: SchemaFieldModel[] } | { ok: false; reason: string } {
-  if (hasUnsupportedKeys(schema)) return { ok: false, reason: "包含组合、引用或动态属性关键字，需要使用高级 JSON 模式。" };
+export function jsonSchemaToFields(
+  schema: Record<string, unknown>,
+  t?: TranslateFn
+): { ok: true; fields: SchemaFieldModel[] } | { ok: false; reason: string } {
+  if (hasUnsupportedKeys(schema)) return { ok: false, reason: tr(t, "schemaBuilder.unsupportedAdvanced") };
   if (schema.type !== "object" && !isRecord(schema.properties)) {
-    return { ok: false, reason: "当前可视化编辑器只支持 object 根结构。" };
+    return { ok: false, reason: tr(t, "schemaBuilder.objectRootOnly") };
   }
   const properties = isRecord(schema.properties) ? schema.properties : {};
   const required = Array.isArray(schema.required) ? schema.required.map(String) : [];
@@ -360,7 +373,7 @@ export function jsonSchemaToFields(schema: Record<string, unknown>): { ok: true;
     .map(([name, childSchema]) => isRecord(childSchema) ? fieldFromSchema(name, childSchema, required.includes(name)) : null)
     .filter(Boolean) as SchemaFieldModel[];
   if (Object.keys(properties).length !== fields.length) {
-    return { ok: false, reason: "存在暂不支持的字段关键字，需要使用高级 JSON 模式。" };
+    return { ok: false, reason: tr(t, "schemaBuilder.unsupportedKeywords") };
   }
   return { ok: true, fields };
 }
@@ -448,6 +461,7 @@ export function SchemaBuilder({
   onChange: (fields: SchemaFieldModel[]) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   const preview = JSON.stringify(schemaFieldsToJsonSchema(fields), null, 2);
 
   function addRootField() {
@@ -463,9 +477,9 @@ export function SchemaBuilder({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" onClick={addRootField} disabled={disabled}>
-            <Plus /> 添加字段
+            <Plus /> {t("schemaBuilder.addField")}
           </Button>
-          <span className="text-xs text-ink-400">模板</span>
+          <span className="text-xs text-ink-400">{t("schemaBuilder.templates")}</span>
           {templates.map((template) => (
             <Button key={template.name} type="button" variant="outline" size="sm" onClick={() => setTemplate(template.fields)} disabled={disabled}>
               {template.name}
@@ -475,8 +489,8 @@ export function SchemaBuilder({
 
         {fields.length === 0 ? (
           <Callout tone="info">
-            <CalloutTitle>当前 Schema 还没有字段</CalloutTitle>
-            <CalloutDescription>添加字段或选择模板后，会自动生成标准 JSON Schema。</CalloutDescription>
+            <CalloutTitle>{t("schemaBuilder.emptyTitle")}</CalloutTitle>
+            <CalloutDescription>{t("schemaBuilder.emptyDescription")}</CalloutDescription>
           </Callout>
         ) : (
           <div className="space-y-3">
@@ -495,7 +509,7 @@ export function SchemaBuilder({
         )}
       </div>
 
-      <CodeBlock title="实时 JSON Schema" language="json" value={preview} maxHeight="34rem" />
+      <CodeBlock title={t("schemaBuilder.previewTitle")} language="json" value={preview} maxHeight="34rem" />
     </div>
   );
 }
@@ -527,6 +541,8 @@ function SchemaFieldNode({
   onDelete: (id: string) => void;
   arrayItem?: boolean;
 }) {
+  const { t } = useI18n();
+
   function patch(patchValue: Partial<SchemaFieldModel>) {
     onUpdate(field.id, (current) => ({ ...current, ...patchValue }));
   }
@@ -541,7 +557,7 @@ function SchemaFieldNode({
   return (
     <div className="rounded-xl border border-ink-200/70 bg-white/60 p-4 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60" style={{ marginLeft: depth ? 14 : 0 }}>
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_150px_110px_auto] lg:items-end">
-        <Field label={arrayItem ? "数组元素" : "字段名"}>
+        <Field label={arrayItem ? t("schemaBuilder.arrayItem") : t("schemaBuilder.fieldName")}>
           <Input
             value={arrayItem ? "items" : field.name}
             onChange={(event) => patch({ name: event.target.value })}
@@ -549,7 +565,7 @@ function SchemaFieldNode({
             placeholder="title"
           />
         </Field>
-        <Field label="类型">
+        <Field label={t("schemaBuilder.fieldType")}>
           <Select
             value={field.type}
             onValueChange={(value) => onUpdate(field.id, (current) => withType(current, value as SchemaFieldType))}
@@ -565,24 +581,24 @@ function SchemaFieldNode({
             disabled={disabled || arrayItem}
             onChange={(event) => patch({ required: event.target.checked })}
           />
-          必填
+          {t("schemaBuilder.required")}
         </label>
         <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" size="icon" onClick={() => onDuplicate(field)} disabled={disabled || arrayItem} aria-label="复制字段">
+          <Button type="button" variant="ghost" size="icon" onClick={() => onDuplicate(field)} disabled={disabled || arrayItem} aria-label={t("schemaBuilder.copyField")}>
             <Copy />
           </Button>
-          <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(field.id)} disabled={disabled || arrayItem} aria-label="删除字段">
+          <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(field.id)} disabled={disabled || arrayItem} aria-label={t("schemaBuilder.deleteField")}>
             <Trash2 />
           </Button>
         </div>
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <Field label="描述">
-          <Input value={field.description} onChange={(event) => patch({ description: event.target.value })} disabled={disabled} placeholder="字段用途" />
+        <Field label={t("common.description")}>
+          <Input value={field.description} onChange={(event) => patch({ description: event.target.value })} disabled={disabled} placeholder={t("schemaBuilder.fieldDesc")} />
         </Field>
-        <Field label="默认值">
-          <Input value={field.defaultValue} onChange={(event) => patch({ defaultValue: event.target.value })} disabled={disabled} placeholder="可填 JSON 或文本" />
+        <Field label={t("schemaBuilder.defaultValue")}>
+          <Input value={field.defaultValue} onChange={(event) => patch({ defaultValue: event.target.value })} disabled={disabled} placeholder={t("schemaBuilder.defaultPlaceholder")} />
         </Field>
       </div>
 
@@ -603,7 +619,7 @@ function SchemaFieldNode({
       ) : null}
 
       {field.type === "enum" ? (
-        <Field className="mt-3" label="枚举选项" help="一行一个，或用英文逗号分隔。">
+        <Field className="mt-3" label={t("schemaBuilder.enumOptions")} help={t("schemaBuilder.enumHelp")}>
           <Textarea value={field.enumValues} onChange={(event) => patch({ enumValues: event.target.value })} disabled={disabled} className="min-h-24 font-mono text-xs" />
         </Field>
       ) : null}
@@ -613,7 +629,7 @@ function SchemaFieldNode({
           <div className="flex items-center justify-between">
             <Badge tone="neutral">object fields</Badge>
             <Button type="button" variant="outline" size="sm" onClick={addNestedField} disabled={disabled}>
-              <Plus /> 添加子字段
+              <Plus /> {t("schemaBuilder.addChild")}
             </Button>
           </div>
           {field.fields.map((child) => (
@@ -644,7 +660,7 @@ export function autoFillObjectToRules(source: Record<string, unknown> | undefine
   });
 }
 
-export function autoFillRulesToObject(rules: AutoFillRuleModel[]): Record<string, unknown> | undefined {
+export function autoFillRulesToObject(rules: AutoFillRuleModel[], t?: TranslateFn): Record<string, unknown> | undefined {
   const output: Record<string, unknown> = {};
   for (const rule of rules) {
     const path = rule.path.trim();
@@ -653,7 +669,7 @@ export function autoFillRulesToObject(rules: AutoFillRuleModel[]): Record<string
     if (rule.kind === "string") output[path] = rule.value;
     if (rule.kind === "number") {
       const n = Number(rule.value);
-      if (!Number.isFinite(n)) throw new Error(`AutoFill ${path} 必须是数字。`);
+      if (!Number.isFinite(n)) throw new Error(tr(t, "schemaBuilder.autoFillMustBeNumber", { path }));
       output[path] = n;
     }
     if (rule.kind === "boolean") output[path] = rule.value === "true";
@@ -662,7 +678,7 @@ export function autoFillRulesToObject(rules: AutoFillRuleModel[]): Record<string
       try {
         output[path] = JSON.parse(rule.value);
       } catch {
-        throw new Error(`AutoFill ${path} 的 JSON 值不合法。`);
+        throw new Error(tr(t, "schemaBuilder.autoFillInvalidJson", { path }));
       }
     }
   }
@@ -678,11 +694,12 @@ export function AutoFillBuilder({
   onChange: (rules: AutoFillRuleModel[]) => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   let preview = "{}";
   try {
-    preview = JSON.stringify(autoFillRulesToObject(rules) ?? {}, null, 2);
+    preview = JSON.stringify(autoFillRulesToObject(rules, t) ?? {}, null, 2);
   } catch {
-    preview = "// AutoFill 配置存在未完成的值";
+    preview = t("schemaBuilder.autoFillIncomplete");
   }
 
   function patchRule(id: string, patch: Partial<AutoFillRuleModel>) {
@@ -693,12 +710,12 @@ export function AutoFillBuilder({
     <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
       <div className="space-y-3">
         <Button type="button" variant="outline" size="sm" onClick={() => onChange([...rules, createAutoFillRule()])} disabled={disabled}>
-          <Plus /> 添加填充规则
+          <Plus /> {t("schemaBuilder.addAutoFill")}
         </Button>
         {rules.length === 0 ? (
           <Callout tone="info" icon={Braces}>
-            <CalloutTitle>未配置 AutoFill</CalloutTitle>
-            <CalloutDescription>可为 data.createdAt、data.authorId 等路径自动填入服务端可信值。</CalloutDescription>
+            <CalloutTitle>{t("schemaBuilder.autoFillEmptyTitle")}</CalloutTitle>
+            <CalloutDescription>{t("schemaBuilder.autoFillEmptyHint")}</CalloutDescription>
           </Callout>
         ) : rules.map((rule) => (
           <div key={rule.id} className="rounded-xl border border-ink-200/70 bg-white/60 p-4 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60">
@@ -715,7 +732,7 @@ export function AutoFillBuilder({
                 />
               </Field>
               <AutoFillValueInput rule={rule} onChange={(value) => patchRule(rule.id, { value })} disabled={disabled} />
-              <Button type="button" variant="ghost" size="icon" onClick={() => onChange(rules.filter((item) => item.id !== rule.id))} disabled={disabled} aria-label="删除 AutoFill 规则">
+              <Button type="button" variant="ghost" size="icon" onClick={() => onChange(rules.filter((item) => item.id !== rule.id))} disabled={disabled} aria-label={t("schemaBuilder.deleteAutoFillRule")}>
                 <Trash2 />
               </Button>
             </div>
@@ -772,8 +789,8 @@ function AutoFillValueInput({
   );
 }
 
-export function parseJsonRecord(source: string): Record<string, unknown> {
+export function parseJsonRecord(source: string, t?: TranslateFn): Record<string, unknown> {
   const parsed = JSON.parse(source) as unknown;
-  if (!isRecord(parsed)) throw new Error("必须是 JSON object。 ");
+  if (!isRecord(parsed)) throw new Error(tr(t, "schemaBuilder.mustBeObject"));
   return parsed;
 }

@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { Button, Field, Input, Select, Textarea, toast } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface CreateAppResponse {
   app?: { id: string; name: string };
@@ -18,6 +19,7 @@ interface CreateAppUserOption {
 }
 
 export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOption[]; currentUserId: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [primaryDomain, setPrimaryDomain] = React.useState("");
@@ -54,16 +56,16 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
       });
       const json = (await res.json().catch(() => ({}))) as CreateAppResponse;
       if (!res.ok || !json.app?.id) {
-        throw new Error(json.error?.message ?? `HTTP ${res.status}`);
+        throw new Error(json.error?.message ?? t("http.status", { status: res.status }));
       }
 
-      toast.success("应用已创建", { description: json.app.name });
+      toast.success(t("createApp.success"), { description: json.app.name });
       router.push(`/console/apps/${json.app.id}`);
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("创建失败", { description: message });
+      toast.error(t("createApp.failed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -71,12 +73,7 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      <Field
-        htmlFor="new-app-name"
-        label="应用名称"
-        required
-        help="控制台内展示的名称，创建后仍可修改。"
-      >
+      <Field htmlFor="new-app-name" label={t("createApp.name")} required help={t("createApp.nameHelp")}>
         <Input
           id="new-app-name"
           autoComplete="off"
@@ -88,12 +85,7 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
         />
       </Field>
 
-      <Field
-        htmlFor="new-app-domain"
-        label="主域名"
-        required
-        help="SDK 只允许从该域名或已验证附加域名访问。开发环境可使用 localhost:3000。"
-      >
+      <Field htmlFor="new-app-domain" label={t("createApp.domain")} required help={t("createApp.domainHelp")}>
         <Input
           id="new-app-domain"
           autoCapitalize="none"
@@ -107,12 +99,7 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
         />
       </Field>
 
-      <Field
-        htmlFor="new-app-owner"
-        label="应用 owner"
-        required
-        help="owner 具备该应用最高管理权限。"
-      >
+      <Field htmlFor="new-app-owner" label={t("createApp.owner")} required help={t("createApp.ownerHelp")}>
         <Select
           id="new-app-owner"
           value={ownerId}
@@ -125,11 +112,7 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
         />
       </Field>
 
-      <Field
-        htmlFor="new-app-admins"
-        label="应用管理员"
-        help="可选，填写用户 ID，多个 ID 用逗号或空格分隔。owner 不需要重复填写。"
-      >
+      <Field htmlFor="new-app-admins" label={t("createApp.admins")} help={t("createApp.adminsHelp")}>
         <Input
           id="new-app-admins"
           autoComplete="off"
@@ -140,11 +123,11 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
         />
       </Field>
 
-      <Field htmlFor="new-app-description" label="描述" help="可选，用于说明应用用途。">
+      <Field htmlFor="new-app-description" label={t("createApp.description")} help={t("createApp.descriptionHelp")}>
         <Textarea
           id="new-app-description"
           maxLength={500}
-          placeholder="例如：官网、文档站或客户门户的身份与数据后端。"
+          placeholder={t("createApp.descriptionPlaceholder")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -161,10 +144,10 @@ export function CreateAppForm({ users, currentUserId }: { users: CreateAppUserOp
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={busy}>
-          <ArrowLeft /> 返回
+          <ArrowLeft /> {t("createApp.back")}
         </Button>
-        <Button type="submit" loading={busy} loadingText="创建中…" disabled={!canSubmit}>
-          <Sparkles /> 创建应用
+        <Button type="submit" loading={busy} loadingText={t("createApp.submitting")} disabled={!canSubmit}>
+          <Sparkles /> {t("createApp.submit")}
         </Button>
       </div>
     </form>

@@ -1,17 +1,12 @@
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { Badge, Card, CardContent } from "@/ui/primitives";
 import { FileRowActions } from "@/ui/console/file-actions";
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
 export default async function AccountFilesPage() {
   const auth = await requireConsoleAuth();
+  const { t, formatBytes, formatDateTime } = createI18n(normalizeLocale(auth.user.locale));
   const files = await prisma.fileObject.findMany({
     where: { ownerId: auth.user.id, deletedAt: null },
     orderBy: { createdAt: "desc" },
@@ -30,47 +25,51 @@ export default async function AccountFilesPage() {
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-semibold tracking-tight">我的文件</h1>
-        <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">所有由你账号上传到任意应用的文件。</p>
+        <h1 className="text-xl font-semibold tracking-tight">{t("accountFiles.title")}</h1>
+        <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">{t("accountFiles.description")}</p>
       </header>
       {files.length === 0 ? (
-        <Card><CardContent className="py-10 text-center text-sm text-ink-500 dark:text-slate-400">暂无文件。</CardContent></Card>
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-ink-500 dark:text-slate-400">
+            {t("accountFiles.empty")}
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead className="bg-cream-100 text-ink-500 text-xs dark:bg-slate-800/70 dark:text-slate-300">
                 <tr>
-                  <th className="text-left px-4 py-2 font-medium">名称</th>
-                  <th className="text-left px-4 py-2 font-medium">应用</th>
-                  <th className="text-left px-4 py-2 font-medium">类型</th>
-                  <th className="text-left px-4 py-2 font-medium">分享</th>
-                  <th className="text-right px-4 py-2 font-medium">大小</th>
-                  <th className="text-right px-4 py-2 font-medium">时间</th>
-                  <th className="text-right px-4 py-2 font-medium">操作</th>
+                  <th className="text-left px-4 py-2 font-medium">{t("accountFiles.name")}</th>
+                  <th className="text-left px-4 py-2 font-medium">{t("accountFiles.app")}</th>
+                  <th className="text-left px-4 py-2 font-medium">{t("accountFiles.type")}</th>
+                  <th className="text-left px-4 py-2 font-medium">{t("accountFiles.share")}</th>
+                  <th className="text-right px-4 py-2 font-medium">{t("accountFiles.size")}</th>
+                  <th className="text-right px-4 py-2 font-medium">{t("accountFiles.time")}</th>
+                  <th className="text-right px-4 py-2 font-medium">{t("accountFiles.actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {files.map((f) => (
                   <tr key={f.id} className="border-t border-ink-100 dark:border-slate-700/70 dark:hover:bg-slate-800/50">
                     <td className="px-4 py-2 truncate max-w-xs">{f.originalName}</td>
-                    <td className="px-4 py-2 text-ink-500 dark:text-slate-400">{f.app?.name ?? "（无）"}</td>
+                    <td className="px-4 py-2 text-ink-500 dark:text-slate-400">{f.app?.name ?? t("accountFiles.noApp")}</td>
                     <td className="px-4 py-2 text-ink-500 font-mono text-xs dark:text-slate-400">{f.mimeType}</td>
                     <td className="px-4 py-2">
                       {f.shareTokens[0] ? (
                         <div className="space-y-1">
-                          <Badge tone="success">shared</Badge>
+                          <Badge tone="success">{t("accountFiles.shared")}</Badge>
                           <p className="text-2xs text-ink-400 dark:text-slate-500">
-                            至 {new Date(f.shareTokens[0].expiresAt * 1000).toLocaleString()}
+                            {t("accountFiles.expiresAt", { time: formatDateTime(f.shareTokens[0].expiresAt) })}
                           </p>
                         </div>
                       ) : (
-                        <Badge tone="neutral">private</Badge>
+                        <Badge tone="neutral">{t("accountFiles.private")}</Badge>
                       )}
                     </td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatBytes(f.size)}</td>
                     <td className="px-4 py-2 text-right text-ink-500 text-xs dark:text-slate-400">
-                      {new Date(f.createdAt * 1000).toLocaleString()}
+                      {formatDateTime(f.createdAt)}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <FileRowActions
@@ -78,9 +77,7 @@ export default async function AccountFilesPage() {
                         file={{
                           id: f.id,
                           originalName: f.originalName,
-                          shareUrl: f.shareTokens[0]
-                            ? `/api/v1/files/public/${f.shareTokens[0].token}`
-                            : null
+                          shareUrl: f.shareTokens[0] ? `/api/v1/files/public/${f.shareTokens[0].token}` : null
                         }}
                       />
                     </td>

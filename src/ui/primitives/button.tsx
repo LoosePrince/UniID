@@ -77,9 +77,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const isDisabled = disabled || loading;
 
     if (asChild) {
-      const child = React.Children.only(children) as React.ReactElement<{
-        children?: React.ReactNode;
-      }>;
+      const child = React.Children.toArray(children).find(React.isValidElement) as
+        | React.ReactElement<{ children?: React.ReactNode }>
+        | undefined;
+      if (!child) {
+        throw new Error("Button with asChild expects a single React element child.");
+      }
 
       return (
         <Slot

@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/ui/primitives";
-
-const items = [
-  { href: "/console/account", label: "授权应用" },
-  { href: "/console/account/sessions", label: "会话" },
-  { href: "/console/account/files", label: "我的文件" },
-  { href: "/console/account/settings", label: "账号设置" }
-];
+import { useI18n } from "@/ui/i18n";
 
 export function AccountNav() {
+  const { t } = useI18n();
   const pathname = usePathname();
+  const items = [
+    { href: "/console/account", label: t("accountNav.authorizations") },
+    { href: "/console/account/sessions", label: t("accountNav.sessions") },
+    { href: "/console/account/files", label: t("accountNav.files") },
+    { href: "/console/account/settings", label: t("accountNav.settings") }
+  ];
+
   return (
     <nav className="-mb-px flex flex-wrap items-center gap-2 border-b border-ink-100 dark:border-slate-700/70">
       {items.map((it) => {

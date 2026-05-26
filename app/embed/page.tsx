@@ -17,6 +17,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Globe, Lock, ShieldCheck, User as UserIcon } from "lucide-react";
 import { Button, Spinner } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 type Step = "boot" | "checking" | "needs_login" | "ready_to_authorize" | "authorizing" | "done" | "cancelled" | "error";
 
@@ -34,6 +35,7 @@ interface AppShape {
 }
 
 function EmbedView() {
+  const { t } = useI18n();
   const params = useSearchParams();
   const appId = params.get("app_id") ?? "";
 
@@ -122,7 +124,7 @@ function EmbedView() {
 
   async function onAuthorize() {
     if (!parentOrigin) {
-      setError("未能确认父页面来源，请刷新重试");
+      setError(t("embed.parentOriginRequired"));
       return;
     }
     setStep("authorizing");
@@ -139,7 +141,7 @@ function EmbedView() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data?.error?.message ?? "授权失败");
+        setError(data?.error?.message ?? t("embed.authorizeFailed"));
         setStep("ready_to_authorize");
         return;
       }
@@ -157,7 +159,7 @@ function EmbedView() {
       );
       setStep("done");
     } catch {
-      setError("网络错误");
+      setError(t("embed.networkError"));
       setStep("ready_to_authorize");
     }
   }
@@ -174,7 +176,9 @@ function EmbedView() {
       <div className="h-full bg-cream-50 flex items-center justify-center p-4">
         <div data-card className="bg-white border border-ink-100 rounded-lg p-6 max-w-sm text-center shadow-sm">
           <Lock className="h-5 w-5 mx-auto text-ink-400" />
-          <p className="text-sm mt-3 text-ink-700">缺少必须参数 <code className="font-mono text-2xs">app_id</code></p>
+          <p className="text-sm mt-3 text-ink-700">
+            {t("embed.missingAppId")} <code className="font-mono text-2xs">app_id</code>
+          </p>
         </div>
       </div>
     );
@@ -190,13 +194,13 @@ function EmbedView() {
         <aside className="md:w-2/5 bg-cream-100 border-b md:border-b-0 md:border-r border-ink-100 p-6 flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <span className="h-7 w-7 rounded-md bg-ink-900 text-cream-50 flex items-center justify-center font-bold text-xs">U</span>
-            <span className="text-2xs uppercase tracking-wider font-medium text-ink-500">UniID 授权</span>
+            <span className="text-2xs uppercase tracking-wider font-medium text-ink-500">{t("embed.brand")}</span>
           </div>
           {app ? (
             <div className="space-y-3">
               <h1 className="text-xl font-semibold text-ink-900 tracking-tight">{app.name}</h1>
               <p className="text-sm text-ink-600 leading-relaxed line-clamp-4">
-                {app.description || "该应用未提供描述。"}
+                {app.description || t("embed.noDescription")}
               </p>
               <div className="pt-3 border-t border-ink-200/60 space-y-2 text-xs">
                 <div className="flex items-center gap-2 text-ink-500">
@@ -205,7 +209,7 @@ function EmbedView() {
                 </div>
                 <div className="flex items-center gap-2 text-ink-500">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>由 UniID 验证签发</span>
+                  <span>{t("embed.verifiedBy")}</span>
                 </div>
               </div>
             </div>
@@ -223,25 +227,25 @@ function EmbedView() {
           {step === "checking" && (
             <div className="flex flex-col items-center justify-center gap-3 text-ink-500 py-12">
               <Spinner />
-              <p className="text-xs">正在校验登录态…</p>
+              <p className="text-xs">{t("embed.checking")}</p>
             </div>
           )}
 
           {step === "needs_login" && (
             <div className="space-y-5">
               <div>
-                <h2 className="text-md font-semibold text-ink-900">登录以继续</h2>
-                <p className="text-xs text-ink-500 mt-1">该应用请求访问你的 UniID 账户。</p>
+                <h2 className="text-md font-semibold text-ink-900">{t("embed.loginTitle")}</h2>
+                <p className="text-xs text-ink-500 mt-1">{t("embed.loginDescription")}</p>
               </div>
               <Button onClick={goLogin} className="w-full" size="lg">
-                登录 UniID
+                {t("embed.loginButton")}
               </Button>
               <button
                 type="button"
                 onClick={onCancel}
                 className="w-full text-xs text-ink-400 hover:text-ink-600 transition-colors"
               >
-                拒绝并返回
+                {t("embed.decline")}
               </button>
             </div>
           )}
@@ -259,41 +263,41 @@ function EmbedView() {
                   {(user.displayName ?? user.username).charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-2xs uppercase tracking-wider text-ink-400 font-medium">当前账号</p>
+                  <p className="text-2xs uppercase tracking-wider text-ink-400 font-medium">{t("embed.currentAccount")}</p>
                   <p className="text-sm font-medium text-ink-900 truncate">{user.displayName ?? user.username}</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-medium text-ink-600">该应用将获得：</p>
+                <p className="text-xs font-medium text-ink-600">{t("embed.grantsTitle")}</p>
                 <ul className="space-y-1.5 text-xs text-ink-700">
                   <li className="flex items-center gap-2">
                     <UserIcon className="h-3.5 w-3.5 text-ink-400" />
-                    访问你的用户名与 ID
+                    {t("embed.grantProfile")}
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3.5 w-3.5 text-ink-400" />
-                    在你的授权范围内读写数据与文件
+                    {t("embed.grantData")}
                   </li>
                 </ul>
               </div>
 
               {showAuthTypeChoice && (
                 <div className="space-y-2">
-                  <p className="text-2xs uppercase tracking-wider font-medium text-ink-400">授权范围</p>
+                  <p className="text-2xs uppercase tracking-wider font-medium text-ink-400">{t("embed.authScope")}</p>
                   <div className="grid grid-cols-2 gap-2">
-                    {(["restricted", "full"] as const).map((t) => (
+                    {(["restricted", "full"] as const).map((scope) => (
                       <button
-                        key={t}
+                        key={scope}
                         type="button"
-                        onClick={() => setAuthType(t)}
+                        onClick={() => setAuthType(scope)}
                         className={`px-3 py-2 rounded-md text-xs font-medium border transition-colors ${
-                          authType === t
+                          authType === scope
                             ? "border-ink-900 bg-ink-900 text-cream-50"
                             : "border-ink-200 bg-white text-ink-700 hover:border-ink-300"
                         }`}
                       >
-                        {t === "restricted" ? "限制（推荐）" : "完整"}
+                        {scope === "restricted" ? t("embed.authRestricted") : t("embed.authFull")}
                       </button>
                     ))}
                   </div>
@@ -308,19 +312,19 @@ function EmbedView() {
 
               <div className="flex flex-col gap-2">
                 <Button type="submit" size="lg" className="w-full" disabled={!parentOrigin}>
-                  同意并授权
+                  {t("embed.approve")}
                 </Button>
                 <button
                   type="button"
                   onClick={onCancel}
                   className="w-full text-xs text-ink-400 hover:text-ink-600 transition-colors py-1"
                 >
-                  拒绝并返回
+                  {t("embed.decline")}
                 </button>
               </div>
 
               {!parentOrigin && (
-                <p className="text-2xs text-ink-400 text-center">等待父页面建立连接…</p>
+                <p className="text-2xs text-ink-400 text-center">{t("embed.waitingParent")}</p>
               )}
             </form>
           )}
@@ -328,7 +332,7 @@ function EmbedView() {
           {step === "authorizing" && (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-ink-500">
               <Spinner />
-              <p className="text-xs">正在签发授权…</p>
+              <p className="text-xs">{t("embed.authorizing")}</p>
             </div>
           )}
 
@@ -337,22 +341,22 @@ function EmbedView() {
               <div className="h-10 w-10 rounded-full bg-success-50 border border-success-100 flex items-center justify-center">
                 <CheckCircle2 className="h-5 w-5 text-success-500" />
               </div>
-              <p className="text-sm font-medium text-ink-900">授权完成</p>
-              <p className="text-xs text-ink-500">返回应用即可继续。</p>
+              <p className="text-sm font-medium text-ink-900">{t("embed.doneTitle")}</p>
+              <p className="text-xs text-ink-500">{t("embed.doneDescription")}</p>
             </div>
           )}
 
           {step === "cancelled" && (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <p className="text-sm text-ink-700">已取消</p>
-              <p className="text-xs text-ink-500">你可以关闭此窗口。</p>
+              <p className="text-sm text-ink-700">{t("embed.cancelledTitle")}</p>
+              <p className="text-xs text-ink-500">{t("embed.cancelledDescription")}</p>
             </div>
           )}
 
           {step === "error" && (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <p className="text-sm text-danger-700">出错了</p>
-              <p className="text-xs text-ink-500">请刷新重试。</p>
+              <p className="text-sm text-danger-700">{t("embed.errorTitle")}</p>
+              <p className="text-xs text-ink-500">{t("embed.errorDescription")}</p>
             </div>
           )}
         </section>

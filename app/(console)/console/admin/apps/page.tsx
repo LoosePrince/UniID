@@ -4,6 +4,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
 import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Select } from "@/ui/primitives";
@@ -26,8 +27,13 @@ type SearchParams = {
 };
 
 export default async function AdminAppsPage({ searchParams }: { searchParams?: SearchParams }) {
+  let t: ReturnType<typeof createI18n>["t"];
+  let formatNumber: ReturnType<typeof createI18n>["formatNumber"];
   try {
-    await requireSystemAdmin();
+    const auth = await requireSystemAdmin();
+    const i18n = createI18n(normalizeLocale(auth.user.locale));
+    t = i18n.t;
+    formatNumber = i18n.formatNumber;
   } catch {
     redirect("/console");
   }
@@ -57,52 +63,54 @@ export default async function AdminAppsPage({ searchParams }: { searchParams?: S
   return (
     <div className="container-page space-y-6 py-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">全部应用</h1>
-        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">共 {filtered.length} 个匹配应用，当前显示 {apps.length} 个。</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("admin.apps.title")}</h1>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">
+          {t("admin.apps.summary", { total: formatNumber(filtered.length), shown: formatNumber(apps.length) })}
+        </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>筛选</CardTitle>
-          <CardDescription>按名称、域名、所有者和状态定位应用。</CardDescription>
+          <CardTitle>{t("admin.filterTitle")}</CardTitle>
+          <CardDescription>{t("admin.filterAppsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_auto]" action="/console/admin/apps">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400 dark:text-slate-500" />
-              <Input name="q" defaultValue={q} className="pl-9" placeholder="搜索名称、域名或所有者" />
+              <Input name="q" defaultValue={q} className="pl-9" placeholder={t("admin.searchApps")} />
             </div>
             <Select
               name="status"
               defaultValue={status ?? "all"}
-              aria-label="状态筛选"
+              aria-label={t("admin.statusFilter")}
               options={[
-                { value: "all", label: "全部状态" },
+                { value: "all", label: t("admin.statusAll") },
                 { value: "active", label: "active" },
                 { value: "suspended", label: "suspended" },
                 { value: "archived", label: "archived" }
               ]}
             />
-            <Button type="submit">筛选</Button>
+            <Button type="submit">{t("admin.filterSubmit")}</Button>
           </form>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>应用列表</CardTitle>
-          <CardDescription>第 {safePage} / {totalPages} 页</CardDescription>
+          <CardTitle>{t("admin.appList")}</CardTitle>
+          <CardDescription>{t("admin.pageOf", { page: safePage, total: totalPages })}</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[880px] text-sm">
             <thead className="border-b border-sand-200 bg-cream-50 dark:border-slate-700/70 dark:bg-slate-900/70">
               <tr>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">名称 / 域名</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">所有者</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">状态</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">授权</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">记录/文件/会话</th>
-                <th className="px-4 py-2 text-right font-medium text-ink-500 dark:text-slate-300">操作</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.nameDomain")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.owner")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.status")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.auth")}</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">{t("admin.col.stats")}</th>
+                <th className="px-4 py-2 text-right font-medium text-ink-500 dark:text-slate-300">{t("admin.col.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -127,7 +135,7 @@ export default async function AdminAppsPage({ searchParams }: { searchParams?: S
               ))}
               {apps.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-ink-400 dark:text-slate-500">暂无匹配应用</td>
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-ink-400 dark:text-slate-500">{t("admin.noMatchApps")}</td>
                 </tr>
               ) : null}
             </tbody>
@@ -137,10 +145,10 @@ export default async function AdminAppsPage({ searchParams }: { searchParams?: S
 
       <div className="flex items-center justify-end gap-2">
         <Button asChild variant="outline" size="sm" disabled={safePage <= 1}>
-          <Link href={makeHref(Math.max(1, safePage - 1))}>上一页</Link>
+          <Link href={makeHref(Math.max(1, safePage - 1))}>{t("admin.prevPage")}</Link>
         </Button>
         <Button asChild variant="outline" size="sm" disabled={safePage >= totalPages}>
-          <Link href={makeHref(Math.min(totalPages, safePage + 1))}>下一页</Link>
+          <Link href={makeHref(Math.min(totalPages, safePage + 1))}>{t("admin.nextPage")}</Link>
         </Button>
       </div>
     </div>

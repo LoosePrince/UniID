@@ -18,6 +18,7 @@ import {
   Textarea,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface ApiErrorResponse {
   error?: { message?: string; details?: unknown };
@@ -51,17 +52,21 @@ function apiMessage(json: ApiErrorResponse, fallback: string) {
   return json.error?.message ?? fallback;
 }
 
-function parseJsonObject(source: string, emptyValue: Record<string, unknown> | undefined = undefined) {
+function parseJsonObject(
+  source: string,
+  emptyValue: Record<string, unknown> | undefined,
+  t: (key: string, values?: Record<string, string>) => string
+) {
   const trimmed = source.trim();
   if (!trimmed) return emptyValue;
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    throw new Error("请输入合法 JSON。");
+    throw new Error(t("common.jsonInvalid"));
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("JSON 内容必须是 object。");
+    throw new Error(t("common.jsonMustBeObject"));
   }
   return parsed as Record<string, unknown>;
 }
@@ -81,6 +86,7 @@ function formatResult(result: FunctionActionResponse) {
 }
 
 export function CreateFunctionForm({ appId }: { appId: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -106,15 +112,15 @@ export function CreateFunctionForm({ appId }: { appId: string }) {
         })
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("函数已创建", { description: name.trim() });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("functions.created"), { description: name.trim() });
       setName("");
       setDescription("");
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("创建失败", { description: message });
+      toast.error(t("common.createFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -122,7 +128,7 @@ export function CreateFunctionForm({ appId }: { appId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Field htmlFor="fn-name" label="函数名" required help="只能包含字母、数字、_ 和 -。">
+      <Field htmlFor="fn-name" label={t("functions.name")} required help={t("functions.nameHelp")}>
         <Input
           id="fn-name"
           required
@@ -134,18 +140,18 @@ export function CreateFunctionForm({ appId }: { appId: string }) {
           disabled={busy}
         />
       </Field>
-      <Field htmlFor="fn-desc" label="描述">
+      <Field htmlFor="fn-desc" label={t("common.description")}>
         <Input
           id="fn-desc"
           maxLength={500}
-          placeholder="一句话描述"
+          placeholder={t("functions.descPlaceholder")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           disabled={busy}
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field htmlFor="fn-memory" label="内存 MB">
+        <Field htmlFor="fn-memory" label={t("functions.memoryMb")}>
           <Input
             id="fn-memory"
             type="number"
@@ -156,7 +162,7 @@ export function CreateFunctionForm({ appId }: { appId: string }) {
             disabled={busy}
           />
         </Field>
-        <Field htmlFor="fn-timeout" label="超时 ms">
+        <Field htmlFor="fn-timeout" label={t("functions.timeoutMs")}>
           <Input
             id="fn-timeout"
             type="number"
@@ -173,14 +179,15 @@ export function CreateFunctionForm({ appId }: { appId: string }) {
           {error}
         </p>
       ) : null}
-      <Button type="submit" loading={busy} loadingText="创建中…" disabled={name.trim() === ""}>
-        创建函数
+      <Button type="submit" loading={busy} loadingText={t("common.creating")} disabled={name.trim() === ""}>
+        {t("functions.create")}
       </Button>
     </form>
   );
 }
 
 export function DeployButton({ appId, fnId, fnName }: { appId: string; fnId: string; fnName?: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [source, setSource] = React.useState(SAMPLE_SOURCE);
@@ -199,14 +206,14 @@ export function DeployButton({ appId, fnId, fnName }: { appId: string; fnId: str
         body: JSON.stringify({ sourceCode: source })
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("函数已部署", { description: fnName ?? fnId });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("functions.deployed"), { description: fnName ?? fnId });
       setOpen(false);
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("部署失败", { description: message });
+      toast.error(t("common.deployFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -215,16 +222,16 @@ export function DeployButton({ appId, fnId, fnName }: { appId: string; fnId: str
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        <UploadCloud /> 部署
+        <UploadCloud /> {t("common.deploy")}
       </Button>
       <DialogContent className="max-w-3xl">
         <form onSubmit={onDeploy}>
           <DialogHeader>
-            <DialogTitle>部署函数版本</DialogTitle>
-            <DialogDescription>源码需要导出或声明 handler(input, uniid)。部署成功后会成为 active deployment。</DialogDescription>
+            <DialogTitle>{t("functions.deployTitle")}</DialogTitle>
+            <DialogDescription>{t("functions.deployDescription")}</DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <Field htmlFor={`src-${fnId}`} label="源码" required error={error}>
+            <Field htmlFor={`src-${fnId}`} label={t("common.sourceCode")} required error={error}>
               <Textarea
                 id={`src-${fnId}`}
                 className="min-h-[420px] font-mono text-xs"
@@ -238,10 +245,10 @@ export function DeployButton({ appId, fnId, fnName }: { appId: string; fnId: str
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button type="submit" loading={busy} loadingText="部署中…" disabled={source.trim() === ""}>
-              部署新版本
+            <Button type="submit" loading={busy} loadingText={t("common.deploying")} disabled={source.trim() === ""}>
+              {t("functions.deployVersion")}
             </Button>
           </DialogFooter>
         </form>
@@ -251,6 +258,7 @@ export function DeployButton({ appId, fnId, fnName }: { appId: string; fnId: str
 }
 
 export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionSummary }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [invokeOpen, setInvokeOpen] = React.useState(false);
@@ -280,7 +288,7 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
       body: JSON.stringify(body)
     });
     const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-    if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
+    if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
     toast.success(successTitle, { description: fn.name });
     router.refresh();
   }
@@ -296,13 +304,13 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
         memoryMb: Number(memoryMb),
         timeoutMs: Number(timeoutMs)
       };
-      if (envJson.trim()) body.env = parseJsonObject(envJson, undefined);
-      await patchFunction(body, "函数设置已保存");
+      if (envJson.trim()) body.env = parseJsonObject(envJson, undefined, t);
+      await patchFunction(body, t("functions.settingsSaved"));
       setSettingsOpen(false);
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("保存失败", { description: message });
+      toast.error(t("common.saveFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -312,11 +320,11 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
     setBusy("toggle");
     setError(null);
     try {
-      await patchFunction({ isActive: fn.isActive !== 1 }, fn.isActive === 1 ? "函数已停用" : "函数已启用");
+      await patchFunction({ isActive: fn.isActive !== 1 }, fn.isActive === 1 ? t("functions.disabled") : t("functions.enabled"));
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("操作失败", { description: message });
+      toast.error(t("common.operationFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -328,7 +336,7 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
     setError(null);
     setResult(null);
     try {
-      const parsedPayload = parseJsonObject(payload, {});
+      const parsedPayload = parseJsonObject(payload, {}, t);
       const res = await fetch(`/api/v1/apps/${appId}/functions/${fn.id}/invoke`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -336,14 +344,14 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
         body: JSON.stringify({ payload: parsedPayload })
       });
       const json = (await res.json().catch(() => ({}))) as FunctionActionResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
       setResult(formatResult(json));
-      toast.success("测试调用已完成", { description: json.status ?? json.invocationId });
+      toast.success(t("functions.invokeDone"), { description: json.status ?? json.invocationId });
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("调用失败", { description: message });
+      toast.error(t("common.invokeFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -358,14 +366,14 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
         credentials: "include"
       });
       const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
-      if (!res.ok) throw new Error(apiMessage(json, `HTTP ${res.status}`));
-      toast.success("函数已删除", { description: fn.name });
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("functions.deleted"), { description: fn.name });
       setDeleteOpen(false);
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("删除失败", { description: message });
+      toast.error(t("common.deleteFailed"), { description: message });
     } finally {
       setBusy(null);
     }
@@ -376,16 +384,16 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
       <div className="flex flex-wrap justify-end gap-1.5">
         <DeployButton appId={appId} fnId={fn.id} fnName={fn.name} />
         <Button size="sm" variant="ghost" onClick={() => setInvokeOpen(true)} disabled={!fn.activeDeploymentId || busy !== null}>
-          <Play /> 测试
+          <Play /> {t("common.test")}
         </Button>
         <Button size="sm" variant="ghost" onClick={toggleActive} loading={busy === "toggle"}>
-          {fn.isActive === 1 ? "停用" : "启用"}
+          {fn.isActive === 1 ? t("common.disable") : t("common.enable")}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setSettingsOpen(true)} disabled={busy !== null}>
-          <Settings2 /> 设置
+          <Settings2 /> {t("functions.settingsTitle")}
         </Button>
         <Button size="sm" variant="danger" onClick={() => setDeleteOpen(true)} disabled={busy !== null}>
-          <Trash2 /> 删除
+          <Trash2 /> {t("common.delete")}
         </Button>
       </div>
       {error ? <p className="text-right text-xs text-danger-700">{error}</p> : null}
@@ -394,11 +402,11 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
         <DialogContent className="max-w-2xl">
           <form onSubmit={saveSettings}>
             <DialogHeader>
-              <DialogTitle>函数设置</DialogTitle>
+              <DialogTitle>{t("functions.settingsTitle")}</DialogTitle>
               <DialogDescription className="font-mono">{fn.name}</DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4">
-              <Field htmlFor={`fn-desc-${fn.id}`} label="描述">
+              <Field htmlFor={`fn-desc-${fn.id}`} label={t("common.description")}>
                 <Input
                   id={`fn-desc-${fn.id}`}
                   value={description}
@@ -407,19 +415,19 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
                 />
               </Field>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Field htmlFor={`fn-active-${fn.id}`} label="状态">
+                <Field htmlFor={`fn-active-${fn.id}`} label={t("common.status")}>
                   <Select
                     id={`fn-active-${fn.id}`}
                     value={isActive}
                     onValueChange={setIsActive}
                     disabled={busy === "settings"}
                     options={[
-                      { value: "true", label: "active" },
-                      { value: "false", label: "disabled" }
+                      { value: "true", label: t("common.active") },
+                      { value: "false", label: t("common.disabled") }
                     ]}
                   />
                 </Field>
-                <Field htmlFor={`fn-memory-${fn.id}`} label="内存 MB">
+                <Field htmlFor={`fn-memory-${fn.id}`} label={t("functions.memoryMb")}>
                   <Input
                     id={`fn-memory-${fn.id}`}
                     type="number"
@@ -430,7 +438,7 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
                     disabled={busy === "settings"}
                   />
                 </Field>
-                <Field htmlFor={`fn-timeout-${fn.id}`} label="超时 ms">
+                <Field htmlFor={`fn-timeout-${fn.id}`} label={t("functions.timeoutMs")}>
                   <Input
                     id={`fn-timeout-${fn.id}`}
                     type="number"
@@ -444,15 +452,15 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
               </div>
               <Field
                 htmlFor={`fn-env-${fn.id}`}
-                label="环境变量 JSON"
-                help="可选；留空表示不修改现有环境变量。示例：{ &quot;API_KEY&quot;: &quot;...&quot; }"
+                label={t("functions.envJson")}
+                help={t("functions.envHelp")}
                 error={settingsOpen && busy === null ? error : undefined}
               >
                 <Textarea
                   id={`fn-env-${fn.id}`}
                   className="min-h-[120px] font-mono text-xs"
                   spellCheck={false}
-                  placeholder="留空则不修改"
+                  placeholder={t("functions.envPlaceholder")}
                   value={envJson}
                   onChange={(e) => setEnvJson(e.target.value)}
                   disabled={busy === "settings"}
@@ -462,10 +470,10 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setSettingsOpen(false)} disabled={busy === "settings"}>
-                取消
+                {t("common.cancel")}
               </Button>
-              <Button type="submit" loading={busy === "settings"} loadingText="保存中…">
-                保存设置
+              <Button type="submit" loading={busy === "settings"} loadingText={t("common.saving")}>
+                {t("functions.saveSettings")}
               </Button>
             </DialogFooter>
           </form>
@@ -476,11 +484,11 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
         <DialogContent className="max-w-3xl">
           <form onSubmit={invokeFunction}>
             <DialogHeader>
-              <DialogTitle>测试调用</DialogTitle>
+              <DialogTitle>{t("functions.invokeTitle")}</DialogTitle>
               <DialogDescription className="font-mono">{fn.name}</DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4">
-              <Field htmlFor={`fn-payload-${fn.id}`} label="Payload JSON" error={invokeOpen ? error : undefined}>
+              <Field htmlFor={`fn-payload-${fn.id}`} label={t("cron.payloadJson")} error={invokeOpen ? error : undefined}>
                 <Textarea
                   id={`fn-payload-${fn.id}`}
                   className="min-h-[180px] font-mono text-xs"
@@ -494,7 +502,7 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
               {result ? (
                 <div className="rounded-md border border-ink-100 bg-cream-50 p-3">
                   <div className="mb-2 flex items-center gap-2 text-xs font-medium text-ink-700">
-                    <Code2 className="h-3.5 w-3.5" /> 调用结果
+                    <Code2 className="h-3.5 w-3.5" /> {t("functions.invokeResult")}
                   </div>
                   <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap text-xs text-ink-700">{result}</pre>
                 </div>
@@ -502,10 +510,10 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
             </DialogBody>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setInvokeOpen(false)} disabled={busy === "invoke"}>
-                关闭
+                {t("common.close")}
               </Button>
-              <Button type="submit" loading={busy === "invoke"} loadingText="调用中…" disabled={!fn.activeDeploymentId}>
-                执行测试
+              <Button type="submit" loading={busy === "invoke"} loadingText={t("functions.invoking")} disabled={!fn.activeDeploymentId}>
+                {t("functions.runTest")}
               </Button>
             </DialogFooter>
           </form>
@@ -515,21 +523,21 @@ export function FunctionRowActions({ appId, fn }: { appId: string; fn: FunctionS
       <Dialog open={deleteOpen} onOpenChange={(next) => busy !== "delete" && setDeleteOpen(next)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>删除函数</DialogTitle>
-            <DialogDescription>函数、部署版本、调用日志和关联 Cron 会按数据库关系一起清理。</DialogDescription>
+            <DialogTitle>{t("functions.deleteTitle")}</DialogTitle>
+            <DialogDescription>{t("functions.deleteDescription")}</DialogDescription>
           </DialogHeader>
           <DialogBody>
             <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-800">
-              确认删除函数 <span className="font-mono">{fn.name}</span>？
+              {t("functions.confirmDelete", { name: fn.name })}
             </div>
             {deleteOpen && error ? <p className="mt-3 text-xs text-danger-700">{error}</p> : null}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={busy === "delete"}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button type="button" variant="danger" loading={busy === "delete"} loadingText="删除中…" onClick={deleteFunction}>
-              删除
+            <Button type="button" variant="danger" loading={busy === "delete"} loadingText={t("common.deleting")} onClick={deleteFunction}>
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

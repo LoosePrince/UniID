@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { AppService } from "@/modules/apps";
 import { prisma } from "@/shared/prisma";
@@ -6,6 +7,7 @@ import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from
 
 export default async function AppOverviewPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
+  const { t, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { domains: true, admins: true, quota: true }
@@ -33,48 +35,28 @@ export default async function AppOverviewPage({ params }: { params: { appId: str
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xs uppercase tracking-wider text-ink-400">记录</p>
-            <p className="mt-1 text-2xl font-semibold">{recordsCount.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xs uppercase tracking-wider text-ink-400">文件</p>
-            <p className="mt-1 text-2xl font-semibold">{filesCount.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xs uppercase tracking-wider text-ink-400">活跃会话</p>
-            <p className="mt-1 text-2xl font-semibold">{sessionsCount.toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-2xs uppercase tracking-wider text-ink-400">Schemas</p>
-            <p className="mt-1 text-2xl font-semibold">{schemasCount.toLocaleString()}</p>
-          </CardContent>
-        </Card>
+        <MetricCard label={t("appDetail.metric.records")} value={formatNumber(recordsCount)} />
+        <MetricCard label={t("appDetail.metric.files")} value={formatNumber(filesCount)} />
+        <MetricCard label={t("appDetail.metric.sessions")} value={formatNumber(sessionsCount)} />
+        <MetricCard label={t("appDetail.metric.schemas")} value={formatNumber(schemasCount)} />
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Card>
           <CardHeader>
-            <CardTitle>域名</CardTitle>
-            <CardDescription>仅以下域名可访问该应用的 UniID API。</CardDescription>
+            <CardTitle>{t("appDetail.domains.title")}</CardTitle>
+            <CardDescription>{t("appDetail.domains.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <span className="font-mono">{app.primaryDomain}</span>
-              <Badge tone="solid">主域名</Badge>
+              <Badge tone="solid">{t("appDetail.domains.primary")}</Badge>
             </div>
             {app.domains.map((d) => (
               <div key={d.id} className="flex items-center justify-between">
                 <span className="font-mono">{d.host}</span>
                 <Badge tone={d.verified ? "success" : "warning"}>
-                  {d.verified ? "已校验" : "待校验"}
+                  {d.verified ? t("appDetail.domains.verified") : t("appDetail.domains.pending")}
                 </Badge>
               </div>
             ))}
@@ -83,19 +65,39 @@ export default async function AppOverviewPage({ params }: { params: { appId: str
 
         <Card>
           <CardHeader>
-            <CardTitle>配额</CardTitle>
-            <CardDescription>限制超出后请求会被节流。</CardDescription>
+            <CardTitle>{t("appDetail.quota.title")}</CardTitle>
+            <CardDescription>{t("appDetail.quota.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1.5 text-sm">
-            <Row k="RPS" v={app.quota?.rpsLimit ?? "—"} />
-            <Row k="每日 API 调用" v={app.quota?.dailyApiCalls?.toLocaleString() ?? "—"} />
-            <Row k="存储 (字节)" v={app.quota?.monthlyStorageBytes?.toLocaleString() ?? "—"} />
-            <Row k="出站 (字节)" v={app.quota?.monthlyEgressBytes?.toLocaleString() ?? "—"} />
-            <Row k="函数 / 日" v={app.quota?.fnInvocationsDaily?.toLocaleString() ?? "—"} />
+            <Row k={t("appDetail.quota.rps")} v={app.quota?.rpsLimit ?? "—"} />
+            <Row k={t("appDetail.quota.dailyApi")} v={app.quota?.dailyApiCalls != null ? formatNumber(app.quota.dailyApiCalls) : "—"} />
+            <Row
+              k={t("appDetail.quota.storage")}
+              v={app.quota?.monthlyStorageBytes != null ? formatNumber(Number(app.quota.monthlyStorageBytes)) : "—"}
+            />
+            <Row
+              k={t("appDetail.quota.egress")}
+              v={app.quota?.monthlyEgressBytes != null ? formatNumber(Number(app.quota.monthlyEgressBytes)) : "—"}
+            />
+            <Row
+              k={t("appDetail.quota.functions")}
+              v={app.quota?.fnInvocationsDaily != null ? formatNumber(app.quota.fnInvocationsDaily) : "—"}
+            />
           </CardContent>
         </Card>
       </section>
     </div>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-2xs uppercase tracking-wider text-ink-400">{label}</p>
+        <p className="mt-1 text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 

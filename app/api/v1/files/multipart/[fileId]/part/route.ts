@@ -19,11 +19,11 @@ async function handler(
     const partNumberRaw = req.nextUrl.searchParams.get("partNumber");
     const partNumber = Number(partNumberRaw);
     if (!Number.isInteger(partNumber) || partNumber < 1) {
-      throw new ApiError("FILE_MULTIPART_INVALID", { message: "partNumber 必须为正整数" });
+      throw new ApiError("FILE_MULTIPART_INVALID", { message: "validation.multipartPartNumber" });
     }
     const buf = Buffer.from(await req.arrayBuffer());
     if (buf.byteLength === 0) {
-      throw new ApiError("FILE_MULTIPART_INVALID", { message: "分片为空" });
+      throw new ApiError("FILE_MULTIPART_INVALID", { message: "validation.multipartEmpty" });
     }
     const result = await FileService.uploadPart({
       fileId,
@@ -33,7 +33,7 @@ async function handler(
     });
     return NextResponse.json({ part: result });
   } catch (err) {
-    return toErrorResponse(err);
+    return await toErrorResponse(err, undefined, req);
   }
 }
 

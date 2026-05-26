@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import {
@@ -56,11 +55,12 @@ export function AppSwitcher({ apps, currentAppId }: { apps: AppOption[]; current
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/console/apps/new" className="flex items-center gap-2 text-accent-600">
-            <Plus className="h-3.5 w-3.5" />
-            {t("common.createApp")}
-          </Link>
+        <DropdownMenuItem
+          onSelect={() => router.push("/console/apps/new")}
+          className="text-accent-600 focus:text-accent-800 data-[highlighted]:text-accent-800 dark:text-accent-200 dark:focus:text-accent-100 dark:data-[highlighted]:text-accent-100"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t("common.createApp")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

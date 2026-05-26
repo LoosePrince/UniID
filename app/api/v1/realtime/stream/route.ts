@@ -86,7 +86,7 @@ async function handler(req: NextRequest): Promise<Response> {
       }
     });
   } catch (err) {
-    return toErrorResponse(err);
+    return await toErrorResponse(err, undefined, req);
   }
 }
 

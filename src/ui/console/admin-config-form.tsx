@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Save } from "lucide-react";
 import { Button, Field, Input, toast } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface QuotaDefaults {
   rpsLimit: number;
@@ -12,6 +13,7 @@ interface QuotaDefaults {
 }
 
 export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
+  const { t } = useI18n();
   const [form, setForm] = useState<QuotaDefaults>(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -39,13 +41,13 @@ export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
         });
         if (!res.ok) {
           const json = await res.json().catch(() => ({}));
-          throw new Error(json?.error?.message ?? `保存失败 (${res.status})`);
+          throw new Error(json?.error?.message ?? t("http.status", { status: res.status }));
         }
-        toast.success("默认配额已保存");
+        toast.success(t("admin.config.defaultQuotaSaved"));
       } catch (err) {
-        const message = err instanceof Error ? err.message : "保存失败";
+        const message = err instanceof Error ? err.message : t("common.saveFailed");
         setError(message);
-        toast.error("保存失败", { description: message });
+        toast.error(t("common.saveFailed"), { description: message });
       }
     });
   };
@@ -53,16 +55,16 @@ export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="每秒请求上限" htmlFor="rps" help="单应用默认 RPS 限额。">
+        <Field label={t("admin.config.rpsLabel")} htmlFor="rps" help={t("admin.config.rpsHelp")}>
           <Input id="rps" type="number" min={1} value={form.rpsLimit} onChange={(event) => set("rpsLimit", event.target.value)} disabled={pending} />
         </Field>
-        <Field label="每日 API 调用上限" htmlFor="daily">
+        <Field label={t("admin.config.dailyApiLabel")} htmlFor="daily">
           <Input id="daily" type="number" min={1} value={form.dailyApiCalls} onChange={(event) => set("dailyApiCalls", event.target.value)} disabled={pending} />
         </Field>
-        <Field label="每月存储上限 (bytes)" htmlFor="storage">
+        <Field label={t("admin.config.storageLabel")} htmlFor="storage">
           <Input id="storage" type="number" min={1} value={form.monthlyStorageBytes} onChange={(event) => set("monthlyStorageBytes", event.target.value)} disabled={pending} />
         </Field>
-        <Field label="每日函数调用上限" htmlFor="fn">
+        <Field label={t("admin.config.fnDailyLabel")} htmlFor="fn">
           <Input id="fn" type="number" min={1} value={form.fnInvocationsDaily} onChange={(event) => set("fnInvocationsDaily", event.target.value)} disabled={pending} />
         </Field>
       </div>
@@ -72,10 +74,10 @@ export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
         </p>
       ) : null}
       <div className="flex items-center gap-3">
-        <Button type="submit" loading={pending} loadingText="保存中..." disabled={!dirty}>
-          <Save /> 保存默认配额
+        <Button type="submit" loading={pending} loadingText={t("common.saving")} disabled={!dirty}>
+          <Save /> {t("admin.config.saveDefaultQuota")}
         </Button>
-        {!dirty ? <span className="text-xs text-ink-400 dark:text-slate-500">没有未保存改动</span> : null}
+        {!dirty ? <span className="text-xs text-ink-400 dark:text-slate-500">{t("profile.noChanges")}</span> : null}
       </div>
     </form>
   );

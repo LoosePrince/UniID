@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
@@ -24,6 +25,7 @@ export default async function DataBrowserPage({
   params: { appId: string; dataType: string };
 }) {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -57,8 +59,11 @@ export default async function DataBrowserPage({
             <span className="font-mono">{params.dataType}</span>
           </h1>
           <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">
-            共 {total} 条 · 当前显示 {records.length} 条 · active schema v
-            {schema.versions[0]?.version ?? "—"}
+            {t("data.browserSummary", {
+              total: formatNumber(total),
+              shown: formatNumber(records.length),
+              version: String(schema.versions[0]?.version ?? "—")
+            })}
           </p>
         </div>
         <CreateRecordButton appId={app.id} dataType={params.dataType} />
@@ -69,11 +74,11 @@ export default async function DataBrowserPage({
           <table className="w-full text-sm">
             <thead className="border-b border-ink-100 bg-cream-100 text-ink-500 text-xs dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
               <tr>
-                <th className="text-left px-4 py-2 font-medium">ID</th>
-                <th className="text-left px-4 py-2 font-medium">Owner</th>
-                <th className="text-left px-4 py-2 font-medium">Data</th>
-                <th className="text-right px-4 py-2 font-medium">Updated</th>
-                <th className="text-right px-4 py-2 font-medium">操作</th>
+                <th className="text-left px-4 py-2 font-medium">{t("data.col.id")}</th>
+                <th className="text-left px-4 py-2 font-medium">{t("data.col.owner")}</th>
+                <th className="text-left px-4 py-2 font-medium">{t("data.col.data")}</th>
+                <th className="text-right px-4 py-2 font-medium">{t("data.col.updated")}</th>
+                <th className="text-right px-4 py-2 font-medium">{t("schema.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -81,10 +86,8 @@ export default async function DataBrowserPage({
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center">
                     <div className="mx-auto max-w-sm space-y-3">
-                      <p className="text-sm font-medium text-ink-700 dark:text-slate-200">暂无记录</p>
-                      <p className="text-xs text-ink-500 dark:text-slate-400">
-                        可以先创建一条 JSON 记录，写入时会使用当前 active schema 校验。
-                      </p>
+                      <p className="text-sm font-medium text-ink-700 dark:text-slate-200">{t("data.noRecords")}</p>
+                      <p className="text-xs text-ink-500 dark:text-slate-400">{t("data.noRecordsHint")}</p>
                       <CreateRecordButton appId={app.id} dataType={params.dataType} />
                     </div>
                   </td>
@@ -104,7 +107,7 @@ export default async function DataBrowserPage({
                       <span className="line-clamp-2 break-all">{previewRecordData(record.data)}</span>
                     </td>
                     <td className="px-4 py-3 text-right text-xs text-ink-500 whitespace-nowrap dark:text-slate-400">
-                      {new Date(record.updatedAt * 1000).toLocaleString()}
+                      {formatDateTime(record.updatedAt)}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <RecordRowActions

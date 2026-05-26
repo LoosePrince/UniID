@@ -1,21 +1,20 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { Home, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
+import { useI18n } from "@/ui/i18n";
 import {
   Button,
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
   toast
 } from "@/ui/primitives";
-import { useI18n } from "@/ui/i18n";
 import { ThemeToggle } from "@/ui/theme";
+import { Home, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { AppSwitcher, type AppOption } from "./app-switcher";
 import { CommandPalette } from "./command-palette";
 
@@ -105,26 +104,20 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
           <DropdownMenuContent align="end" className="min-w-56">
             <DropdownMenuLabel>
               <span className="block truncate">{props.user.username}</span>
-              <span className="mt-0.5 block text-2xs font-normal text-ink-400 dark:text-slate-500">{props.user.role}</span>
+              <span className="">{props.user.role}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/">
-                <Home className="h-3.5 w-3.5" />
-                {t("topbar.goHome")}
-              </Link>
+            <DropdownMenuItem onSelect={() => router.push("/")}>
+              <Home className="h-3.5 w-3.5" />
+              {t("topbar.goHome")}
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/console/account">
-                <UserIcon className="h-3.5 w-3.5" />
-                {t("common.accountCenter")}
-              </Link>
+            <DropdownMenuItem onSelect={() => router.push("/console/account")}>
+              <UserIcon className="h-3.5 w-3.5" />
+              {t("common.accountCenter")}
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/console/account/settings">
-                <Settings className="h-3.5 w-3.5" />
-                {t("topbar.accountSettings")}
-              </Link>
+            <DropdownMenuItem onSelect={() => router.push("/console/account/settings")}>
+              <Settings className="h-3.5 w-3.5" />
+              {t("topbar.accountSettings")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

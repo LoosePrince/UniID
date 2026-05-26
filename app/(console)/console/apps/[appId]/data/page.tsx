@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
@@ -9,6 +10,7 @@ import { Plus } from "lucide-react";
 
 export default async function DataIndexPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -33,25 +35,21 @@ export default async function DataIndexPage({ params }: { params: { appId: strin
     <div className="container-page py-8 space-y-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">数据浏览器</h1>
-          <p className="text-sm text-ink-500 mt-1">
-            按 dataType 浏览、创建和维护此应用的数据记录。
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">{t("appData.title")}</h1>
+          <p className="text-sm text-ink-500 mt-1">{t("appData.description")}</p>
         </div>
         <Button asChild>
-          <Link href={`/console/apps/${app.id}/schemas`}><Plus /> 管理 Schema</Link>
+          <Link href={`/console/apps/${app.id}/schemas`}><Plus /> {t("data.manageSchemas")}</Link>
         </Button>
       </header>
 
       {schemas.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-sm font-medium text-ink-700">还没有任何 dataType</p>
-            <p className="mt-1 text-xs text-ink-500">
-              先创建 Schema，之后就能在这里写入和管理记录。
-            </p>
+            <p className="text-sm font-medium text-ink-700">{t("data.noDataTypesTitle")}</p>
+            <p className="mt-1 text-xs text-ink-500">{t("data.noDataTypesDescription")}</p>
             <Button asChild variant="outline" className="mt-4">
-              <Link href={`/console/apps/${app.id}/schemas`}><Plus /> 创建第一个 Schema</Link>
+              <Link href={`/console/apps/${app.id}/schemas`}><Plus /> {t("data.createFirstSchema")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -71,18 +69,18 @@ export default async function DataIndexPage({ params }: { params: { appId: strin
                       {version && <Badge tone={version.isActive ? "success" : "neutral"}>v{version.version}</Badge>}
                     </div>
                     <CardDescription className="line-clamp-2">
-                      {schema.description ?? "未填写描述。"}
+                      {schema.description ?? t("data.noDescription")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="grid grid-cols-2 gap-3 text-xs text-ink-500">
                     <div>
-                      <p className="text-2xs uppercase tracking-wide text-ink-400">Records</p>
-                      <p className="mt-1 text-sm font-medium text-ink-900">{count}</p>
+                      <p className="text-2xs uppercase tracking-wide text-ink-400">{t("data.recordsLabel")}</p>
+                      <p className="mt-1 text-sm font-medium text-ink-900">{formatNumber(count)}</p>
                     </div>
                     <div>
-                      <p className="text-2xs uppercase tracking-wide text-ink-400">Last update</p>
+                      <p className="text-2xs uppercase tracking-wide text-ink-400">{t("data.lastUpdate")}</p>
                       <p className="mt-1 truncate text-ink-700">
-                        {updatedAt ? new Date(updatedAt * 1000).toLocaleString() : "—"}
+                        {updatedAt ? formatDateTime(updatedAt) : "—"}
                       </p>
                     </div>
                   </CardContent>
