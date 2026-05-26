@@ -15,11 +15,12 @@ import {
   DialogTrigger,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 export function RevokeSessionButton({
   sessionId,
   kind,
-  label = "撤销",
+  label,
   variant = "ghost"
 }: {
   sessionId: string;
@@ -27,6 +28,7 @@ export function RevokeSessionButton({
   label?: string;
   variant?: "ghost" | "danger" | "outline";
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,15 +42,15 @@ export function RevokeSessionButton({
         const res = await fetch(url, { method: "DELETE", credentials: "include" });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data?.error?.message ?? `撤销失败 (${res.status})`);
+          throw new Error(data?.error?.message ?? `${t("sessions.revokeSessionFailed")} (${res.status})`);
         }
-        toast.success("会话已撤销");
+        toast.success(t("sessions.revokeSessionSuccess"));
         setOpen(false);
         router.refresh();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "撤销失败";
+        const message = err instanceof Error ? err.message : t("sessions.revokeSessionFailed");
         setError(message);
-        toast.error("撤销失败", { description: message });
+        toast.error(t("sessions.revokeSessionFailed"), { description: message });
       }
     });
   }
@@ -57,18 +59,16 @@ export function RevokeSessionButton({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={variant} size="xs" className={variant === "ghost" ? "text-danger-600 hover:bg-danger-50" : undefined}>
-          <Trash2 className="h-3 w-3" /> {label}
+          <Trash2 className="h-3 w-3" /> {label ?? t("common.revoke")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>撤销会话</DialogTitle>
-          <DialogDescription>
-            撤销后该设备或 SDK 会话需要重新登录授权。
-          </DialogDescription>
+          <DialogTitle>{t("sessions.revokeSessionTitle")}</DialogTitle>
+          <DialogDescription>{t("sessions.revokeSessionDescription")}</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-sm text-ink-600">确定撤销该会话吗？该操作会立即生效。</p>
+          <p className="text-sm text-ink-600 dark:text-slate-300">{t("sessions.revokeSessionConfirm")}</p>
           {error ? (
             <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
               {error}
@@ -76,9 +76,9 @@ export function RevokeSessionButton({
           ) : null}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>取消</Button>
-          <Button variant="danger" onClick={revoke} loading={pending} loadingText="撤销中...">
-            <Trash2 /> 确认撤销
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>{t("common.cancel")}</Button>
+          <Button variant="danger" onClick={revoke} loading={pending} loadingText={t("sessions.revoking")}>
+            <Trash2 /> {t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

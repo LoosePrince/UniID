@@ -39,6 +39,7 @@ export interface ConsoleAuthContext {
     id: string;
     username: string;
     role: string;
+    locale: string;
   };
   session: UserSessionDescriptor;
 }
@@ -176,12 +177,12 @@ export async function requireConsoleAuth(): Promise<ConsoleAuthContext> {
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: { id: true, username: true, role: true, deletedAt: true }
+    select: { id: true, username: true, role: true, locale: true, deletedAt: true }
   });
   if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
 
   return {
-    user: { id: user.id, username: user.username, role: user.role },
+    user: { id: user.id, username: user.username, role: user.role, locale: user.locale },
     session
   };
 }

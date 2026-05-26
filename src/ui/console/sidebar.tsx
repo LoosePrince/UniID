@@ -16,6 +16,7 @@ import {
   BookOpen,
   type LucideIcon
 } from "lucide-react";
+import { useI18n } from "@/ui/i18n";
 import { cn } from "@/ui/primitives";
 
 interface NavItem {
@@ -23,32 +24,6 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
 }
-
-const APP_NAV = (appId: string): NavItem[] => [
-  { href: `/console/apps/${appId}`, label: "概览", icon: LayoutDashboard },
-  { href: `/console/apps/${appId}/schemas`, label: "Schemas", icon: Shield },
-  { href: `/console/apps/${appId}/data`, label: "数据", icon: Database },
-  { href: `/console/apps/${appId}/files`, label: "文件", icon: Files },
-  { href: `/console/apps/${appId}/realtime`, label: "实时", icon: Radio },
-  { href: `/console/apps/${appId}/functions`, label: "函数", icon: Code2 },
-  { href: `/console/apps/${appId}/cron`, label: "定时", icon: Clock },
-  { href: `/console/apps/${appId}/webhooks`, label: "Webhooks", icon: Webhook },
-  { href: `/console/apps/${appId}/members`, label: "成员", icon: Users },
-  { href: "/docs", label: "文档", icon: BookOpen },
-  { href: `/console/apps/${appId}/settings`, label: "设置", icon: Settings }
-];
-
-const ROOT_NAV: NavItem[] = [
-  { href: "/console", label: "概览", icon: LayoutDashboard },
-  { href: "/console/apps", label: "应用", icon: Database },
-  { href: "/docs", label: "文档", icon: BookOpen }
-];
-
-const ADMIN_NAV: NavItem[] = [
-  { href: "/console/admin/users", label: "用户", icon: Users },
-  { href: "/console/admin/apps", label: "全部应用", icon: Database },
-  { href: "/console/admin/config", label: "全局配置", icon: Settings }
-];
 
 export function ConsoleSidebar({
   appId,
@@ -58,7 +33,37 @@ export function ConsoleSidebar({
   isSystemAdmin: boolean;
 }) {
   const pathname = usePathname();
-  const items = appId ? APP_NAV(appId) : ROOT_NAV;
+  const { t } = useI18n();
+
+  const appNav: NavItem[] = appId
+    ? [
+        { href: `/console/apps/${appId}`, label: t("common.overview"), icon: LayoutDashboard },
+        { href: `/console/apps/${appId}/schemas`, label: t("common.schemas"), icon: Shield },
+        { href: `/console/apps/${appId}/data`, label: t("common.data"), icon: Database },
+        { href: `/console/apps/${appId}/files`, label: t("common.files"), icon: Files },
+        { href: `/console/apps/${appId}/realtime`, label: t("common.realtime"), icon: Radio },
+        { href: `/console/apps/${appId}/functions`, label: t("common.functions"), icon: Code2 },
+        { href: `/console/apps/${appId}/cron`, label: t("common.cron"), icon: Clock },
+        { href: `/console/apps/${appId}/webhooks`, label: t("common.webhooks"), icon: Webhook },
+        { href: `/console/apps/${appId}/members`, label: t("common.members"), icon: Users },
+        { href: "/docs", label: t("common.docs"), icon: BookOpen },
+        { href: `/console/apps/${appId}/settings`, label: t("common.settings"), icon: Settings }
+      ]
+    : [];
+
+  const rootNav: NavItem[] = [
+    { href: "/console", label: t("common.overview"), icon: LayoutDashboard },
+    { href: "/console/apps", label: t("common.apps"), icon: Database },
+    { href: "/docs", label: t("common.docs"), icon: BookOpen }
+  ];
+
+  const adminNav: NavItem[] = [
+    { href: "/console/admin/users", label: t("common.users"), icon: Users },
+    { href: "/console/admin/apps", label: t("common.allApps"), icon: Database },
+    { href: "/console/admin/config", label: t("common.globalConfig"), icon: Settings }
+  ];
+
+  const items = appId ? appNav : rootNav;
 
   function isActive(item: NavItem) {
     if (!pathname) return false;
@@ -81,9 +86,9 @@ export function ConsoleSidebar({
       {isSystemAdmin && (
         <>
           <div className="mb-1 mt-2 px-2.5 text-2xs font-medium uppercase tracking-[0.16em] text-ink-400">
-            系统管理
+            {t("sidebar.systemAdmin")}
           </div>
-          {ADMIN_NAV.map((item) => (
+          {adminNav.map((item) => (
             <SidebarLink key={item.href} item={item} active={isActive(item)} />
           ))}
         </>

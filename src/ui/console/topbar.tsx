@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 import { ThemeToggle } from "@/ui/theme";
 import { AppSwitcher, type AppOption } from "./app-switcher";
 import { CommandPalette } from "./command-palette";
@@ -25,12 +26,6 @@ export interface ConsoleTopbarProps {
 
 const APP_PATH_RE = /^\/console\/apps\/([^/]+)/;
 
-const SECTION_LABELS: Array<{ test: (pathname: string) => boolean; label: string }> = [
-  { test: (pathname) => pathname.startsWith("/console/account"), label: "账号" },
-  { test: (pathname) => pathname.startsWith("/console/admin"), label: "系统管理" },
-  { test: (pathname) => pathname.startsWith("/console/apps"), label: "应用" }
-];
-
 function useCurrentAppId(): string | undefined {
   const pathname = usePathname();
   const match = APP_PATH_RE.exec(pathname ?? "");
@@ -39,21 +34,27 @@ function useCurrentAppId(): string | undefined {
 
 function useSectionLabel() {
   const pathname = usePathname() ?? "/console";
-  return SECTION_LABELS.find((item) => item.test(pathname))?.label ?? "控制台";
+  const { t } = useI18n();
+
+  if (pathname.startsWith("/console/account")) return t("common.account");
+  if (pathname.startsWith("/console/admin")) return t("common.systemAdmin");
+  if (pathname.startsWith("/console/apps")) return t("common.apps");
+  return t("common.console");
 }
 
 export function ConsoleTopbar(props: ConsoleTopbarProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const currentAppId = useCurrentAppId();
   const sectionLabel = useSectionLabel();
 
   async function logout() {
     try {
       await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" });
-      toast.success("已登出");
+      toast.success(t("topbar.loggedOut"));
       router.replace("/login");
     } catch {
-      toast.error("登出失败");
+      toast.error(t("topbar.logoutFailed"));
     }
   }
 
@@ -64,7 +65,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink-900 text-xs font-bold text-cream-50 shadow-[0_12px_26px_rgba(19,17,14,0.16),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform group-hover:-translate-y-0.5">
             U
           </span>
-          <span className="hidden text-sm font-semibold tracking-tight sm:inline">UniID Console</span>
+          <span className="hidden text-sm font-semibold tracking-tight sm:inline">{t("app.consoleName")}</span>
         </Link>
         <span className="hidden text-ink-200 dark:text-slate-700 sm:inline">/</span>
         <span className="hidden rounded-full border border-ink-200/70 bg-white/50 px-2.5 py-1 text-xs font-medium text-ink-500 shadow-xs sm:inline-flex dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
@@ -87,7 +88,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
         >
           <span className="flex items-center gap-2">
             <Search className="h-3.5 w-3.5" />
-            搜索 / 跳转
+            {t("common.searchAndJump")}
           </span>
           <span className="rounded-md border border-ink-200/80 bg-white/60 px-1.5 py-0.5 font-mono text-2xs text-ink-400 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-500">⌘K</span>
         </Button>
@@ -96,7 +97,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" aria-label="个人菜单" className="gap-2">
+            <Button variant="ghost" size="sm" aria-label={t("topbar.personalMenu")} className="gap-2">
               <UserIcon className="h-4 w-4" />
               <span className="hidden max-w-28 truncate sm:inline">{props.user.username}</span>
             </Button>
@@ -110,19 +111,19 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
             <DropdownMenuItem asChild>
               <Link href="/">
                 <Home className="h-3.5 w-3.5" />
-                前往首页
+                {t("topbar.goHome")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/console/account">
                 <UserIcon className="h-3.5 w-3.5" />
-                账号中心
+                {t("common.accountCenter")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/console/account/settings">
                 <Settings className="h-3.5 w-3.5" />
-                个人设置
+                {t("topbar.accountSettings")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -131,7 +132,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
               className="text-danger-600 focus:bg-danger-50 focus:text-danger-700 dark:text-danger-100 dark:focus:bg-danger-700/30 dark:focus:text-danger-50"
             >
               <LogOut className="h-3.5 w-3.5" />
-              登出
+              {t("common.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

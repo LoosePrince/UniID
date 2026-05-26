@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import { Button, Field, Input, Select, toast } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface AccountProfileFormProps {
   initial: {
@@ -14,6 +15,7 @@ interface AccountProfileFormProps {
 }
 
 export function AccountProfileForm({ initial }: AccountProfileFormProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -43,22 +45,22 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data?.error?.message ?? `保存失败 (${res.status})`);
+          throw new Error(data?.error?.message ?? `${t("profile.saveFailed")} (${res.status})`);
         }
-        toast.success("资料已保存");
+        toast.success(t("profile.saved"));
         router.refresh();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "保存失败";
+        const message = err instanceof Error ? err.message : t("profile.saveFailed");
         setError(message);
-        toast.error("保存失败", { description: message });
+        toast.error(t("profile.saveFailed"), { description: message });
       }
     });
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 max-w-md">
+    <form onSubmit={submit} className="max-w-md space-y-4">
       <Field
-        label="显示名"
+        label={t("profile.displayName")}
         htmlFor="account-display-name"
         required
         error={error && form.displayName.trim().length === 0 ? error : undefined}
@@ -74,7 +76,7 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
         />
       </Field>
 
-      <Field label="邮箱" htmlFor="account-email" help="用于展示与后续通知；留空表示不绑定邮箱。">
+      <Field label={t("profile.email")} htmlFor="account-email" help={t("profile.emailHelp")}>
         <Input
           id="account-email"
           type="email"
@@ -86,7 +88,7 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
         />
       </Field>
 
-      <Field label="语言" htmlFor="account-locale">
+      <Field label={t("profile.locale")} htmlFor="account-locale">
         <Select
           id="account-locale"
           value={form.locale}
@@ -106,10 +108,10 @@ export function AccountProfileForm({ initial }: AccountProfileFormProps) {
       ) : null}
 
       <div className="flex items-center gap-3 pt-1">
-        <Button type="submit" loading={pending} loadingText="保存中..." disabled={!dirty || form.displayName.trim().length === 0}>
-          <Save /> 保存资料
+        <Button type="submit" loading={pending} loadingText={t("profile.saving")} disabled={!dirty || form.displayName.trim().length === 0}>
+          <Save /> {t("profile.save")}
         </Button>
-        {!dirty ? <span className="text-xs text-ink-400 dark:text-slate-500">没有未保存改动</span> : null}
+        {!dirty ? <span className="text-xs text-ink-400 dark:text-slate-500">{t("profile.noChanges")}</span> : null}
       </div>
     </form>
   );

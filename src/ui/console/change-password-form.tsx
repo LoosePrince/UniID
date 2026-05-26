@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, KeyRound, Save } from "lucide-react";
 import { Button, Field, Input, toast } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 export function ChangePasswordForm() {
+  const { t } = useI18n();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -20,7 +22,7 @@ export function ChangePasswordForm() {
     setError(null);
 
     if (mismatch) {
-      setError("两次输入的新密码不一致");
+      setError(t("password.mismatch"));
       return;
     }
 
@@ -34,23 +36,23 @@ export function ChangePasswordForm() {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          throw new Error(data?.error?.message ?? `修改失败 (${res.status})`);
+          throw new Error(data?.error?.message ?? `${t("password.updateFailed")} (${res.status})`);
         }
-        toast.success("密码已更新");
+        toast.success(t("password.updated"));
         setOldPw("");
         setNewPw("");
         setConfirm("");
       } catch (err) {
-        const message = err instanceof Error ? err.message : "修改失败";
+        const message = err instanceof Error ? err.message : t("password.updateFailed");
         setError(message);
-        toast.error("修改失败", { description: message });
+        toast.error(t("password.updateFailed"), { description: message });
       }
     });
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 max-w-md">
-      <Field label="原密码" htmlFor="oldPw" required>
+    <form onSubmit={onSubmit} className="max-w-md space-y-4">
+      <Field label={t("password.current")} htmlFor="oldPw" required>
         <Input
           id="oldPw"
           type={showPasswords ? "text" : "password"}
@@ -63,7 +65,7 @@ export function ChangePasswordForm() {
         />
       </Field>
 
-      <Field label="新密码" htmlFor="newPw" required help="至少 8 位，建议混合大小写、数字和符号。">
+      <Field label={t("password.new")} htmlFor="newPw" required help={t("password.newHelp")}>
         <Input
           id="newPw"
           type={showPasswords ? "text" : "password"}
@@ -76,7 +78,7 @@ export function ChangePasswordForm() {
         />
       </Field>
 
-      <Field label="确认新密码" htmlFor="confirm" required error={mismatch ? "两次输入的新密码不一致" : undefined}>
+      <Field label={t("password.confirm")} htmlFor="confirm" required error={mismatch ? t("password.mismatch") : undefined}>
         <Input
           id="confirm"
           type={showPasswords ? "text" : "password"}
@@ -97,14 +99,14 @@ export function ChangePasswordForm() {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Button type="submit" loading={pending} loadingText="更新中..." disabled={!canSubmit}>
-          <Save /> 更新密码
+        <Button type="submit" loading={pending} loadingText={t("password.updating")} disabled={!canSubmit}>
+          <Save /> {t("password.update")}
         </Button>
         <Button type="button" variant="ghost" onClick={() => setShowPasswords((value) => !value)} disabled={pending}>
-          {showPasswords ? <EyeOff /> : <Eye />} {showPasswords ? "隐藏密码" : "显示密码"}
+          {showPasswords ? <EyeOff /> : <Eye />} {showPasswords ? t("password.hide") : t("password.show")}
         </Button>
         <span className="inline-flex items-center gap-1 text-xs text-ink-400 dark:text-slate-500">
-          <KeyRound className="h-3.5 w-3.5" /> 修改后当前会话保持登录
+          <KeyRound className="h-3.5 w-3.5" /> {t("password.keepSignedIn")}
         </span>
       </div>
     </form>

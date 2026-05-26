@@ -15,6 +15,7 @@ import {
   DialogTrigger,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 interface SessionTarget {
   id: string;
@@ -22,6 +23,7 @@ interface SessionTarget {
 }
 
 export function RevokeOtherSessionsButton({ sessions }: { sessions: SessionTarget[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +45,11 @@ export function RevokeOtherSessionsButton({ sessions }: { sessions: SessionTarge
       if (failures.length > 0) {
         const message = failures.slice(0, 2).join("；");
         setError(message);
-        toast.error("部分会话撤销失败", { description: message });
+        toast.error(t("sessions.revokeOthersFailedPartial"), { description: message });
         return;
       }
 
-      toast.success("其他会话已撤销");
+      toast.success(t("sessions.revokeOthersSuccess"));
       setOpen(false);
       router.refresh();
     });
@@ -56,7 +58,7 @@ export function RevokeOtherSessionsButton({ sessions }: { sessions: SessionTarge
   if (sessions.length === 0) {
     return (
       <Button variant="outline" size="sm" disabled>
-        <Trash2 /> 无其他会话
+        <Trash2 /> {t("sessions.revokeNone")}
       </Button>
     );
   }
@@ -65,18 +67,16 @@ export function RevokeOtherSessionsButton({ sessions }: { sessions: SessionTarge
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <Trash2 /> 撤销其他会话
+          <Trash2 /> {t("sessions.revokeOthers")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>撤销其他会话</DialogTitle>
-          <DialogDescription>
-            将撤销除当前控制台设备外的 {sessions.length} 个控制台 / SDK 会话。
-          </DialogDescription>
+          <DialogTitle>{t("sessions.revokeOthersTitle")}</DialogTitle>
+          <DialogDescription>{t("sessions.revokeOthersDescription", { count: sessions.length })}</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <p className="text-sm text-ink-600">撤销后对应设备需要重新登录或重新授权。</p>
+          <p className="text-sm text-ink-600 dark:text-slate-300">{t("sessions.revokeOthersHint")}</p>
           {error ? (
             <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
               {error}
@@ -84,9 +84,9 @@ export function RevokeOtherSessionsButton({ sessions }: { sessions: SessionTarge
           ) : null}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>取消</Button>
-          <Button variant="danger" onClick={revokeAll} loading={pending} loadingText="撤销中...">
-            <Trash2 /> 确认撤销
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>{t("common.cancel")}</Button>
+          <Button variant="danger" onClick={revokeAll} loading={pending} loadingText={t("sessions.revoking")}>
+            <Trash2 /> {t("common.confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

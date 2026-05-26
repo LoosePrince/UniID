@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useI18n } from "@/ui/i18n";
 import {
   Button,
   Card,
@@ -19,6 +20,7 @@ import {
 function RegisterPageContent() {
   const router = useRouter();
   const params = useSearchParams();
+  const { t } = useI18n();
   const redirectTo = params.get("redirectTo") ?? "/console";
 
   const [form, setForm] = useState({ username: "", email: "", displayName: "", password: "" });
@@ -41,14 +43,16 @@ function RegisterPageContent() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error("注册失败", { description: data?.error?.message ?? `状态 ${res.status}` });
+        toast.error(t("auth.register.failed"), {
+          description: data?.error?.message ?? t("http.status", { status: res.status })
+        });
         setLoading(false);
         return;
       }
-      toast.success("注册成功");
+      toast.success(t("auth.register.success"));
       router.replace(redirectTo);
     } catch {
-      toast.error("网络错误");
+      toast.error(t("auth.register.networkError"));
       setLoading(false);
     }
   }
@@ -56,13 +60,13 @@ function RegisterPageContent() {
   return (
     <Card className="w-full max-w-[420px] shadow-md">
       <CardHeader>
-        <CardTitle className="text-xl">注册 UniID 账户</CardTitle>
-        <CardDescription>开始管理你的应用、数据和文件。</CardDescription>
+        <CardTitle className="text-xl">{t("auth.register.title")}</CardTitle>
+        <CardDescription>{t("auth.register.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="reg-username">用户名</Label>
+            <Label htmlFor="reg-username">{t("auth.register.username")}</Label>
             <Input
               id="reg-username"
               autoFocus
@@ -75,7 +79,7 @@ function RegisterPageContent() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="reg-email">邮箱（可选）</Label>
+            <Label htmlFor="reg-email">{t("auth.register.email")}</Label>
             <Input
               id="reg-email"
               type="email"
@@ -85,7 +89,7 @@ function RegisterPageContent() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="reg-displayName">显示名（可选）</Label>
+            <Label htmlFor="reg-displayName">{t("auth.register.displayName")}</Label>
             <Input
               id="reg-displayName"
               value={form.displayName}
@@ -93,7 +97,7 @@ function RegisterPageContent() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="reg-password">密码</Label>
+            <Label htmlFor="reg-password">{t("auth.register.password")}</Label>
             <Input
               id="reg-password"
               type="password"
@@ -106,12 +110,12 @@ function RegisterPageContent() {
           </div>
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
             {loading ? <Spinner className="text-cream-50" /> : null}
-            {loading ? "创建中…" : "创建账户"}
+            {loading ? t("auth.register.submitting") : t("auth.register.submit")}
           </Button>
           <p className="text-xs text-ink-500 text-center pt-2">
-            已有账户？{" "}
+            {t("auth.register.hasAccount")} {" "}
             <Link href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="text-accent-600 hover:underline">
-              直接登录
+              {t("auth.register.goLogin")}
             </Link>
           </p>
         </form>

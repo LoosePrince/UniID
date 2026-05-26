@@ -3,11 +3,13 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useI18n } from "@/ui/i18n";
 import { Button, Card, CardContent, CardHeader, CardTitle, CardDescription, Input, Label, Spinner, toast } from "@/ui/primitives";
 
 function LoginPageContent() {
   const router = useRouter();
   const params = useSearchParams();
+  const { t } = useI18n();
   const redirectTo = params.get("redirectTo") ?? "/console";
 
   const [username, setUsername] = useState("");
@@ -26,14 +28,16 @@ function LoginPageContent() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error("登录失败", { description: data?.error?.message ?? `状态 ${res.status}` });
+        toast.error(t("auth.login.failed"), {
+          description: data?.error?.message ?? t("http.status", { status: res.status })
+        });
         setLoading(false);
         return;
       }
-      toast.success("欢迎回来");
+      toast.success(t("auth.login.success"));
       router.replace(redirectTo);
     } catch {
-      toast.error("网络错误");
+      toast.error(t("auth.login.networkError"));
       setLoading(false);
     }
   }
@@ -41,13 +45,13 @@ function LoginPageContent() {
   return (
     <Card className="w-full max-w-[420px] shadow-md">
       <CardHeader>
-        <CardTitle className="text-xl">登录到 UniID</CardTitle>
-        <CardDescription>使用你的账户继续。</CardDescription>
+        <CardTitle className="text-xl">{t("auth.login.title")}</CardTitle>
+        <CardDescription>{t("auth.login.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="login-username">用户名</Label>
+            <Label htmlFor="login-username">{t("auth.login.username")}</Label>
             <Input
               id="login-username"
               autoFocus
@@ -59,7 +63,7 @@ function LoginPageContent() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="login-password">密码</Label>
+            <Label htmlFor="login-password">{t("auth.login.password")}</Label>
             <Input
               id="login-password"
               type="password"
@@ -72,12 +76,12 @@ function LoginPageContent() {
           </div>
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
             {loading ? <Spinner className="text-cream-50" /> : null}
-            {loading ? "登录中…" : "登录"}
+            {loading ? t("auth.login.submitting") : t("auth.login.submit")}
           </Button>
           <p className="text-xs text-ink-500 text-center pt-2">
-            还没有账户？{" "}
+            {t("auth.login.noAccount")} {" "}
             <Link href={`/register?redirectTo=${encodeURIComponent(redirectTo)}`} className="text-accent-600 hover:underline">
-              注册一个
+              {t("auth.login.createAccount")}
             </Link>
           </p>
         </form>

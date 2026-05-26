@@ -10,29 +10,45 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 import { cn } from "@/ui/primitives/utils";
 import { type ThemeMode, useTheme } from "./theme-provider";
 
-const themeOptions: Array<{
-  value: ThemeMode;
-  label: string;
-  description: string;
-  icon: typeof Monitor;
-}> = [
-  { value: "system", label: "自动", description: "跟随系统", icon: Monitor },
-  { value: "light", label: "浅色", description: "暖色浅底", icon: Sun },
-  { value: "dark", label: "深色", description: "冷色深底", icon: Moon }
-];
-
-const themeLabel: Record<ThemeMode, string> = {
-  system: "自动",
-  light: "浅色",
-  dark: "深色"
-};
-
 export function ThemeToggle({ className, compact = false }: { className?: string; compact?: boolean }) {
+  const { t } = useI18n();
   const { themeMode, resolvedTheme, setThemeMode } = useTheme();
   const CurrentIcon = resolvedTheme === "dark" ? Moon : Sun;
+  const themeOptions: Array<{
+    value: ThemeMode;
+    label: string;
+    description: string;
+    icon: typeof Monitor;
+  }> = [
+    {
+      value: "system",
+      label: t("theme.system.label"),
+      description: t("theme.system.description"),
+      icon: Monitor
+    },
+    {
+      value: "light",
+      label: t("theme.light.label"),
+      description: t("theme.light.description"),
+      icon: Sun
+    },
+    {
+      value: "dark",
+      label: t("theme.dark.label"),
+      description: t("theme.dark.description"),
+      icon: Moon
+    }
+  ];
+
+  const themeLabel: Record<ThemeMode, string> = {
+    system: t("theme.system.label"),
+    light: t("theme.light.label"),
+    dark: t("theme.dark.label")
+  };
 
   return (
     <DropdownMenu>
@@ -45,7 +61,7 @@ export function ThemeToggle({ className, compact = false }: { className?: string
             compact ? "h-9 w-9 rounded-lg" : "px-3",
             className
           )}
-          aria-label="切换主题"
+          aria-label={t("theme.aria")}
         >
           <CurrentIcon className="h-4 w-4" />
           {!compact && <span>{themeLabel[themeMode]}</span>}
@@ -53,9 +69,9 @@ export function ThemeToggle({ className, compact = false }: { className?: string
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <DropdownMenuLabel>
-          <span className="block text-sm">主题</span>
+          <span className="block text-sm">{t("theme.title")}</span>
           <span className="mt-0.5 block text-2xs font-normal text-ink-400 dark:text-slate-500">
-            当前为 {resolvedTheme === "dark" ? "深色" : "浅色"}
+            {t("theme.current", { theme: themeLabel[resolvedTheme] })}
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

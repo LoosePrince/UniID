@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { resolveCurrentLocale } from "@/shared/i18n";
+import { I18nProvider } from "@/ui/i18n";
 import { Toaster } from "@/ui/primitives";
 import { ThemeProvider, ThemeScript } from "@/ui/theme";
 import "./globals.css";
@@ -23,19 +25,23 @@ export const viewport: Viewport = {
   themeColor: "#FBF9F4"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await resolveCurrentLocale();
+
   return (
     <html
-      lang="zh-CN"
+      lang={locale}
       className={`${GeistSans.variable} ${GeistMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen antialiased">
         <ThemeScript />
-        <ThemeProvider>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <I18nProvider locale={locale}>
+          <ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

@@ -1,3 +1,4 @@
+import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { AuthService } from "@/modules/auth";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
@@ -6,6 +7,7 @@ import { RevokeSessionButton } from "@/ui/console/revoke-session-button";
 
 export default async function AccountSessionsPage() {
   const auth = await requireConsoleAuth();
+  const { t, formatDateTime, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const [consoleSessions, appSessions] = await Promise.all([
     AuthService.listConsoleSessions(auth.user.id),
     AuthService.listAppSessions(auth.user.id)
@@ -22,41 +24,43 @@ export default async function AccountSessionsPage() {
     <div className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">会话</h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">管理所有登录设备与 SDK 会话。</p>
+          <h1 className="text-xl font-semibold tracking-tight">{t("sessions.title")}</h1>
+          <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">{t("sessions.description")}</p>
         </div>
         <RevokeOtherSessionsButton sessions={otherSessions} />
       </header>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Metric label="控制台会话" value={consoleSessions.length} />
-        <Metric label="SDK / 应用会话" value={appSessions.length} />
-        <Metric label="可撤销会话" value={otherSessions.length} />
+        <Metric label={t("sessions.consoleCount")} value={formatNumber(consoleSessions.length)} />
+        <Metric label={t("sessions.appCount")} value={formatNumber(appSessions.length)} />
+        <Metric label={t("sessions.revokableCount")} value={formatNumber(otherSessions.length)} />
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">UniID 控制台会话</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">{t("sessions.consoleSection")}</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {consoleSessions.length === 0 ? <Empty label="暂无控制台会话" /> : null}
+          {consoleSessions.length === 0 ? <Empty label={t("sessions.emptyConsole")} /> : null}
           {consoleSessions.map((s) => (
             <Card key={s.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle className="text-sm">
-                    {s.id === auth.session.sessionId ? "当前设备" : `会话 ${s.id.slice(0, 6)}`}
+                    {s.id === auth.session.sessionId
+                      ? t("sessions.currentDevice")
+                      : t("sessions.sessionShort", { id: s.id.slice(0, 6) })}
                   </CardTitle>
-                  {s.id === auth.session.sessionId ? <Badge tone="success">当前</Badge> : null}
+                  {s.id === auth.session.sessionId ? <Badge tone="success">{t("sessions.current")}</Badge> : null}
                 </div>
                 <CardDescription className="truncate font-mono text-2xs">
-                  {s.userAgent ?? "unknown UA"}
+                  {s.userAgent ?? t("sessions.unknownUa")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-xs text-ink-500 dark:text-slate-400">
                 <div className="grid grid-cols-2 gap-2">
-                  <span>最近活跃</span>
-                  <span className="text-right font-mono">{new Date(s.lastSeenAt * 1000).toLocaleString()}</span>
-                  <span>过期时间</span>
-                  <span className="text-right font-mono">{new Date(s.expiresAt * 1000).toLocaleString()}</span>
+                  <span>{t("sessions.lastSeen")}</span>
+                  <span className="text-right font-mono">{formatDateTime(s.lastSeenAt)}</span>
+                  <span>{t("sessions.expiresAt")}</span>
+                  <span className="text-right font-mono">{formatDateTime(s.expiresAt)}</span>
                 </div>
                 {s.id !== auth.session.sessionId ? (
                   <div className="flex justify-end">
@@ -70,26 +74,26 @@ export default async function AccountSessionsPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">SDK / 应用会话</h2>
+        <h2 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">{t("sessions.appSection")}</h2>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {appSessions.length === 0 ? <Empty label="暂无 SDK / 应用会话" /> : null}
+          {appSessions.length === 0 ? <Empty label={t("sessions.emptyApp")} /> : null}
           {appSessions.map((s) => (
             <Card key={s.id}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <CardTitle className="truncate text-sm">{s.app.name}</CardTitle>
                   <Badge tone={s.authType === "full" ? "accent" : "neutral"}>
-                    {s.authType === "full" ? "完整" : "限制"}
+                    {s.authType === "full" ? t("sessions.full") : t("sessions.restricted")}
                   </Badge>
                 </div>
                 <CardDescription className="truncate font-mono text-2xs">{s.app.primaryDomain}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-xs text-ink-500 dark:text-slate-400">
                 <div className="grid grid-cols-2 gap-2">
-                  <span>最近活跃</span>
-                  <span className="text-right font-mono">{new Date(s.lastSeenAt * 1000).toLocaleString()}</span>
-                  <span>创建时间</span>
-                  <span className="text-right font-mono">{new Date(s.createdAt * 1000).toLocaleString()}</span>
+                  <span>{t("sessions.lastSeen")}</span>
+                  <span className="text-right font-mono">{formatDateTime(s.lastSeenAt)}</span>
+                  <span>{t("sessions.createdAt")}</span>
+                  <span className="text-right font-mono">{formatDateTime(s.createdAt)}</span>
                 </div>
                 <div className="flex justify-end">
                   <RevokeSessionButton sessionId={s.id} kind="app" />
@@ -103,7 +107,7 @@ export default async function AccountSessionsPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
     <Card>
       <CardContent className="p-4">
