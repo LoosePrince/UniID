@@ -96,7 +96,14 @@ export function CreateRecordButton({ appId, dataType }: { appId: string; dataTyp
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (busy) return;
+        setOpen(next);
+        if (next) setError(null);
+      }}
+    >
       <Button onClick={() => setOpen(true)}>
         <Plus /> 创建记录
       </Button>
@@ -226,7 +233,14 @@ export function RecordRowActions({
 
   return (
     <div className="flex justify-end gap-1.5">
-      <Dialog open={editOpen} onOpenChange={(next) => !busy && setEditOpen(next)}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(next) => {
+          if (busy) return;
+          setEditOpen(next);
+          if (next) setError(null);
+        }}
+      >
         <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} aria-label="编辑记录">
           <Edit3 /> 编辑
         </Button>
@@ -261,7 +275,14 @@ export function RecordRowActions({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteOpen} onOpenChange={(next) => !busy && setDeleteOpen(next)}>
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(next) => {
+          if (busy) return;
+          setDeleteOpen(next);
+          if (next) setError(null);
+        }}
+      >
         <Button size="sm" variant="danger" onClick={() => setDeleteOpen(true)} aria-label="删除记录">
           <Trash2 /> 删除
         </Button>
