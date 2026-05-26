@@ -118,13 +118,13 @@ export const SelectTrigger = React.forwardRef<React.ElementRef<typeof SelectPrim
         data-invalid={invalid ? "true" : undefined}
         aria-invalid={invalid || undefined}
         className={cn(
-          "group flex h-10 w-full items-center justify-between gap-3 rounded-lg border border-white/70 bg-white/76 px-3.5 text-left text-sm text-ink-900",
-          "shadow-[0_8px_20px_rgba(19,17,14,0.05),inset_0_1px_0_rgba(255,255,255,0.8)] backdrop-blur-sm",
+          "group flex h-10 w-full items-center justify-between gap-3 rounded-lg border border-ink-200/80 bg-cream-50/70 px-3.5 text-left text-sm text-ink-900 dark:border-slate-600/70 dark:bg-slate-800/60 dark:text-slate-100",
+          "shadow-[0_8px_18px_rgba(19,17,14,0.045),inset_0_1px_0_rgba(255,255,255,0.62)] backdrop-blur-sm dark:shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.04)]",
           "transition-[border,box-shadow,background-color,transform] duration-200 ease-out",
-          "hover:bg-white hover:shadow-[0_12px_28px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.88)]",
-          "focus-visible:border-accent-300 focus-visible:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/30 focus-visible:shadow-[0_10px_28px_rgba(91,91,214,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]",
-          "disabled:cursor-not-allowed disabled:bg-cream-50 disabled:opacity-65 disabled:shadow-none",
-          "data-[invalid=true]:border-danger-300 data-[invalid=true]:focus-visible:ring-danger-500/28",
+          "hover:border-ink-300/80 hover:bg-white/80 dark:hover:border-slate-500/70 dark:hover:bg-slate-800/70",
+          "focus-visible:border-accent-400/70 focus-visible:bg-white/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-400/30 focus-visible:shadow-[0_0_0_3px_rgba(119,111,218,0.08),0_10px_24px_rgba(19,17,14,0.08)] dark:focus-visible:border-accent-300/40 dark:focus-visible:bg-slate-800/75 dark:focus-visible:ring-accent-300/20 dark:focus-visible:shadow-[0_0_0_3px_rgba(119,111,218,0.10),0_10px_24px_rgba(0,0,0,0.18)]",
+          "disabled:cursor-not-allowed disabled:border-ink-100 disabled:bg-cream-100/70 disabled:text-ink-400 disabled:shadow-none dark:disabled:border-slate-700/60 dark:disabled:bg-slate-900/50 dark:disabled:text-slate-500",
+          "data-[invalid=true]:border-danger-500/60 data-[invalid=true]:focus-visible:ring-danger-500/30",
           className
         )}
         {...props}
@@ -132,7 +132,7 @@ export const SelectTrigger = React.forwardRef<React.ElementRef<typeof SelectPrim
         {children}
         {showIcon ? (
           <SelectPrimitive.Icon asChild>
-            <ChevronDown className="h-4 w-4 shrink-0 text-ink-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-ink-400 transition-transform duration-200 group-data-[state=open]:rotate-180 dark:text-slate-500" />
           </SelectPrimitive.Icon>
         ) : null}
       </SelectPrimitive.Trigger>
@@ -151,7 +151,7 @@ export const SelectContent = React.forwardRef<
         position={position}
         sideOffset={sideOffset}
         className={cn(
-          "surface-elevated z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-white/70 p-1.5 shadow-lg",
+          "surface-elevated z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-ink-200/70 p-1.5 shadow-lg dark:border-slate-600/60",
           "data-[state=open]:animate-scale-in",
           className
         )}
@@ -170,7 +170,7 @@ export const SelectLabel = React.forwardRef<
   return (
     <SelectPrimitive.Label
       ref={ref}
-      className={cn("px-3 pb-1 pt-2 text-2xs font-medium uppercase tracking-[0.14em] text-ink-400", className)}
+      className={cn("px-3 pb-1 pt-2 text-2xs font-medium uppercase tracking-[0.14em] text-ink-400 dark:text-slate-500", className)}
       {...props}
     />
   );
@@ -180,7 +180,7 @@ export const SelectSeparator = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
 >(function SelectSeparator({ className, ...props }, ref) {
-  return <SelectPrimitive.Separator ref={ref} className={cn("my-1 h-px bg-ink-100/90", className)} {...props} />;
+  return <SelectPrimitive.Separator ref={ref} className={cn("my-1 h-px bg-ink-100/90 dark:bg-slate-700/70", className)} {...props} />;
 });
 
 export const Select = React.forwardRef<React.ElementRef<typeof SelectPrimitive.Trigger>, SelectProps>(
@@ -251,11 +251,11 @@ export const SelectItem = React.forwardRef<
     <SelectPrimitive.Item
       ref={ref}
       className={cn(
-        "relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 pr-9 text-sm font-medium text-ink-700",
+        "relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 pr-9 text-sm font-medium text-ink-700 dark:text-slate-300",
         "outline-none transition-[background,color,box-shadow] duration-150",
-        "data-[state=checked]:bg-accent-50/70 data-[state=checked]:font-semibold data-[state=checked]:text-ink-900",
-        "data-[highlighted]:bg-accent-50 data-[highlighted]:text-ink-900 data-[highlighted]:shadow-[inset_0_0_0_1px_rgba(119,111,218,0.16)]",
-        "data-[highlighted]:data-[state=checked]:bg-accent-100 data-[highlighted]:data-[state=checked]:text-ink-900",
+        "data-[state=checked]:bg-accent-50/50 data-[state=checked]:font-semibold data-[state=checked]:text-ink-900 data-[state=checked]:shadow-[inset_0_0_0_1px_rgba(119,111,218,0.22)] dark:data-[state=checked]:bg-slate-800/60 dark:data-[state=checked]:text-slate-100 dark:data-[state=checked]:shadow-[inset_0_0_0_1px_rgba(129,148,163,0.24)]",
+        "data-[highlighted]:bg-ink-100/60 data-[highlighted]:text-ink-900 data-[highlighted]:shadow-[inset_0_0_0_1px_rgba(119,111,218,0.18)] dark:data-[highlighted]:bg-slate-800/60 dark:data-[highlighted]:text-slate-100 dark:data-[highlighted]:shadow-[inset_0_0_0_1px_rgba(129,148,163,0.2)]",
+        "data-[highlighted]:data-[state=checked]:bg-accent-50/60 data-[highlighted]:data-[state=checked]:text-ink-900 dark:data-[highlighted]:data-[state=checked]:bg-slate-800/70 dark:data-[highlighted]:data-[state=checked]:text-slate-100",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-45",
         "[&>svg]:size-4 [&>svg]:shrink-0",
         className

@@ -10,9 +10,9 @@ const buttonVariants = cva(
   [
     "relative inline-flex items-center justify-center gap-2 overflow-hidden whitespace-nowrap border border-transparent",
     "font-medium select-none",
-    "transition-[background,border,color,box-shadow,transform,opacity] duration-200 ease-out",
-    "hover:-translate-y-0.5 active:translate-y-0",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-50",
+    "transition-[background,border,color,box-shadow,transform,opacity] duration-180 ease-out",
+    "hover:-translate-y-px active:translate-y-0",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-cream-50 dark:focus-visible:ring-accent-300/30 dark:focus-visible:ring-offset-slate-950",
     "disabled:pointer-events-none disabled:opacity-55 disabled:shadow-none",
     "data-[loading=true]:cursor-wait data-[loading=true]:opacity-90",
     "[&>svg]:size-4 [&>svg]:shrink-0"
@@ -21,19 +21,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-ink-900 text-cream-50 shadow-[0_16px_34px_rgba(19,17,14,0.18),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-ink-800 active:bg-ink-950",
+          "bg-ink-900 text-cream-50 shadow-[0_16px_34px_rgba(19,17,14,0.18),inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-ink-800 active:bg-ink-950 dark:border-slate-400/60 dark:bg-slate-100 dark:text-slate-950 dark:shadow-[0_14px_32px_rgba(0,0,0,0.2)] dark:hover:bg-slate-200",
         secondary:
-          "border-white/80 bg-white/76 text-ink-900 shadow-[0_12px_28px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-sm hover:bg-white hover:shadow-[0_18px_34px_rgba(19,17,14,0.1),inset_0_1px_0_rgba(255,255,255,0.9)]",
+          "border-ink-200/70 bg-white/80 text-ink-900 shadow-[0_12px_28px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.76)] backdrop-blur-sm hover:border-ink-300/80 hover:bg-white/90 hover:shadow-[0_16px_30px_rgba(19,17,14,0.1),inset_0_1px_0_rgba(255,255,255,0.84)] dark:border-slate-600/60 dark:bg-slate-800/60 dark:text-slate-100 dark:shadow-[0_10px_24px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.055)] dark:hover:border-slate-500/70 dark:hover:bg-slate-800/80",
         outline:
-          "border-ink-200/80 bg-white/30 text-ink-900 shadow-[0_8px_20px_rgba(19,17,14,0.04),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-sm hover:bg-white/78 hover:shadow-[0_16px_30px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.86)]",
+          "border-ink-200/80 bg-cream-50/50 text-ink-900 shadow-[0_8px_20px_rgba(19,17,14,0.04),inset_0_1px_0_rgba(255,255,255,0.62)] backdrop-blur-sm hover:border-ink-300/80 hover:bg-white/75 hover:shadow-[0_14px_26px_rgba(19,17,14,0.08),inset_0_1px_0_rgba(255,255,255,0.78)] dark:border-slate-600/60 dark:bg-slate-900/50 dark:text-slate-100 dark:shadow-[0_8px_22px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.04)] dark:hover:border-slate-500/70 dark:hover:bg-slate-800/60",
         ghost:
-          "bg-transparent text-ink-700 shadow-none hover:bg-white/72 hover:text-ink-900",
+          "bg-transparent text-ink-700 shadow-none hover:bg-ink-100/60 hover:text-ink-900 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-slate-100",
         danger:
-          "bg-danger-500 text-white shadow-[0_16px_32px_rgba(197,59,59,0.24),inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-danger-600 active:bg-danger-700",
+          "bg-danger-500 text-white shadow-[0_16px_32px_rgba(197,59,59,0.24),inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-danger-600 active:bg-danger-700 dark:bg-danger-600 dark:hover:bg-danger-500",
         link:
-          "h-auto rounded-none border-transparent bg-transparent px-0 text-accent-600 shadow-none hover:translate-y-0 hover:text-accent-700 hover:underline",
+          "h-auto rounded-none border-transparent bg-transparent px-0 text-accent-600 shadow-none hover:translate-y-0 hover:text-accent-700 hover:underline dark:text-accent-300 dark:hover:text-accent-200",
         hero:
-          "accent-halo sheen-subtle border border-accent-200/70 bg-[linear-gradient(135deg,#4b4bc4_0%,#5b5bd6_42%,#776fda_100%)] text-white shadow-[0_22px_48px_rgba(61,61,160,0.28),inset_0_1px_0_rgba(255,255,255,0.18)] hover:bg-[linear-gradient(135deg,#4343b4_0%,#5757cf_42%,#7068d7_100%)]"
+          "border border-accent-200/70 bg-[linear-gradient(135deg,#4b4bc4_0%,#5b5bd6_42%,#776fda_100%)] text-white shadow-[0_16px_34px_rgba(61,61,160,0.2),inset_0_1px_0_rgba(255,255,255,0.16)] hover:bg-[linear-gradient(135deg,#4545b9_0%,#5454ca_42%,#6f67d3_100%)] dark:border-accent-300/30 dark:shadow-[0_12px_28px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.1)]"
       },
       size: {
         xs: "h-8 rounded-lg px-3 text-xs",

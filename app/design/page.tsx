@@ -1,15 +1,17 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Copy,
   Database,
   Layers3,
+  Moon,
   Plus,
   Save,
   Search,
   ShieldCheck,
+  Sun,
   Trash2
 } from "lucide-react";
 import { colors as colorTokens } from "@/ui/tokens";
@@ -84,6 +86,17 @@ import {
   toast
 } from "@/ui/primitives";
 
+const themeModes = [
+  { value: "system", label: "自动" },
+  { value: "light", label: "浅色" },
+  { value: "dark", label: "深色" }
+] as const;
+
+type ThemeMode = (typeof themeModes)[number]["value"];
+
+const lightColorGroups = ["cream", "sand", "ink", "accent", "success", "warning", "danger"] as const;
+const darkColorGroups = ["slate", "accent", "success", "warning", "danger"] as const;
+
 const codeSample = JSON.stringify(
   {
     type: "object",
@@ -104,21 +117,79 @@ export default function DesignSystemPage() {
   const [compactMenu, setCompactMenu] = useState(true);
   const [menuDensity, setMenuDensity] = useState("comfortable");
   const [schemaPreset, setSchemaPreset] = useState("posts");
+  const [themeMode, setThemeMode] = useState<ThemeMode>("system");
+  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
+  const isDark = themeMode === "dark" || (themeMode === "system" && systemPrefersDark);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => setSystemPrefersDark(query.matches);
+
+    syncSystemTheme();
+    query.addEventListener("change", syncSystemTheme);
+
+    return () => query.removeEventListener("change", syncSystemTheme);
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const hadDarkClass = root.classList.contains("dark");
+
+    root.classList.toggle("dark", isDark);
+    root.style.colorScheme = isDark ? "dark" : "light";
+
+    return () => {
+      root.classList.toggle("dark", hadDarkClass);
+      root.style.colorScheme = "";
+    };
+  }, [isDark]);
 
   return (
     <TooltipProvider>
-      <main className="min-h-screen overflow-hidden bg-cream-50 py-12 text-ink-900">
-        <div className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[460px] bg-[radial-gradient(circle_at_20%_10%,rgba(119,111,218,0.14),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(197,184,145,0.18),transparent_30%)]" />
+      <div className={isDark ? "dark" : undefined}>
+        <main className="relative min-h-screen overflow-hidden bg-cream-50 py-8 text-ink-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+          <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_18%_8%,rgba(119,111,218,0.11),transparent_32%),radial-gradient(circle_at_84%_16%,rgba(197,184,145,0.13),transparent_28%),linear-gradient(180deg,#fbf9f4_0%,#f6f2e9_54%,#efe9d9_100%)] dark:bg-[radial-gradient(circle_at_18%_8%,rgba(99,109,180,0.12),transparent_30%),radial-gradient(circle_at_80%_14%,rgba(89,110,128,0.14),transparent_28%),linear-gradient(180deg,#0b1117_0%,#111a21_52%,#141d24_100%)]" />
 
-        <div className="container-page space-y-12">
-          <header className="surface-subtle accent-halo rounded-2xl p-8 md:p-10">
+          <div className="container-page relative z-10 space-y-10">
+          <div className="surface-glass sticky top-4 z-30 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-ink-700 dark:text-slate-200">
+              {isDark ? <Moon className="h-4 w-4 text-slate-300" /> : <Sun className="h-4 w-4 text-accent-600" />}
+              <span>主题</span>
+              <span className="font-mono text-2xs uppercase tracking-[0.14em] text-ink-400 dark:text-slate-500">
+                {isDark ? "dark" : "light"}
+              </span>
+            </div>
+            <div className="flex rounded-xl border border-ink-200/70 bg-cream-50/60 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] dark:border-slate-600/60 dark:bg-slate-900/50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]">
+              {themeModes.map((mode) => {
+                const active = themeMode === mode.value;
+
+                return (
+                  <button
+                    key={mode.value}
+                    type="button"
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-[background,border,color,box-shadow] ${
+                      active
+                        ? "border border-ink-200/80 bg-white/80 text-ink-900 shadow-[0_6px_16px_rgba(19,17,14,0.065),inset_0_0_0_1px_rgba(213,210,200,0.65),inset_0_1px_0_rgba(255,255,255,0.62)] dark:border-slate-500/70 dark:bg-slate-800/75 dark:text-slate-100 dark:shadow-[0_8px_20px_rgba(0,0,0,0.14),inset_0_0_0_1px_rgba(129,148,163,0.22),inset_0_1px_0_rgba(255,255,255,0.04)]"
+                        : "border border-transparent text-ink-500 hover:bg-ink-100/50 hover:text-ink-800 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-100"
+                    }`}
+                    aria-pressed={active}
+                    onClick={() => setThemeMode(mode.value)}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <header className="surface-subtle rounded-2xl p-8 md:p-10">
             <div className="max-w-3xl space-y-4">
               <Badge tone="accent" className="rounded-full px-3 py-1">
                 Internal · UI Kit
               </Badge>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">UniID Design System</h1>
-                <p className="max-w-2xl text-md leading-7 text-ink-600">
+                <p className="max-w-2xl text-md leading-7 text-ink-600 dark:text-slate-300">
                   用于验收 primitives、视觉 surface、表单状态、浮层、数据展示和反馈组件。页面本身也作为 UI 质感基线。
                 </p>
               </div>
@@ -136,12 +207,25 @@ export default function DesignSystemPage() {
           <Section
             eyebrow="Foundation"
             title="Color tokens"
-            description="暖中性色承载主体，accent 只作为轻量强调。"
+            description="浅色使用暖中性色，深色使用低对比冷中性色；accent 只作为轻量强调。"
           >
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-              {(["cream", "sand", "ink", "accent", "success", "warning", "danger"] as const).map((name) => (
-                <Swatch key={name} name={name} />
-              ))}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-2xs font-medium uppercase tracking-[0.14em] text-ink-400 dark:text-slate-500">Light · warm neutrals</p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
+                  {lightColorGroups.map((name) => (
+                    <Swatch key={name} name={name} />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-2xs font-medium uppercase tracking-[0.14em] text-ink-400 dark:text-slate-500">Dark · low contrast cool neutrals</p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-5">
+                  {darkColorGroups.map((name) => (
+                    <Swatch key={name} name={name} dark />
+                  ))}
+                </div>
+              </div>
             </div>
           </Section>
 
@@ -270,8 +354,8 @@ export default function DesignSystemPage() {
                       </SelectContent>
                     </SelectRoot>
                   </Field>
-                  <div className="rounded-xl border border-white/70 bg-white/58 px-3 py-2 text-sm text-ink-600">
-                    当前选择：<span className="font-mono text-ink-900">{schemaPreset}</span>
+                  <div className="rounded-xl border border-ink-200/70 bg-cream-50/60 px-3 py-2 text-sm text-ink-600 dark:border-slate-600/60 dark:bg-slate-900/50 dark:text-slate-300">
+                    当前选择：<span className="font-mono text-ink-900 dark:text-slate-100">{schemaPreset}</span>
                   </div>
                 </div>
               </PreviewPanel>
@@ -299,7 +383,7 @@ export default function DesignSystemPage() {
                       ]}
                     />
                   </Field>
-                  <p className="text-sm leading-6 text-ink-500">
+                  <p className="text-sm leading-6 text-ink-500 dark:text-slate-400">
                     菜单项使用统一的 <span className="font-mono">min-h-9</span>、<span className="font-mono">text-sm</span> 和 <span className="font-mono">size-4</span> 图标规范。
                   </p>
                 </div>
@@ -352,7 +436,7 @@ export default function DesignSystemPage() {
                     <Badge tone="success">active</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="text-sm leading-6 text-ink-600">
+                <CardContent className="text-sm leading-6 text-ink-600 dark:text-slate-300">
                   这是一个示例应用卡片，包含名称、域名和描述信息。
                 </CardContent>
                 <CardFooter>
@@ -448,19 +532,19 @@ export default function DesignSystemPage() {
           <Section eyebrow="Controls" title="Tabs · Switch · Checkbox · Loading" description="小控件也需要拥有完整尺寸和状态，不依赖浏览器默认外观。">
             <PreviewPanel>
               <div className="flex flex-wrap items-center gap-5">
-                <div className="flex items-center gap-2 rounded-xl bg-white/58 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200/70 bg-cream-50/60 px-3 py-2 dark:border-slate-600/60 dark:bg-slate-900/50">
                   <Switch defaultChecked id="switch-demo" />
                   <Label htmlFor="switch-demo">启用</Label>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-white/58 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200/70 bg-cream-50/60 px-3 py-2 dark:border-slate-600/60 dark:bg-slate-900/50">
                   <Switch disabled id="switch-disabled" />
                   <Label htmlFor="switch-disabled">禁用</Label>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-white/58 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200/70 bg-cream-50/60 px-3 py-2 dark:border-slate-600/60 dark:bg-slate-900/50">
                   <Checkbox defaultChecked id="ck" />
                   <Label htmlFor="ck">我同意</Label>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-white/58 px-3 py-2">
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200/70 bg-cream-50/60 px-3 py-2 dark:border-slate-600/60 dark:bg-slate-900/50">
                   <Checkbox disabled id="ck-disabled" />
                   <Label htmlFor="ck-disabled">不可选</Label>
                 </div>
@@ -477,9 +561,9 @@ export default function DesignSystemPage() {
                     <TabsTrigger value="settings">设置</TabsTrigger>
                     <TabsTrigger value="advanced">高级</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="overview" className="text-sm leading-6 text-ink-600">概览内容展示在统一 spacing 下。</TabsContent>
-                  <TabsContent value="settings" className="text-sm leading-6 text-ink-600">设置内容可直接放表单或卡片。</TabsContent>
-                  <TabsContent value="advanced" className="text-sm leading-6 text-ink-600">高级内容建议配合 Callout 降低风险。</TabsContent>
+                  <TabsContent value="overview" className="text-sm leading-6 text-ink-600 dark:text-slate-300">概览内容展示在统一 spacing 下。</TabsContent>
+                  <TabsContent value="settings" className="text-sm leading-6 text-ink-600 dark:text-slate-300">设置内容可直接放表单或卡片。</TabsContent>
+                  <TabsContent value="advanced" className="text-sm leading-6 text-ink-600 dark:text-slate-300">高级内容建议配合 Callout 降低风险。</TabsContent>
                 </Tabs>
               </div>
             </PreviewPanel>
@@ -500,15 +584,15 @@ export default function DesignSystemPage() {
                   </TableHeader>
                   <TableBody>
                     <TableRow>
-                      <TableCell className="font-medium text-ink-900"><Database className="mr-2 inline h-4 w-4" />posts</TableCell>
+                      <TableCell className="font-medium text-ink-900 dark:text-slate-100"><Database className="mr-2 inline h-4 w-4" />posts</TableCell>
                       <TableCell><Badge tone="success">active</Badge></TableCell>
-                      <TableCell className="text-xs text-ink-500">2026/05/25 18:20</TableCell>
+                      <TableCell className="text-xs text-ink-500 dark:text-slate-400">2026/05/25 18:20</TableCell>
                       <TableCell className="text-right font-mono text-xs">128</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell className="font-medium text-ink-900"><ShieldCheck className="mr-2 inline h-4 w-4" />profiles</TableCell>
+                      <TableCell className="font-medium text-ink-900 dark:text-slate-100"><ShieldCheck className="mr-2 inline h-4 w-4" />profiles</TableCell>
                       <TableCell><Badge tone="warning">draft</Badge></TableCell>
-                      <TableCell className="text-xs text-ink-500">2026/05/25 17:04</TableCell>
+                      <TableCell className="text-xs text-ink-500 dark:text-slate-400">2026/05/25 17:04</TableCell>
                       <TableCell className="text-right font-mono text-xs">42</TableCell>
                     </TableRow>
                   </TableBody>
@@ -523,8 +607,9 @@ export default function DesignSystemPage() {
               <CodeBlock title="JSON Schema" language="json" value={codeSample} maxHeight="20rem" />
             </div>
           </Section>
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
     </TooltipProvider>
   );
 }
@@ -544,8 +629,8 @@ function Section({
     <section className="space-y-4">
       <div className="flex flex-col gap-1">
         <p className="text-2xs font-medium uppercase tracking-[0.16em] text-accent-600">{eyebrow}</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-ink-900">{title}</h2>
-        {description ? <p className="max-w-2xl text-sm leading-6 text-ink-500">{description}</p> : null}
+        <h2 className="text-2xl font-semibold tracking-tight text-ink-900 dark:text-slate-100">{title}</h2>
+        {description ? <p className="max-w-2xl text-sm leading-6 text-ink-500 dark:text-slate-400">{description}</p> : null}
       </div>
       {children}
     </section>
@@ -559,11 +644,11 @@ function PreviewPanel({ children }: { children: ReactNode }) {
 function SurfaceCard({ className, title, description }: { className: string; title: string; description: string }) {
   return (
     <div className={`${className} rounded-2xl p-5`}>
-      <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl bg-white/70 text-accent-700 shadow-xs">
+      <div className="mb-5 flex h-10 w-10 items-center justify-center rounded-xl border border-ink-200/70 bg-cream-50/60 text-accent-700 shadow-xs dark:border-slate-600/60 dark:bg-slate-900/50 dark:text-accent-200">
         <Layers3 className="h-4 w-4" />
       </div>
-      <h3 className="font-mono text-sm font-semibold text-ink-900">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-500">{description}</p>
+      <h3 className="font-mono text-sm font-semibold text-ink-900 dark:text-slate-100">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-slate-400">{description}</p>
     </div>
   );
 }
@@ -571,28 +656,30 @@ function SurfaceCard({ className, title, description }: { className: string; tit
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-ink-500">{label}</span>
-      <span className="font-mono text-xs text-ink-800">{value}</span>
+      <span className="text-ink-500 dark:text-slate-400">{label}</span>
+      <span className="font-mono text-xs text-ink-800 dark:text-slate-200">{value}</span>
     </div>
   );
 }
 
-function Swatch({ name }: { name: string }) {
-  const steps = [50, 100, 200, 300, 500, 700, 900] as const;
+function Swatch({ name, dark = false }: { name: string; dark?: boolean }) {
+  const steps = [50, 100, 200, 300, 500, 700, 900, 950] as const;
   const family = (colorTokens as Record<string, Record<number, string>>)[name];
   if (!family) return null;
   return (
     <div className="surface-elevated overflow-hidden rounded-xl p-2">
-      <p className="mb-2 px-1 text-2xs font-medium uppercase tracking-wider text-ink-400">{name}</p>
-      <div className="overflow-hidden rounded-lg border border-ink-100/70">
+      <p className="mb-2 px-1 text-2xs font-medium uppercase tracking-wider text-ink-400 dark:text-slate-500">{name}</p>
+      <div className="overflow-hidden rounded-lg border border-ink-100/70 dark:border-slate-700/70">
         {steps.map((s) => {
           const hex = family[s];
           if (!hex) return null;
+          const textColor = dark ? (s >= 500 ? "#F4F7F8" : "#0B1117") : s >= 500 ? "#FBF9F4" : "#13110E";
+
           return (
             <div
               key={s}
               className="flex items-center justify-between px-2 py-1.5 font-mono text-2xs"
-              style={{ backgroundColor: hex, color: s >= 500 ? "#FBF9F4" : "#13110E" }}
+              style={{ backgroundColor: hex, color: textColor }}
             >
               <span>{s}</span>
               <span>{hex}</span>

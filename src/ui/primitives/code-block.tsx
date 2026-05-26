@@ -35,22 +35,22 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-ink-100/80 bg-ink-950 text-cream-50 shadow-[0_18px_42px_rgba(19,17,14,0.18)]",
+        "overflow-hidden rounded-xl border border-slate-700/80 bg-ink-950 text-cream-50 shadow-[0_18px_42px_rgba(19,17,14,0.18)] dark:border-slate-600/70",
         className
       )}
       {...props}
     >
       {(title || language) && (
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.04] px-3 py-2">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-slate-900 px-3 py-2">
           <div className="min-w-0">
             {title ? <p className="truncate text-xs font-medium text-cream-50">{title}</p> : null}
-            {language ? <p className="font-mono text-2xs uppercase tracking-[0.14em] text-cream-50/48">{language}</p> : null}
+            {language ? <p className="font-mono text-2xs uppercase tracking-[0.14em] text-cream-50/50">{language}</p> : null}
           </div>
           <Button
             type="button"
             variant="ghost"
             size="xs"
-            className="h-7 rounded-md px-2 text-cream-50/72 hover:bg-white/10 hover:text-cream-50"
+            className="h-7 rounded-md px-2 text-cream-50/70 hover:bg-slate-800 hover:text-cream-50"
             onClick={copy}
           >
             {copied ? <Check /> : <Copy />}

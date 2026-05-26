@@ -7,23 +7,23 @@ import { cn } from "./utils";
 const toneStyles = {
   info: {
     icon: Info,
-    className: "border-accent-100/80 bg-accent-50/72 text-accent-900",
-    iconClassName: "text-accent-600"
+    className: "border-accent-300/40 bg-accent-50/50 text-accent-900 dark:border-accent-300/40 dark:bg-accent-900/30 dark:text-accent-100",
+    iconClassName: "text-accent-600 dark:text-accent-200"
   },
   success: {
     icon: CheckCircle2,
-    className: "border-success-100/80 bg-success-50/78 text-success-700",
-    iconClassName: "text-success-600"
+    className: "border-success-500/30 bg-success-50/60 text-success-700 dark:border-success-500/40 dark:bg-success-700/20 dark:text-success-100",
+    iconClassName: "text-success-600 dark:text-success-100"
   },
   warning: {
     icon: AlertTriangle,
-    className: "border-warning-100/80 bg-warning-50/78 text-warning-700",
-    iconClassName: "text-warning-600"
+    className: "border-warning-500/40 bg-warning-50/60 text-warning-700 dark:border-warning-500/40 dark:bg-warning-700/20 dark:text-warning-100",
+    iconClassName: "text-warning-600 dark:text-warning-100"
   },
   danger: {
     icon: XCircle,
-    className: "border-danger-100/80 bg-danger-50/78 text-danger-700",
-    iconClassName: "text-danger-600"
+    className: "border-danger-500/30 bg-danger-50/60 text-danger-700 dark:border-danger-500/40 dark:bg-danger-700/30 dark:text-danger-100",
+    iconClassName: "text-danger-600 dark:text-danger-100"
   }
 } as const;
 
@@ -41,7 +41,7 @@ export const Callout = React.forwardRef<HTMLDivElement, CalloutProps>(
       <div
         ref={ref}
         className={cn(
-          "relative flex gap-3 rounded-xl border px-4 py-3 text-sm shadow-[0_10px_26px_rgba(19,17,14,0.04),inset_0_1px_0_rgba(255,255,255,0.72)] backdrop-blur-sm",
+          "relative flex gap-3 rounded-xl border px-4 py-3 text-sm shadow-[0_10px_24px_rgba(19,17,14,0.045),inset_0_1px_0_rgba(255,255,255,0.48)] backdrop-blur-sm dark:shadow-[0_10px_24px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.035)]",
           style.className,
           className
         )}
