@@ -292,11 +292,11 @@ export function RecordRowActions({
             <DialogDescription>记录会被软删除，可避免误删造成直接数据丢失。</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-3">
-            <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+            <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-xs text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100">
               确认删除记录 <span className="font-mono">{recordId}</span>？
             </div>
             {error && (
-              <p className="text-xs leading-5 text-danger-700" role="alert">
+              <p className="text-xs leading-5 text-danger-700 dark:text-danger-200" role="alert">
                 {error}
               </p>
             )}

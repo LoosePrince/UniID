@@ -177,9 +177,9 @@ export function UserActions({ user }: { user: UserSummary }) {
             <DialogDescription>{dialogCopy.description}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm">
-              <span className="text-ink-500">目标用户：</span>
-              <span className="font-mono text-ink-900">@{user.username}</span>
+            <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm dark:border-slate-700/70 dark:bg-slate-900/50">
+              <span className="text-ink-500 dark:text-slate-400">目标用户：</span>
+              <span className="font-mono text-ink-900 dark:text-slate-100">@{user.username}</span>
             </div>
 
             {dialog === "edit" ? (
@@ -257,13 +257,13 @@ export function UserActions({ user }: { user: UserSummary }) {
             ) : null}
 
             {dialog === "delete" ? (
-              <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700">
+              <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100">
                 确认删除 <span className="font-mono">@{user.username}</span>？如该用户仍有关联资产，系统会拒绝删除。
               </div>
             ) : null}
 
             {error ? (
-              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100" role="alert">
                 {error}
               </p>
             ) : null}

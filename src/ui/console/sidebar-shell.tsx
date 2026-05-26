@@ -10,7 +10,7 @@ export function ConsoleSidebarShell({ isSystemAdmin }: { isSystemAdmin: boolean 
   const match = APP_PATH_RE.exec(pathname ?? "");
   const appId = match?.[1];
   return (
-    <aside className="min-h-0 h-full w-64 shrink-0 overflow-y-auto border-r border-white/60 bg-cream-50/68 shadow-[inset_-1px_0_0_rgba(255,255,255,0.7)] backdrop-blur-xl">
+    <aside className="min-h-0 h-full w-64 shrink-0 overflow-y-auto border-r border-white/60 bg-cream-50/70 shadow-[inset_-1px_0_0_rgba(255,255,255,0.7)] backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/70 dark:shadow-[inset_-1px_0_0_rgba(129,148,163,0.12)]">
       <ConsoleSidebar appId={appId} isSystemAdmin={isSystemAdmin} />
     </aside>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Copy,
@@ -15,6 +15,7 @@ import {
   Trash2
 } from "lucide-react";
 import { colors as colorTokens } from "@/ui/tokens";
+import { useTheme, type ThemeMode } from "@/ui/theme";
 import {
   Badge,
   Button,
@@ -86,13 +87,11 @@ import {
   toast
 } from "@/ui/primitives";
 
-const themeModes = [
+const themeModes: Array<{ value: ThemeMode; label: string }> = [
   { value: "system", label: "自动" },
   { value: "light", label: "浅色" },
   { value: "dark", label: "深色" }
 ] as const;
-
-type ThemeMode = (typeof themeModes)[number]["value"];
 
 const lightColorGroups = ["cream", "sand", "ink", "accent", "success", "warning", "danger"] as const;
 const darkColorGroups = ["slate", "accent", "success", "warning", "danger"] as const;
@@ -117,37 +116,12 @@ export default function DesignSystemPage() {
   const [compactMenu, setCompactMenu] = useState(true);
   const [menuDensity, setMenuDensity] = useState("comfortable");
   const [schemaPreset, setSchemaPreset] = useState("posts");
-  const [themeMode, setThemeMode] = useState<ThemeMode>("system");
-  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
-  const isDark = themeMode === "dark" || (themeMode === "system" && systemPrefersDark);
-
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncSystemTheme = () => setSystemPrefersDark(query.matches);
-
-    syncSystemTheme();
-    query.addEventListener("change", syncSystemTheme);
-
-    return () => query.removeEventListener("change", syncSystemTheme);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const hadDarkClass = root.classList.contains("dark");
-
-    root.classList.toggle("dark", isDark);
-    root.style.colorScheme = isDark ? "dark" : "light";
-
-    return () => {
-      root.classList.toggle("dark", hadDarkClass);
-      root.style.colorScheme = "";
-    };
-  }, [isDark]);
+  const { themeMode, resolvedTheme, setThemeMode } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   return (
     <TooltipProvider>
-      <div className={isDark ? "dark" : undefined}>
-        <main className="relative min-h-screen overflow-hidden bg-cream-50 py-8 text-ink-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+      <main className="relative min-h-screen overflow-hidden bg-cream-50 py-8 text-ink-900 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
           <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_18%_8%,rgba(119,111,218,0.11),transparent_32%),radial-gradient(circle_at_84%_16%,rgba(197,184,145,0.13),transparent_28%),linear-gradient(180deg,#fbf9f4_0%,#f6f2e9_54%,#efe9d9_100%)] dark:bg-[radial-gradient(circle_at_18%_8%,rgba(99,109,180,0.12),transparent_30%),radial-gradient(circle_at_80%_14%,rgba(89,110,128,0.14),transparent_28%),linear-gradient(180deg,#0b1117_0%,#111a21_52%,#141d24_100%)]" />
 
           <div className="container-page relative z-10 space-y-10">
@@ -609,7 +583,6 @@ export default function DesignSystemPage() {
           </Section>
           </div>
         </main>
-      </div>
     </TooltipProvider>
   );
 }

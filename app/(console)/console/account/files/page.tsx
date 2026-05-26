@@ -31,18 +31,18 @@ export default async function ConsoleAccountFilesPage() {
     <div className="space-y-4">
       <header>
         <h2 className="text-xl font-semibold tracking-tight">我的文件</h2>
-        <p className="mt-1 text-sm text-ink-500">所有由你账号上传到任意应用的文件。</p>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">所有由你账号上传到任意应用的文件。</p>
       </header>
       {files.length === 0 ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-ink-500">暂无文件。</CardContent>
+          <CardContent className="py-10 text-center text-sm text-ink-500 dark:text-slate-400">暂无文件。</CardContent>
         </Card>
       ) : (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-cream-100 text-xs text-ink-500">
+                <thead className="bg-cream-100 text-xs text-ink-500 dark:bg-slate-800/70 dark:text-slate-300">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">名称</th>
                     <th className="px-4 py-2 text-left font-medium">应用</th>
@@ -55,15 +55,15 @@ export default async function ConsoleAccountFilesPage() {
                 </thead>
                 <tbody>
                   {files.map((f) => (
-                    <tr key={f.id} className="border-t border-ink-100">
+                    <tr key={f.id} className="border-t border-ink-100 transition-colors dark:border-slate-700/70 dark:hover:bg-slate-800/50">
                       <td className="max-w-xs truncate px-4 py-2">{f.originalName}</td>
-                      <td className="px-4 py-2 text-ink-500">{f.app?.name ?? "（无）"}</td>
-                      <td className="px-4 py-2 font-mono text-xs text-ink-500">{f.mimeType}</td>
+                      <td className="px-4 py-2 text-ink-500 dark:text-slate-400">{f.app?.name ?? "（无）"}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-ink-500 dark:text-slate-400">{f.mimeType}</td>
                       <td className="px-4 py-2">
                         {f.shareTokens[0] ? (
                           <div className="space-y-1">
                             <Badge tone="success">shared</Badge>
-                            <p className="text-2xs text-ink-400">
+                            <p className="text-2xs text-ink-400 dark:text-slate-500">
                               至 {new Date(f.shareTokens[0].expiresAt * 1000).toLocaleString()}
                             </p>
                           </div>
@@ -72,7 +72,7 @@ export default async function ConsoleAccountFilesPage() {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">{formatBytes(f.size)}</td>
-                      <td className="px-4 py-2 text-right text-xs text-ink-500">
+                      <td className="px-4 py-2 text-right text-xs text-ink-500 dark:text-slate-400">
                         {new Date(f.createdAt * 1000).toLocaleString()}
                       </td>
                       <td className="px-4 py-2 text-right">

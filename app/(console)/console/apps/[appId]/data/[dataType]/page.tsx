@@ -53,10 +53,10 @@ export default async function DataBrowserPage({
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">
-            <span className="text-ink-400">data /</span>{" "}
+            <span className="text-ink-400 dark:text-slate-500">data /</span>{" "}
             <span className="font-mono">{params.dataType}</span>
           </h1>
-          <p className="text-sm text-ink-500 mt-1">
+          <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">
             共 {total} 条 · 当前显示 {records.length} 条 · active schema v
             {schema.versions[0]?.version ?? "—"}
           </p>
@@ -67,7 +67,7 @@ export default async function DataBrowserPage({
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-cream-100 text-ink-500 text-xs">
+            <thead className="border-b border-ink-100 bg-cream-100 text-ink-500 text-xs dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">ID</th>
                 <th className="text-left px-4 py-2 font-medium">Owner</th>
@@ -81,8 +81,8 @@ export default async function DataBrowserPage({
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center">
                     <div className="mx-auto max-w-sm space-y-3">
-                      <p className="text-sm font-medium text-ink-700">暂无记录</p>
-                      <p className="text-xs text-ink-500">
+                      <p className="text-sm font-medium text-ink-700 dark:text-slate-200">暂无记录</p>
+                      <p className="text-xs text-ink-500 dark:text-slate-400">
                         可以先创建一条 JSON 记录，写入时会使用当前 active schema 校验。
                       </p>
                       <CreateRecordButton appId={app.id} dataType={params.dataType} />
@@ -93,17 +93,17 @@ export default async function DataBrowserPage({
               {records.map((record) => {
                 const parsed = parseRecordData(record.data);
                 return (
-                  <tr key={record.id} className="border-t border-ink-100 hover:bg-cream-50">
-                    <td className="px-4 py-3 font-mono text-xs text-ink-600 whitespace-nowrap">
+                  <tr key={record.id} className="border-t border-ink-100 bg-white/40 transition-colors hover:bg-cream-50 dark:border-slate-700/70 dark:bg-slate-950/10 dark:hover:bg-slate-800/50">
+                    <td className="px-4 py-3 font-mono text-xs text-ink-600 whitespace-nowrap dark:text-slate-300">
                       {record.id}
                     </td>
-                    <td className="px-4 py-3 text-xs text-ink-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-ink-500 whitespace-nowrap dark:text-slate-400">
                       {record.ownerId ?? "—"}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-ink-700 max-w-xl">
+                    <td className="px-4 py-3 font-mono text-xs text-ink-700 max-w-xl dark:text-slate-300">
                       <span className="line-clamp-2 break-all">{previewRecordData(record.data)}</span>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs text-ink-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right text-xs text-ink-500 whitespace-nowrap dark:text-slate-400">
                       {new Date(record.updatedAt * 1000).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">

@@ -23,7 +23,7 @@ export default async function ConsoleAccountSessionsPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">会话</h2>
-          <p className="mt-1 text-sm text-ink-500">管理所有登录设备与 SDK 会话。</p>
+          <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">管理所有登录设备与 SDK 会话。</p>
         </div>
         <RevokeOtherSessionsButton sessions={otherSessions} />
       </header>
@@ -35,7 +35,7 @@ export default async function ConsoleAccountSessionsPage() {
       </div>
 
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-ink-900">UniID 控制台会话</h3>
+        <h3 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">UniID 控制台会话</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {consoleSessions.length === 0 ? <Empty label="暂无控制台会话" /> : null}
           {consoleSessions.map((s) => (
@@ -51,7 +51,7 @@ export default async function ConsoleAccountSessionsPage() {
                   {s.userAgent ?? "unknown UA"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-xs text-ink-500">
+              <CardContent className="space-y-3 text-xs text-ink-500 dark:text-slate-400">
                 <div className="grid grid-cols-2 gap-2">
                   <span>最近活跃</span>
                   <span className="text-right font-mono">{new Date(s.lastSeenAt * 1000).toLocaleString()}</span>
@@ -70,7 +70,7 @@ export default async function ConsoleAccountSessionsPage() {
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-ink-900">SDK / 应用会话</h3>
+        <h3 className="mb-3 text-sm font-semibold text-ink-900 dark:text-slate-100">SDK / 应用会话</h3>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {appSessions.length === 0 ? <Empty label="暂无 SDK / 应用会话" /> : null}
           {appSessions.map((s) => (
@@ -84,7 +84,7 @@ export default async function ConsoleAccountSessionsPage() {
                 </div>
                 <CardDescription className="truncate font-mono text-2xs">{s.app.primaryDomain}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-xs text-ink-500">
+              <CardContent className="space-y-3 text-xs text-ink-500 dark:text-slate-400">
                 <div className="grid grid-cols-2 gap-2">
                   <span>最近活跃</span>
                   <span className="text-right font-mono">{new Date(s.lastSeenAt * 1000).toLocaleString()}</span>
@@ -107,8 +107,8 @@ function Metric({ label, value }: { label: string; value: number }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <p className="text-xs text-ink-500">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight text-ink-900">{value}</p>
+        <p className="text-xs text-ink-500 dark:text-slate-400">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight text-ink-900 dark:text-slate-100">{value}</p>
       </CardContent>
     </Card>
   );
@@ -117,7 +117,7 @@ function Metric({ label, value }: { label: string; value: number }) {
 function Empty({ label }: { label: string }) {
   return (
     <Card className="md:col-span-2">
-      <CardContent className="py-10 text-center text-sm text-ink-400">{label}</CardContent>
+      <CardContent className="py-10 text-center text-sm text-ink-400 dark:text-slate-500">{label}</CardContent>
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BookOpen, Code2, Database, FileText, Network, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from "@/ui/primitives";
+import { ThemeToggle } from "@/ui/theme";
 
 const docs = [
   {
@@ -42,15 +43,16 @@ const docs = [
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen bg-cream-50">
-      <header className="border-b border-ink-100 bg-white/80 backdrop-blur">
+    <main className="min-h-screen bg-cream-50 text-ink-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="border-b border-ink-100 bg-white/80 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/90 dark:shadow-[0_1px_0_rgba(129,148,163,0.12)]">
         <div className="container-page flex h-14 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ink-900 text-sm text-cream-50">U</span>
-            UniID Docs
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ink-900 text-sm text-cream-50 dark:bg-slate-100 dark:text-slate-950">U</span>
+            <span className="text-ink-900 dark:text-slate-100">UniID Docs</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
+            <ThemeToggle compact />
+            <Button asChild variant="outline" size="sm">
               <Link href="/design">设计系统</Link>
             </Button>
             <Button asChild size="sm">
@@ -63,10 +65,10 @@ export default function DocsPage() {
       <section className="container-page py-12 space-y-10">
         <div className="max-w-3xl space-y-4">
           <Badge tone="accent">Documentation</Badge>
-          <h1 className="text-3xl font-semibold tracking-tight text-ink-900 md:text-5xl">
+          <h1 className="text-3xl font-semibold tracking-tight text-ink-900 dark:text-slate-100 md:text-5xl">
             UniID 文档
           </h1>
-          <p className="text-md leading-relaxed text-ink-600">
+          <p className="text-md leading-relaxed text-ink-600 dark:text-slate-300">
             这里汇总现有文档主题和接入路径。首页 CTA 现在会进入这个可浏览文档入口。
           </p>
           <div className="flex flex-wrap gap-2">
@@ -94,9 +96,9 @@ export default function DocsPage() {
                     <Badge tone="neutral">{doc.source}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm text-ink-600">
+                <CardContent className="space-y-4 text-sm text-ink-600 dark:text-slate-300">
                   <p>
-                    源文件位于 <span className="font-mono text-xs text-ink-900">{doc.source}</span>，页面会直接渲染当前仓库内容。
+                    源文件位于 <span className="font-mono text-xs text-ink-900 dark:text-slate-100">{doc.source}</span>，页面会直接渲染当前仓库内容。
                   </p>
                   <Button asChild variant="outline" size="sm">
                     <Link href={`/docs/${doc.slug}`}>

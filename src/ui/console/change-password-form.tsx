@@ -91,7 +91,7 @@ export function ChangePasswordForm() {
       </Field>
 
       {error && !mismatch ? (
-        <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+        <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-200" role="alert">
           {error}
         </p>
       ) : null}
@@ -103,7 +103,7 @@ export function ChangePasswordForm() {
         <Button type="button" variant="ghost" onClick={() => setShowPasswords((value) => !value)} disabled={pending}>
           {showPasswords ? <EyeOff /> : <Eye />} {showPasswords ? "隐藏密码" : "显示密码"}
         </Button>
-        <span className="inline-flex items-center gap-1 text-xs text-ink-400">
+        <span className="inline-flex items-center gap-1 text-xs text-ink-400 dark:text-slate-500">
           <KeyRound className="h-3.5 w-3.5" /> 修改后当前会话保持登录
         </span>
       </div>

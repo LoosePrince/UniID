@@ -32,7 +32,7 @@ export default async function AdminConfigPage() {
     <div className="container-page space-y-6 py-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">全局配置</h1>
-        <p className="mt-1 text-sm text-ink-500">默认配额、全局开关、文件策略等。</p>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">默认配额、全局开关、文件策略等。</p>
       </div>
 
       <Card>

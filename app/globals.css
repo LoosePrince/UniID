@@ -27,7 +27,8 @@
     text-rendering: optimizeLegibility;
   }
 
-  html:has(.dark),
+  html.dark,
+  html.dark body,
   body:has(.dark) {
     background-color: theme("colors.slate.950");
     background-image:
@@ -197,6 +198,22 @@
 
   .dark .supports-blur-fallback {
     background-color: rgba(20, 29, 36, 0.82);
+  }
+
+  .dark :where(.text-black, .text-ink-950, .text-ink-900, .text-ink-800) {
+    color: theme("colors.slate.100");
+  }
+
+  .dark :where(.text-ink-700, .text-ink-600) {
+    color: theme("colors.slate.300");
+  }
+
+  .dark :where(.text-ink-500) {
+    color: theme("colors.slate.400");
+  }
+
+  .dark :where(.text-ink-400) {
+    color: theme("colors.slate.500");
   }
 
   @supports (backdrop-filter: blur(1px)) {

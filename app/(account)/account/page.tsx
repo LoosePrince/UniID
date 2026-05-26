@@ -11,11 +11,11 @@ export default async function AccountAuthorizationsPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-semibold tracking-tight">授权应用</h1>
-        <p className="text-sm text-ink-500 mt-1">已授予访问你 UniID 账号的外部应用。</p>
+        <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">已授予访问你 UniID 账号的外部应用。</p>
       </header>
       {authorizations.length === 0 ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-ink-500">
+          <CardContent className="py-10 text-center text-sm text-ink-500 dark:text-slate-400">
             暂无授权应用。当外部网站通过 UniID 登录后会出现在这里。
           </CardContent>
         </Card>
@@ -32,7 +32,7 @@ export default async function AccountAuthorizationsPage() {
                 </div>
                 <CardDescription className="font-mono truncate">{az.app.primaryDomain}</CardDescription>
               </CardHeader>
-              <CardContent className="flex items-center justify-between text-xs text-ink-500">
+              <CardContent className="flex items-center justify-between text-xs text-ink-500 dark:text-slate-400">
                 <span>授权于 {new Date(az.grantedAt * 1000).toLocaleString()}</span>
                 <RevokeAppButton userId={auth.user.id} appId={az.appId} appName={az.app.name} />
               </CardContent>

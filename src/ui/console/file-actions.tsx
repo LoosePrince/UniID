@@ -126,7 +126,7 @@ export function AppFileUploadButton({ appId }: { appId: string }) {
                 ]}
               />
             </Field>
-            {error && file ? <p className="text-xs text-danger-700">{error}</p> : null}
+            {error && file ? <p className="text-xs text-danger-700 dark:text-danger-200">{error}</p> : null}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>
@@ -290,7 +290,7 @@ export function FileRowActions({ file, basePath }: { file: ManagedFile; basePath
           <Trash2 /> 删除
         </Button>
       </div>
-      {error ? <p className="mt-1 text-right text-xs text-danger-700">{error}</p> : null}
+      {error ? <p className="mt-1 text-right text-xs text-danger-700 dark:text-danger-200">{error}</p> : null}
 
       <Dialog open={deleteOpen} onOpenChange={(next) => busy !== "delete" && setDeleteOpen(next)}>
         <DialogContent>
@@ -299,10 +299,10 @@ export function FileRowActions({ file, basePath }: { file: ManagedFile; basePath
             <DialogDescription>该操作会软删除文件记录，并尝试删除存储对象。</DialogDescription>
           </DialogHeader>
           <DialogBody>
-            <div className="rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800">
+            <div className="rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100">
               确认删除「{file.originalName}」？此操作不会使用浏览器原生确认框。
             </div>
-            {error ? <p className="mt-3 text-xs text-danger-700">{error}</p> : null}
+            {error ? <p className="mt-3 text-xs text-danger-700 dark:text-danger-200">{error}</p> : null}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={busy === "delete"} onClick={() => setDeleteOpen(false)}>

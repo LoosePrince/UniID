@@ -100,14 +100,14 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
       className={cn(
         "group relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-[background,color,box-shadow,transform] duration-200",
         active
-          ? "bg-white/74 text-ink-900 font-medium shadow-[0_7px_18px_rgba(19,17,14,0.055),inset_0_1px_0_rgba(255,255,255,0.82)]"
-          : "text-ink-600 hover:bg-white/52 hover:text-ink-900"
+          ? "bg-white/75 text-ink-900 font-medium shadow-[0_7px_18px_rgba(19,17,14,0.055),inset_0_1px_0_rgba(255,255,255,0.82)] dark:bg-slate-800/70 dark:text-slate-100 dark:shadow-[inset_0_0_0_1px_rgba(129,148,163,0.18)]"
+          : "text-ink-600 hover:bg-white/50 hover:text-ink-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-100"
       )}
     >
       <span
         className={cn(
           "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
-          active ? "bg-ink-900 text-cream-50" : "bg-white/46 text-ink-500 group-hover:text-accent-700"
+          active ? "bg-ink-900 text-cream-50 dark:bg-slate-100 dark:text-slate-950" : "bg-white/50 text-ink-500 group-hover:text-accent-700 dark:bg-slate-800/60 dark:text-slate-400 dark:group-hover:text-accent-200"
         )}
       >
         <Icon className="h-3.5 w-3.5" />

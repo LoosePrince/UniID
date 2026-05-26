@@ -14,7 +14,7 @@ const items = [
 export function AccountNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-wrap items-center gap-2 border-b border-ink-100 -mb-px">
+    <nav className="-mb-px flex flex-wrap items-center gap-2 border-b border-ink-100 dark:border-slate-700/70">
       {items.map((it) => {
         const active = pathname === it.href;
         return (
@@ -24,8 +24,8 @@ export function AccountNav() {
             className={cn(
               "px-3 py-3 text-sm border-b-2 transition-colors",
               active
-                ? "border-ink-900 text-ink-900 font-medium"
-                : "border-transparent text-ink-500 hover:text-ink-900"
+                ? "border-ink-900 text-ink-900 font-medium dark:border-slate-300/70 dark:text-slate-100"
+                : "border-transparent text-ink-500 hover:text-ink-900 dark:text-slate-400 dark:hover:text-slate-100"
             )}
           >
             {it.label}

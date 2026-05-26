@@ -24,7 +24,7 @@ export default async function AccountSettingsPage() {
     <div className="max-w-3xl space-y-6">
       <header>
         <h1 className="text-xl font-semibold tracking-tight">账号设置</h1>
-        <p className="mt-1 text-sm text-ink-500">查看与修改你的账号信息。</p>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">查看与修改你的账号信息。</p>
       </header>
 
       <Card>
@@ -76,9 +76,9 @@ export default async function AccountSettingsPage() {
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-ink-100 bg-cream-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-ink-500">{k}</span>
-      <span className="break-all font-mono text-xs text-ink-900">{v}</span>
+    <div className="flex flex-col gap-1 rounded-md border border-ink-100 bg-cream-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between dark:border-slate-700/70 dark:bg-slate-900/50">
+      <span className="text-ink-500 dark:text-slate-400">{k}</span>
+      <span className="break-all font-mono text-xs text-ink-900 dark:text-slate-100">{v}</span>
     </div>
   );
 }

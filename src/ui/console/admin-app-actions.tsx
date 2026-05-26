@@ -116,12 +116,12 @@ export function AppStatusActions({ app }: { app: AppSummary }) {
             <DialogDescription>{copy?.description}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-3">
-            <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm">
-              <span className="text-ink-500">目标应用：</span>
-              <span className="font-medium text-ink-900">{app.name}</span>
+            <div className="rounded-md border border-ink-100 bg-cream-50 px-3 py-2 text-sm dark:border-slate-700/70 dark:bg-slate-900/50">
+              <span className="text-ink-500 dark:text-slate-400">目标应用：</span>
+              <span className="font-medium text-ink-900 dark:text-slate-100">{app.name}</span>
             </div>
             {error ? (
-              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100" role="alert">
                 {error}
               </p>
             ) : null}

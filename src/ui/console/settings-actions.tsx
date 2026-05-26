@@ -279,12 +279,12 @@ export function DangerZone({ appId, appName }: { appId: string; appName: string 
   }
 
   return (
-    <div className="rounded-md border border-danger-200 bg-danger-50/60 p-4 space-y-4">
+    <div className="rounded-md border border-danger-200 bg-danger-50/60 p-4 space-y-4 dark:border-danger-500/30 dark:bg-danger-500/10">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 h-4 w-4 text-danger-600" />
         <div>
-          <h3 className="font-medium text-danger-900 text-sm">删除应用</h3>
-          <p className="text-xs leading-5 text-danger-700 mt-1">
+          <h3 className="font-medium text-danger-900 text-sm dark:text-danger-100">删除应用</h3>
+          <p className="text-xs leading-5 text-danger-700 mt-1 dark:text-danger-200/90">
             此操作不可恢复。所有 Schema / 记录 / 文件 / Webhooks / Cron / 授权关系会被级联删除。
           </p>
         </div>

@@ -57,7 +57,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
     <div className="container-page space-y-6 py-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">用户管理</h1>
-        <p className="mt-1 text-sm text-ink-500">共 {filtered.length} 个匹配用户，当前显示 {users.length} 个。</p>
+        <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">共 {filtered.length} 个匹配用户，当前显示 {users.length} 个。</p>
       </div>
 
       <Card>
@@ -68,7 +68,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
         <CardContent>
           <form className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_160px_160px_auto]" action="/console/admin/users">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400 dark:text-slate-500" />
               <Input name="q" defaultValue={q} className="pl-9" placeholder="搜索用户名或邮箱" />
             </div>
             <Select
@@ -103,33 +103,33 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <table className="w-full min-w-[820px] text-sm">
-            <thead className="border-b border-sand-200 bg-cream-50">
+            <thead className="border-b border-sand-200 bg-cream-50 dark:border-slate-700/70 dark:bg-slate-900/70">
               <tr>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">用户名</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">邮箱</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">角色</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">状态</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">会话</th>
-                <th className="px-4 py-2 text-left font-medium text-ink-500">记录/文件</th>
-                <th className="px-4 py-2 text-right font-medium text-ink-500">操作</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">用户名</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">邮箱</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">角色</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">状态</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">会话</th>
+                <th className="px-4 py-2 text-left font-medium text-ink-500 dark:text-slate-300">记录/文件</th>
+                <th className="px-4 py-2 text-right font-medium text-ink-500 dark:text-slate-300">操作</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-sand-200 last:border-b-0">
+                <tr key={u.id} className="border-b border-sand-200 bg-white/30 transition-colors last:border-b-0 hover:bg-cream-50 dark:border-slate-700/70 dark:bg-slate-950/10 dark:hover:bg-slate-800/50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-ink-900">{u.displayName ?? u.username}</div>
-                    <div className="text-xs text-ink-400">@{u.username}</div>
+                    <div className="font-medium text-ink-900 dark:text-slate-100">{u.displayName ?? u.username}</div>
+                    <div className="text-xs text-ink-400 dark:text-slate-500">@{u.username}</div>
                   </td>
-                  <td className="px-4 py-3 text-ink-700">{u.email ?? "—"}</td>
+                  <td className="px-4 py-3 text-ink-700 dark:text-slate-300">{u.email ?? "—"}</td>
                   <td className="px-4 py-3">
                     <Badge tone={u.role === "admin" ? "accent" : "neutral"}>{u.role === "admin" ? "admin" : "user"}</Badge>
                   </td>
                   <td className="px-4 py-3">
                     {u.deletedAt ? <Badge tone="danger">已禁用</Badge> : <Badge tone="success">活跃</Badge>}
                   </td>
-                  <td className="px-4 py-3 text-ink-700">{u._count.appSessions}</td>
-                  <td className="px-4 py-3 text-ink-700">{u._count.recordsOwned} / {u._count.filesOwned}</td>
+                  <td className="px-4 py-3 text-ink-700 dark:text-slate-300">{u._count.appSessions}</td>
+                  <td className="px-4 py-3 text-ink-700 dark:text-slate-300">{u._count.recordsOwned} / {u._count.filesOwned}</td>
                   <td className="px-4 py-3 text-right">
                     <UserActions
                       user={{
@@ -147,7 +147,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams?: 
               ))}
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-400">暂无匹配用户</td>
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-400 dark:text-slate-500">暂无匹配用户</td>
                 </tr>
               ) : null}
             </tbody>

@@ -539,7 +539,7 @@ function SchemaFieldNode({
   }
 
   return (
-    <div className="rounded-xl border border-white/70 bg-white/58 p-4 shadow-xs backdrop-blur-sm" style={{ marginLeft: depth ? 14 : 0 }}>
+    <div className="rounded-xl border border-ink-200/70 bg-white/60 p-4 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60" style={{ marginLeft: depth ? 14 : 0 }}>
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_150px_110px_auto] lg:items-end">
         <Field label={arrayItem ? "数组元素" : "字段名"}>
           <Input
@@ -557,7 +557,7 @@ function SchemaFieldNode({
             options={fieldTypeOptions}
           />
         </Field>
-        <label className="flex h-10 items-center gap-2 rounded-lg border border-white/70 bg-white/52 px-3 text-sm text-ink-700">
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-ink-200/70 bg-white/50 px-3 text-sm text-ink-700 dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-300">
           <input
             type="checkbox"
             className="h-4 w-4 accent-ink-900"
@@ -701,7 +701,7 @@ export function AutoFillBuilder({
             <CalloutDescription>可为 data.createdAt、data.authorId 等路径自动填入服务端可信值。</CalloutDescription>
           </Callout>
         ) : rules.map((rule) => (
-          <div key={rule.id} className="rounded-xl border border-white/70 bg-white/58 p-4 shadow-xs backdrop-blur-sm">
+          <div key={rule.id} className="rounded-xl border border-ink-200/70 bg-white/60 p-4 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60">
             <div className="grid gap-3 lg:grid-cols-[1fr_150px_1fr_auto] lg:items-end">
               <Field label="path">
                 <Input value={rule.path} onChange={(event) => patchRule(rule.id, { path: event.target.value })} disabled={disabled} placeholder="data.createdAt" />

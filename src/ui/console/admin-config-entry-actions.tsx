@@ -44,21 +44,21 @@ export function ConfigEntryActions({ entries }: { entries: ConfigEntry[] }) {
       <div className="flex justify-end">
         <ConfigEntryDialog mode="create" />
       </div>
-      <div className="overflow-hidden rounded-md border border-ink-100">
+      <div className="overflow-hidden rounded-md border border-ink-100 dark:border-slate-700/70 dark:bg-slate-950/10">
         <table className="w-full text-sm">
-          <thead className="border-b border-ink-100 bg-cream-50">
+          <thead className="border-b border-ink-100 bg-cream-50 dark:border-slate-700/70 dark:bg-slate-900/70">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-ink-500">Key</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-ink-500">Value</th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-ink-500">操作</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-ink-500 dark:text-slate-300">Key</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-ink-500 dark:text-slate-300">Value</th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-ink-500 dark:text-slate-300">操作</th>
             </tr>
           </thead>
           <tbody>
             {entries.map((entry) => (
-              <tr key={entry.key} className="border-b border-ink-100 last:border-b-0">
-                <td className="px-4 py-3 align-top font-mono text-xs text-ink-900">{entry.key}</td>
+              <tr key={entry.key} className="border-b border-ink-100 transition-colors last:border-b-0 hover:bg-cream-50 dark:border-slate-700/70 dark:hover:bg-slate-800/50">
+                <td className="px-4 py-3 align-top font-mono text-xs text-ink-900 dark:text-slate-100">{entry.key}</td>
                 <td className="px-4 py-3 align-top">
-                  <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded-sm bg-cream-50 p-2 text-xs text-ink-600">
+                  <pre className="max-h-24 overflow-auto whitespace-pre-wrap rounded-sm border border-ink-100 bg-cream-50 p-2 text-xs text-ink-600 dark:border-slate-700/70 dark:bg-slate-950/60 dark:text-slate-300">
                     {formatValue(entry.value)}
                   </pre>
                 </td>
@@ -69,7 +69,7 @@ export function ConfigEntryActions({ entries }: { entries: ConfigEntry[] }) {
             ))}
             {entries.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-10 text-center text-sm text-ink-400">暂无配置</td>
+                <td colSpan={3} className="px-4 py-10 text-center text-sm text-ink-400 dark:text-slate-500">暂无配置</td>
               </tr>
             ) : null}
           </tbody>
@@ -168,7 +168,7 @@ function ConfigEntryDialog({
               />
             </Field>
             {error ? (
-              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+              <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100" role="alert">
                 {error}
               </p>
             ) : null}

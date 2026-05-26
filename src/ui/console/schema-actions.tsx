@@ -215,7 +215,7 @@ export function SchemaManagementPanel({ appId, schemas }: { appId: string; schem
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Schemas</h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">
             管理 dataType 写入约束、版本切换和数据浏览入口。
           </p>
         </div>
@@ -225,8 +225,8 @@ export function SchemaManagementPanel({ appId, schemas }: { appId: string; schem
       {schemas.length === 0 ? (
         <Card>
           <CardContent className="py-14 text-center">
-            <p className="text-sm font-medium text-ink-800">尚未定义任何 Schema</p>
-            <p className="mt-1 text-xs text-ink-500">
+            <p className="text-sm font-medium text-ink-800 dark:text-slate-200">尚未定义任何 Schema</p>
+            <p className="mt-1 text-xs text-ink-500 dark:text-slate-400">
               创建第一个 Schema 后，就可以写入受校验的记录。
             </p>
             <div className="mt-5 flex justify-center">
@@ -266,7 +266,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
             <CardDescription className="max-w-3xl">
               {schema.description || "未填写 schema 级描述。"}
             </CardDescription>
-            <p className="text-xs text-ink-400">更新于 {formatTime(schema.updatedAt)}</p>
+            <p className="text-xs text-ink-400 dark:text-slate-500">更新于 {formatTime(schema.updatedAt)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {seedVersion ? (
@@ -302,7 +302,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
             <TableBody>
               {schema.versions.map((version) => (
                 <TableRow key={version.id} className="align-top">
-                  <TableCell className="font-mono text-xs text-ink-700">v{version.version}</TableCell>
+                  <TableCell className="font-mono text-xs text-ink-700 dark:text-slate-200">v{version.version}</TableCell>
                   <TableCell>
                     {version.isActive === 1 ? <Badge tone="success">active</Badge> : <Badge>draft</Badge>}
                   </TableCell>
@@ -312,7 +312,7 @@ function SchemaCard({ appId, schema }: { appId: string; schema: DataSchemaSummar
                   <TableCell className="min-w-56">
                     <VersionPreview version={version} />
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-ink-500">
+                  <TableCell className="whitespace-nowrap text-xs text-ink-500 dark:text-slate-400">
                     {formatTime(version.createdAt)}
                   </TableCell>
                   <TableCell>
@@ -434,9 +434,9 @@ function SchemaVersionDetailDialog({ version }: { version: SchemaVersionSummary 
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-white/70 bg-white/58 p-4 shadow-xs backdrop-blur-sm">
-      <p className="text-xs text-ink-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-ink-900">{value}</p>
+    <div className="rounded-xl border border-ink-200/70 bg-white/60 p-4 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60">
+      <p className="text-xs text-ink-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-ink-900 dark:text-slate-100">{value}</p>
     </div>
   );
 }
@@ -485,16 +485,16 @@ function FieldTreeNode({
   const itemSchema = record.items && typeof record.items === "object" && !Array.isArray(record.items) ? record.items as Record<string, unknown> : null;
 
   return (
-    <div className="rounded-xl border border-white/70 bg-white/58 p-3 text-sm shadow-xs backdrop-blur-sm" style={{ marginLeft: depth ? 14 : 0 }}>
+    <div className="rounded-xl border border-ink-200/70 bg-white/60 p-3 text-sm shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/60" style={{ marginLeft: depth ? 14 : 0 }}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-xs font-medium text-ink-800">{name}</span>
+        <span className="font-mono text-xs font-medium text-ink-800 dark:text-slate-100">{name}</span>
         <Badge tone="neutral">{type}</Badge>
         {required ? <Badge tone="accent">required</Badge> : null}
         {typeof record.format === "string" ? <Badge tone="neutral">{record.format}</Badge> : null}
         {Array.isArray(record.enum) ? <Badge tone="neutral">{record.enum.length} options</Badge> : null}
       </div>
       {typeof record.description === "string" ? (
-        <p className="mt-2 text-xs leading-5 text-ink-500">{record.description}</p>
+        <p className="mt-2 text-xs leading-5 text-ink-500 dark:text-slate-400">{record.description}</p>
       ) : null}
       {Object.keys(childProperties).length > 0 ? (
         <div className="mt-3 space-y-2">
@@ -690,7 +690,7 @@ function SchemaEditorDialog({
               />
             </Field>
             <Field label="保存动作">
-              <div className="rounded-xl border border-white/70 bg-white/52 px-3 py-2 text-xs leading-5 text-ink-500 shadow-xs backdrop-blur-sm">
+              <div className="rounded-xl border border-ink-200/70 bg-white/50 px-3 py-2 text-xs leading-5 text-ink-500 shadow-xs backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
                 可保存草稿，也可创建后立即激活。
               </div>
             </Field>
@@ -729,7 +729,7 @@ function SchemaEditorDialog({
                 <TabsTrigger value="builder">可视化 Builder</TabsTrigger>
                 <TabsTrigger value="advanced">高级 JSON</TabsTrigger>
               </TabsList>
-              <p className="text-xs text-ink-500">复杂 schema 可留在高级 JSON 模式，保存协议不变。</p>
+              <p className="text-xs text-ink-500 dark:text-slate-400">复杂 schema 可留在高级 JSON 模式，保存协议不变。</p>
             </div>
             <TabsContent value="builder">
               <SchemaBuilder fields={builderFields} onChange={setBuilderFields} disabled={busy} />

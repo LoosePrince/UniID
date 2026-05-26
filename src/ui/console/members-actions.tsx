@@ -136,11 +136,11 @@ export function RemoveMemberButton({
           <DialogDescription>成员被移除后，将无法继续访问此应用控制台。</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">
-          <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+          <div className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-xs text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100">
             确认移除 <span className="font-mono">{label}</span>？
           </div>
           {error ? (
-            <p className="text-xs leading-5 text-danger-700" role="alert">
+            <p className="text-xs leading-5 text-danger-700 dark:text-danger-200" role="alert">
               {error}
             </p>
           ) : null}

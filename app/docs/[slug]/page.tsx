@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge, Button, Card, CardContent } from "@/ui/primitives";
+import { ThemeToggle } from "@/ui/theme";
 
 type ListItem = {
   content: string;
@@ -93,7 +94,7 @@ function renderMarkdown(markdown: string) {
   function flushParagraph(key: string) {
     if (state.paragraph.length === 0) return;
     state.nodes.push(
-      <p key={key} className="text-sm leading-7 text-ink-600">
+      <p key={key} className="text-sm leading-7 text-ink-600 dark:text-slate-300">
         {inline(state.paragraph.join(" "))}
       </p>
     );
@@ -103,7 +104,7 @@ function renderMarkdown(markdown: string) {
   function flushQuote(key: string) {
     if (state.quote.length === 0) return;
     state.nodes.push(
-      <blockquote key={key} className="rounded-xl border-l-4 border-accent-200 bg-accent-50/45 px-4 py-3 text-sm leading-7 text-ink-600">
+      <blockquote key={key} className="rounded-xl border-l-4 border-accent-200 bg-accent-50/50 px-4 py-3 text-sm leading-7 text-ink-600 dark:border-accent-400/50 dark:bg-slate-900/60 dark:text-slate-300">
         {state.quote.map((line, index) => (
           <p key={index}>{inline(line)}</p>
         ))}
@@ -117,7 +118,7 @@ function renderMarkdown(markdown: string) {
     const ordered = state.list.every((item) => item.ordered);
     const Tag = ordered ? "ol" : "ul";
     state.nodes.push(
-      <Tag key={key} className={ordered ? "list-decimal space-y-1 pl-5 text-sm leading-7 text-ink-600" : "list-disc space-y-1 pl-5 text-sm leading-7 text-ink-600"}>
+      <Tag key={key} className={ordered ? "list-decimal space-y-1 pl-5 text-sm leading-7 text-ink-600 dark:text-slate-300" : "list-disc space-y-1 pl-5 text-sm leading-7 text-ink-600 dark:text-slate-300"}>
         {state.list.map((item, index) => (
           <li key={index}>{inline(item.content)}</li>
         ))}
@@ -133,16 +134,16 @@ function renderMarkdown(markdown: string) {
     const body = state.tableRows.slice(1);
     const aligns = state.tableAligns ?? header.map(() => "left" as const);
     state.nodes.push(
-      <div key={key} className="overflow-x-auto rounded-xl border border-ink-100 bg-white/48">
+      <div key={key} className="overflow-x-auto rounded-xl border border-ink-100 bg-white/50 dark:border-slate-700/60 dark:bg-slate-900/60">
         <table className="w-full border-collapse text-sm">
-          <thead className="bg-cream-100/70 text-ink-700">
+          <thead className="bg-cream-100/70 text-ink-700 dark:bg-slate-800/70 dark:text-slate-200">
             <tr>
               {header.map((cell, index) => {
                 const align = aligns[index] ?? "left";
                 return (
                   <th
                     key={index}
-                    className={`border-b border-ink-100 px-4 py-2.5 font-medium ${tableCellAlignClass[align]}`}
+                    className={`border-b border-ink-100 px-4 py-2.5 font-medium dark:border-slate-700/60 ${tableCellAlignClass[align]}`}
                     style={{ textAlign: tableCellAlignStyle[align] }}
                   >
                     {inline(cell)}
@@ -153,13 +154,13 @@ function renderMarkdown(markdown: string) {
           </thead>
           <tbody>
             {body.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-ink-100/70 last:border-0">
+              <tr key={rowIndex} className="border-b border-ink-100/70 last:border-0 dark:border-slate-700/50">
                 {row.map((cell, cellIndex) => {
                   const align = aligns[cellIndex] ?? "left";
                   return (
                     <td
                       key={cellIndex}
-                      className={`px-4 py-2.5 align-top text-ink-600 ${tableCellAlignClass[align]}`}
+                      className={`px-4 py-2.5 align-top text-ink-600 dark:text-slate-300 ${tableCellAlignClass[align]}`}
                       style={{ textAlign: tableCellAlignStyle[align] }}
                     >
                       {inline(cell)}
@@ -243,17 +244,17 @@ function renderMarkdown(markdown: string) {
 
     if (line.startsWith("# ")) {
       flushFlow(`before-h1-${index}`);
-      state.nodes.push(<h1 key={index} className="text-3xl font-semibold tracking-tight text-ink-900">{inline(line.slice(2))}</h1>);
+      state.nodes.push(<h1 key={index} className="text-3xl font-semibold tracking-tight text-ink-900 dark:text-slate-100">{inline(line.slice(2))}</h1>);
       return;
     }
     if (line.startsWith("## ")) {
       flushFlow(`before-h2-${index}`);
-      state.nodes.push(<h2 key={index} className="pt-6 text-xl font-semibold tracking-tight text-ink-900">{inline(line.slice(3))}</h2>);
+      state.nodes.push(<h2 key={index} className="pt-6 text-xl font-semibold tracking-tight text-ink-900 dark:text-slate-100">{inline(line.slice(3))}</h2>);
       return;
     }
     if (line.startsWith("### ")) {
       flushFlow(`before-h3-${index}`);
-      state.nodes.push(<h3 key={index} className="pt-4 text-md font-semibold text-ink-900">{inline(line.slice(4))}</h3>);
+      state.nodes.push(<h3 key={index} className="pt-4 text-md font-semibold text-ink-900 dark:text-slate-100">{inline(line.slice(4))}</h3>);
       return;
     }
     if (line.startsWith(">")) {
@@ -303,10 +304,10 @@ function inline(text: string): React.ReactNode[] {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
-      return <code key={index} className="rounded-sm bg-cream-100 px-1 py-0.5 font-mono text-xs text-ink-900">{part.slice(1, -1)}</code>;
+      return <code key={index} className="rounded-sm bg-cream-100 px-1 py-0.5 font-mono text-xs text-ink-900 dark:bg-slate-800 dark:text-slate-100">{part.slice(1, -1)}</code>;
     }
     if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={index} className="font-semibold text-ink-900">{inline(part.slice(2, -2))}</strong>;
+      return <strong key={index} className="font-semibold text-ink-900 dark:text-slate-100">{inline(part.slice(2, -2))}</strong>;
     }
     return <span key={index}>{part}</span>;
   });
@@ -320,13 +321,16 @@ export default async function DocDetailPage({ params }: { params: { slug: string
   if (!markdown) notFound();
 
   return (
-    <main className="min-h-screen bg-cream-50">
-      <header className="border-b border-ink-100 bg-white/80 backdrop-blur">
+    <main className="min-h-screen bg-cream-50 text-ink-900 dark:bg-slate-950 dark:text-slate-100">
+      <header className="border-b border-ink-100 bg-white/80 backdrop-blur dark:border-slate-700/70 dark:bg-slate-950/90 dark:shadow-[0_1px_0_rgba(129,148,163,0.12)]">
         <div className="container-page flex h-14 items-center justify-between">
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="outline" size="sm">
             <Link href="/docs"><ArrowLeft /> 返回文档</Link>
           </Button>
-          <Badge tone="neutral">docs/{doc.file}</Badge>
+          <div className="flex items-center gap-2">
+            <ThemeToggle compact />
+            <Badge tone="neutral">docs/{doc.file}</Badge>
+          </div>
         </div>
       </header>
       <section className="container-page max-w-4xl py-10">

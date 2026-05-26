@@ -30,7 +30,7 @@ export default async function SettingsPage({ params }: { params: { appId: string
     <div className="container-page py-8 space-y-6 max-w-3xl">
       <header>
         <h1 className="text-xl font-semibold tracking-tight">应用设置</h1>
-        <p className="text-sm text-ink-500 mt-1">{app.name} · {app.primaryDomain}</p>
+        <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">{app.name} · {app.primaryDomain}</p>
       </header>
 
       <Card>
@@ -60,10 +60,10 @@ export default async function SettingsPage({ params }: { params: { appId: string
         </CardHeader>
         <CardContent className="space-y-3">
           {app.domains.length === 0 && (
-            <p className="text-sm text-ink-500">尚未添加附加域名。</p>
+            <p className="text-sm text-ink-500 dark:text-slate-400">尚未添加附加域名。</p>
           )}
           {app.domains.map((d) => (
-            <div key={d.id} className="flex items-center justify-between text-sm">
+            <div key={d.id} className="flex items-center justify-between rounded-lg border border-ink-100 bg-white/40 px-3 py-2 text-sm dark:border-slate-700/70 dark:bg-slate-900/40">
               <span className="font-mono">{d.host}</span>
               <div className="flex items-center gap-2">
                 <Badge tone={d.verified ? "success" : "warning"}>
@@ -99,7 +99,7 @@ export default async function SettingsPage({ params }: { params: { appId: string
       {isOwner && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base text-red-700">危险区</CardTitle>
+            <CardTitle className="text-base text-danger-700 dark:text-danger-100">危险区</CardTitle>
             <CardDescription>仅 owner 可见。请慎重操作。</CardDescription>
           </CardHeader>
           <CardContent>

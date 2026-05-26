@@ -42,14 +42,14 @@ export default async function AppFilesPage({ params }: { params: { appId: string
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">文件</h1>
-          <p className="text-sm text-ink-500 mt-1">该应用的所有上传文件（最多展示 200 个）。</p>
+          <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">该应用的所有上传文件（最多展示 200 个）。</p>
         </div>
         <AppFileUploadButton appId={app.id} />
       </header>
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-cream-100 text-ink-500 text-xs">
+            <thead className="border-b border-ink-100 bg-cream-100 text-ink-500 text-xs dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">名称</th>
                 <th className="text-left px-4 py-2 font-medium">所有者</th>
@@ -63,26 +63,26 @@ export default async function AppFilesPage({ params }: { params: { appId: string
             </thead>
             <tbody>
               {files.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-ink-400">暂无文件</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-ink-400 dark:text-slate-500">暂无文件</td></tr>
               )}
               {files.map((f) => (
-                <tr key={f.id} className="border-t border-ink-100">
-                  <td className="px-4 py-2 truncate max-w-xs">{f.originalName}</td>
-                  <td className="px-4 py-2 text-xs text-ink-500 font-mono truncate max-w-[120px]">{f.ownerId}</td>
-                  <td className="px-4 py-2 text-xs text-ink-500 font-mono">{f.mimeType}</td>
+                <tr key={f.id} className="border-t border-ink-100 bg-white/40 transition-colors hover:bg-cream-50 dark:border-slate-700/70 dark:bg-slate-950/10 dark:hover:bg-slate-800/50">
+                  <td className="px-4 py-2 truncate max-w-xs text-ink-800 dark:text-slate-200">{f.originalName}</td>
+                  <td className="px-4 py-2 text-xs text-ink-500 font-mono truncate max-w-[120px] dark:text-slate-400">{f.ownerId}</td>
+                  <td className="px-4 py-2 text-xs text-ink-500 font-mono dark:text-slate-400">{f.mimeType}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-1">
                       <Badge tone={f.visibility === "public" ? "accent" : "neutral"}>{f.visibility}</Badge>
                       {f.shareTokens[0] ? <Badge tone="success">shared</Badge> : null}
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-xs text-ink-500">
+                  <td className="px-4 py-2 text-xs text-ink-500 dark:text-slate-400">
                     {f.shareTokens[0]
                       ? new Date(f.shareTokens[0].expiresAt * 1000).toLocaleString()
                       : "—"}
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums">{formatBytes(f.size)}</td>
-                  <td className="px-4 py-2 text-right text-xs text-ink-500">
+                  <td className="px-4 py-2 text-right tabular-nums text-ink-700 dark:text-slate-300">{formatBytes(f.size)}</td>
+                  <td className="px-4 py-2 text-right text-xs text-ink-500 dark:text-slate-400">
                     {new Date(f.createdAt * 1000).toLocaleString()}
                   </td>
                   <td className="px-4 py-2 text-right">

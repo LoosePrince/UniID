@@ -35,22 +35,22 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-slate-700/80 bg-ink-950 text-cream-50 shadow-[0_18px_42px_rgba(19,17,14,0.18)] dark:border-slate-600/70",
+        "overflow-hidden rounded-xl border border-slate-700/80 bg-slate-950 text-slate-100 shadow-[0_18px_42px_rgba(0,0,0,0.22)] dark:border-slate-600/70 dark:bg-slate-950",
         className
       )}
       {...props}
     >
       {(title || language) && (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-slate-900 px-3 py-2">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-slate-900/95 px-3 py-2">
           <div className="min-w-0">
-            {title ? <p className="truncate text-xs font-medium text-cream-50">{title}</p> : null}
-            {language ? <p className="font-mono text-2xs uppercase tracking-[0.14em] text-cream-50/50">{language}</p> : null}
+            {title ? <p className="truncate text-xs font-medium text-slate-100">{title}</p> : null}
+            {language ? <p className="font-mono text-2xs uppercase tracking-[0.14em] text-slate-400">{language}</p> : null}
           </div>
           <Button
             type="button"
             variant="ghost"
             size="xs"
-            className="h-7 rounded-md px-2 text-cream-50/70 hover:bg-slate-800 hover:text-cream-50"
+            className="h-7 rounded-md px-2 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
             onClick={copy}
           >
             {copied ? <Check /> : <Copy />}
@@ -59,7 +59,7 @@ export function CodeBlock({
         </div>
       )}
       <pre
-        className="overflow-auto p-4 font-mono text-xs leading-6 text-cream-100"
+        className="overflow-auto p-4 font-mono text-xs leading-6 text-slate-200"
         style={{ maxHeight }}
       >
         <code>{value}</code>

@@ -67,7 +67,7 @@ export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
         </Field>
       </div>
       {error ? (
-        <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700" role="alert">
+        <p className="rounded-md border border-danger-100 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-100" role="alert">
           {error}
         </p>
       ) : null}
@@ -75,7 +75,7 @@ export function DefaultQuotaForm({ initial }: { initial: QuotaDefaults }) {
         <Button type="submit" loading={pending} loadingText="保存中..." disabled={!dirty}>
           <Save /> 保存默认配额
         </Button>
-        {!dirty ? <span className="text-xs text-ink-400">没有未保存改动</span> : null}
+        {!dirty ? <span className="text-xs text-ink-400 dark:text-slate-500">没有未保存改动</span> : null}
       </div>
     </form>
   );

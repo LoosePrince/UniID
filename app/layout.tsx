@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { Toaster } from "@/ui/primitives";
+import { ThemeProvider, ThemeScript } from "@/ui/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,8 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <body className="min-h-screen antialiased">
-        {children}
-        <Toaster />
+        <ThemeScript />
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

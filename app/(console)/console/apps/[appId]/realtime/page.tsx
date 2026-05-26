@@ -27,7 +27,7 @@ export default async function RealtimePage({ params }: { params: { appId: string
     <div className="container-page py-8 space-y-6">
       <header>
         <h1 className="text-xl font-semibold tracking-tight">实时 (Realtime)</h1>
-        <p className="text-sm text-ink-500 mt-1">
+        <p className="text-sm text-ink-500 mt-1 dark:text-slate-400">
           基于 SSE。所有数据/文件/广播事件按订阅推送到客户端。
         </p>
       </header>
@@ -39,8 +39,8 @@ export default async function RealtimePage({ params }: { params: { appId: string
         </CardHeader>
         <CardContent className="text-sm">
           <p>
-            <span className="text-ink-500">24h 内更新记录数：</span>
-            <span className="font-mono">{recentRecords.toLocaleString()}</span>
+            <span className="text-ink-500 dark:text-slate-400">24h 内更新记录数：</span>
+            <span className="font-mono text-ink-900 dark:text-slate-100">{recentRecords.toLocaleString()}</span>
           </p>
         </CardContent>
       </Card>
@@ -51,7 +51,7 @@ export default async function RealtimePage({ params }: { params: { appId: string
           <CardDescription>无需任何控制台配置，前端订阅即可。</CardDescription>
         </CardHeader>
         <CardContent>
-          <pre className="text-xs font-mono bg-cream-50 border border-cream-300 rounded-sm p-3 overflow-auto">
+          <pre className="overflow-auto rounded-xl border border-slate-700/80 bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200 shadow-[0_18px_42px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.04)] dark:border-slate-600/70 dark:bg-slate-950 dark:text-slate-200">
 {`// 订阅 records 频道（自动鉴权 + 自动 reconnect）
 const ch = uniid.realtime
   .channel("records:post")
@@ -63,8 +63,8 @@ const ch = uniid.realtime
 uniid.realtime.broadcast("chat:lobby", { from: "alice", text: "Hi!" });
 `}
           </pre>
-          <p className="mt-3 text-xs text-ink-500">
-            完整 API 见 <code className="font-mono">docs/sdk.md</code> 的 Realtime 章节。
+          <p className="mt-3 text-xs text-ink-500 dark:text-slate-400">
+            完整 API 见 <code className="font-mono text-ink-900 dark:text-slate-100">docs/sdk.md</code> 的 Realtime 章节。
           </p>
         </CardContent>
       </Card>
