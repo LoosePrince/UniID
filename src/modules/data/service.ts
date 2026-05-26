@@ -245,9 +245,10 @@ function deleteAtPath(data: Record<string, unknown>, parts: string[]) {
   if (leaf && cursor && typeof cursor === "object") delete (cursor as Record<string, unknown>)[leaf];
 }
 
-function applyOp(data: Record<string, unknown>, op: FieldOp): string {
+function applyOp(data: Record<string, unknown>, op: FieldOp): { policyFieldPath: string; mutationPath: string } {
   const parts = normalizeDataPath(op.path);
   const policyFieldPath = `data.${parts[0]}`;
+  const mutationPath = `data.${parts.join(".")}`;
 
   switch (op.kind) {
     case "set":
@@ -273,7 +274,7 @@ function applyOp(data: Record<string, unknown>, op: FieldOp): string {
     }
   }
 
-  return policyFieldPath;
+  return { policyFieldPath, mutationPath };
 }
 
 export class DataService {
@@ -367,6 +368,34 @@ export class DataService {
     return snapshotEnvelope(result.record);
   }
 
+  static async transition(
+    input: {
+      appId: string;
+      dataType: string;
+      recordId: string;
+      transition: string;
+      data: unknown;
+      merge?: boolean;
+      metadata?: Record<string, unknown>;
+    },
+    context: { actor: AuthContext }
+  ) {
+    const result = await DataPipeline.execute(
+      {
+        op: "update",
+        appId: input.appId,
+        dataType: input.dataType,
+        recordId: input.recordId,
+        data: asObject(input.data),
+        merge: input.merge ?? false,
+        transition: input.transition,
+        metadata: input.metadata
+      },
+      { actor: context.actor }
+    );
+    return snapshotEnvelope(result.record);
+  }
+
   static async delete(
     input: { appId: string; dataType: string; recordId: string },
     context: { actor: AuthContext }
@@ -383,10 +412,12 @@ export class DataService {
     assertRecordScope(existing, input.appId, input.dataType);
     const next = asObject(parseJson(existing.data));
     const policyActions: Record<string, PolicyAction> = {};
+    const mutationActions: Record<string, string> = {};
 
     for (const op of input.ops) {
-      const fieldPath = applyOp(next, op);
-      policyActions[fieldPath] = op.kind;
+      const { policyFieldPath, mutationPath } = applyOp(next, op);
+      policyActions[policyFieldPath] = op.kind;
+      mutationActions[mutationPath] = op.kind;
     }
 
     const result = await DataPipeline.execute(
@@ -397,7 +428,8 @@ export class DataService {
         recordId: input.recordId,
         data: next,
         merge: false,
-        policyActions
+        policyActions,
+        mutationActions
       },
       { actor: context.actor }
     );

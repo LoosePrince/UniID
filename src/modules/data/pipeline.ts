@@ -6,13 +6,17 @@
  *   3. autofill（$serverTime/$userId/...，仅 create 强制覆盖）
  *   4. AJV JSON Schema 校验（fail 则 VALIDATION_FAILED）
  *   5. 自定义 validationRules（QuickJS 沙箱执行）—— M6 接入；当前为 no-op
- *   6. PolicyEngine 字段级校验：对所有发生变化的顶层字段判定
+ *   6. PolicyEngine 字段级校验：对所有发生变化的字段路径判定
  *   7. RecordRepository 持久化
  *   8. bus.emit record.created / updated
  */
 
 import type { AuthContext } from "@/shared/policy/variables";
+import type { CommandContext, DataChangeSet, DataCommandIntent } from "@/shared/business";
+import { MutationRuleEngine, WorkflowEngine } from "@/shared/business";
 import { PolicyEngine, type PolicyAction } from "@/shared/policy";
+import { MutationRuleService } from "@/modules/mutation-rules";
+import { WorkflowService } from "@/modules/workflows";
 import { ApiError } from "@/shared/errors";
 import { prisma } from "@/shared/prisma";
 import { bus } from "@/shared/bus";
@@ -42,6 +46,9 @@ export interface DataPipelineInput {
   merge?: boolean;
   /** 字段操作入口可传入 data.<topKey> -> increment/push/set/unset 的动作语义。 */
   policyActions?: Record<string, PolicyAction>;
+  mutationActions?: Record<string, string>;
+  transition?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DataPipelineRunCtx {
@@ -52,6 +59,68 @@ export interface DataPipelineRunCtx {
 
 export interface DataPipelineResult {
   record: RecordSnapshot;
+  command: CommandContext;
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function collectChangedPaths(before: unknown, after: unknown, base = "data"): string[] {
+  if (sameValue(before, after)) return [];
+  const beforeObj = asObject(before);
+  const afterObj = asObject(after);
+  const beforeIsObject = before && typeof before === "object" && !Array.isArray(before);
+  const afterIsObject = after && typeof after === "object" && !Array.isArray(after);
+
+  if (!beforeIsObject || !afterIsObject) return [base];
+
+  const keys = new Set([...Object.keys(beforeObj), ...Object.keys(afterObj)]);
+  const paths: string[] = [];
+  for (const key of keys) {
+    const childPaths = collectChangedPaths(beforeObj[key], afterObj[key], `${base}.${key}`);
+    paths.push(...childPaths);
+  }
+  return paths;
+}
+
+function buildIntent(input: DataPipelineInput): DataCommandIntent {
+  const metadata: Record<string, unknown> = { ...(input.metadata ?? {}) };
+  if (input.policyActions) metadata.policyActions = input.policyActions;
+  if (input.mutationActions) metadata.mutationActions = input.mutationActions;
+  return {
+    kind: input.transition ? "transition" : input.op,
+    appId: input.appId,
+    dataType: input.dataType,
+    recordId: input.recordId,
+    ownerId: input.ownerId,
+    data: input.data,
+    merge: input.merge,
+    transition: input.transition,
+    metadata: Object.keys(metadata).length > 0 ? metadata : undefined
+  };
+}
+
+function buildCommandContext(
+  input: DataPipelineInput,
+  ctx: DataPipelineRunCtx,
+  changeSet?: DataChangeSet
+): CommandContext {
+  return {
+    actor: {
+      ...ctx.actor,
+      requestId: ctx.requestId,
+      ip: ctx.ip ?? null
+    },
+    intent: buildIntent(input),
+    changeSet
+  };
 }
 
 async function loadPolicyDocuments(appId: string, dataType: string, recordId?: string) {
@@ -98,11 +167,13 @@ export class DataPipeline {
 
     // 4) JSON Schema
     const validate = compileSchemaCached(schemaSnap.id, schemaSnap.jsonSchema);
-    if (!validate(envelope.data)) {
-      throw new ApiError("VALIDATION_FAILED", {
-        details: { errors: formatAjvErrors(validate.errors) }
-      });
-    }
+    const validateFinalData = (data: Record<string, unknown>) => {
+      if (!validate(data)) {
+        throw new ApiError("VALIDATION_FAILED", {
+          details: { errors: formatAjvErrors(validate.errors) }
+        });
+      }
+    };
 
     // 5) 自定义 validationRules（QuickJS 沙箱执行）
     //    Schema 维护方可写一个 handler(input, uniid)，input = { op, data, actor, recordId }
@@ -147,8 +218,16 @@ export class DataPipeline {
     }
 
     // 6) PolicyEngine
+    let changeSet: DataChangeSet;
     let beforeSnapshot: unknown = null;
     if (input.op === "create") {
+      changeSet = {
+        before: null,
+        submitted: envelope.data,
+        after: envelope.data,
+        changedPaths: collectChangedPaths(null, envelope.data)
+      };
+      validateFinalData(envelope.data);
       const actor = {
         ...ctx.actor,
         ownerId: input.ownerId ?? ctx.actor.userId
@@ -178,6 +257,21 @@ export class DataPipeline {
           });
         }
       }
+
+      const rules = await MutationRuleService.loadActiveRules(input.appId, input.dataType, input.recordId);
+      if (rules.length > 0) {
+        const mutation = MutationRuleEngine.apply(rules, buildCommandContext(input, ctx, changeSet));
+        if (mutation.appliedRules.length > 0) {
+          envelope.data = mutation.data;
+          changeSet = {
+            before: null,
+            submitted: changeSet.submitted,
+            after: mutation.data,
+            changedPaths: collectChangedPaths(null, mutation.data)
+          };
+          validateFinalData(mutation.data);
+        }
+      }
     } else {
       if (!input.recordId) throw new ApiError("DATA_RECORD_NOT_FOUND");
       const existing = await RecordRepository.findById(input.recordId);
@@ -191,6 +285,13 @@ export class DataPipeline {
       const finalData = input.merge
         ? { ...currentData, ...submittedData }
         : submittedData;
+      changeSet = {
+        before: currentData,
+        submitted: submittedData,
+        after: finalData,
+        changedPaths: collectChangedPaths(currentData, finalData)
+      };
+      validateFinalData(finalData);
 
       const wholeDecision = PolicyEngine.evaluate(
         {
@@ -229,6 +330,26 @@ export class DataPipeline {
       }
 
       envelope.data = finalData;
+      const rules = await MutationRuleService.loadActiveRules(input.appId, input.dataType, input.recordId);
+      if (rules.length > 0) {
+        const mutation = MutationRuleEngine.apply(rules, buildCommandContext(input, ctx, changeSet));
+        if (mutation.appliedRules.length > 0) {
+          envelope.data = mutation.data;
+          changeSet = {
+            before: currentData,
+            submitted: submittedData,
+            after: mutation.data,
+            changedPaths: collectChangedPaths(currentData, mutation.data)
+          };
+          validateFinalData(mutation.data);
+        }
+      }
+
+      const workflows = await WorkflowService.loadActiveWorkflows(input.appId, input.dataType, input.recordId);
+      if (workflows.length > 0) {
+        const workflow = WorkflowEngine.evaluate(workflows, buildCommandContext(input, { ...ctx, actor }, changeSet));
+        if (!workflow.allow) throw new ApiError("BUSINESS_WORKFLOW_FORBIDDEN", { details: workflow });
+      }
     }
 
     // 7) persist
@@ -276,7 +397,7 @@ export class DataPipeline {
       });
     }
 
-    return { record };
+    return { record, command: buildCommandContext(input, ctx, changeSet) };
   }
 
   /** 软删除（仅校验 delete 权限）。 */
@@ -292,6 +413,26 @@ export class DataPipeline {
     );
     if (!decision.allow) throw new ApiError("POLICY_FORBIDDEN", { details: decision });
 
+    const changeSet: DataChangeSet = {
+      before: asObject(existing.data),
+      submitted: {},
+      after: null,
+      changedPaths: collectChangedPaths(existing.data, null)
+    };
+    const command: CommandContext = {
+      actor: {
+        ...ctx.actor,
+        requestId: ctx.requestId,
+        ip: ctx.ip ?? null
+      },
+      intent: {
+        kind: "delete",
+        appId: input.appId,
+        dataType: input.dataType,
+        recordId: input.recordId
+      },
+      changeSet
+    };
     await RecordRepository.softDelete(input.recordId);
     bus.emit("record.deleted", {
       appId: existing.appId,
@@ -301,6 +442,6 @@ export class DataPipeline {
       actorId: ctx.actor.userId,
       at: Math.floor(Date.now() / 1000)
     });
-    return { id: existing.id };
+    return { id: existing.id, command };
   }
 }

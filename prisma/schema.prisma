@@ -37,6 +37,8 @@ model User {
   appApiKeys      AppApiKey[]        @relation("AppApiKeyCreatedBy")
   authorizations  Authorization[]
   policyDocuments PolicyDocument[]   @relation("PolicyCreatedBy")
+  mutationRules    MutationRuleDocument[] @relation("MutationRuleCreatedBy")
+  workflows        WorkflowDocument[] @relation("WorkflowCreatedBy")
   dataSchemas     DataSchema[]       @relation("SchemaCreatedBy")
   schemaVersions  SchemaVersion[]    @relation("SchemaVersionCreatedBy")
   recordsOwned    Record[]           @relation("RecordOwner")
@@ -135,6 +137,8 @@ model App {
   appSessions    AppSession[]
   authorizations Authorization[]
   policies       PolicyDocument[]
+  mutationRules  MutationRuleDocument[]
+  workflows      WorkflowDocument[]
   schemas        DataSchema[]
   records        Record[]
   files          FileObject[]
@@ -230,6 +234,54 @@ model PolicyDocument {
 
   @@unique([appId, scope, target])
   @@index([appId, scope])
+}
+
+// ============================================================================
+// Mutation rule documents (same-record derived changes)
+// ============================================================================
+
+model MutationRuleDocument {
+  id          String  @id @default(cuid())
+  appId       String
+  scope       String  // app | dataType | record
+  target      String? // dataType 名或 recordId，scope=app 时为 null
+  ruleId      String
+  document    String  // JSON
+  description String?
+  isActive    Int     @default(1)
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("MutationRuleCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, scope, target, ruleId])
+  @@index([appId, scope, isActive])
+}
+
+// ============================================================================
+// Workflow documents (state machine business process)
+// ============================================================================
+
+model WorkflowDocument {
+  id          String  @id @default(cuid())
+  appId       String
+  scope       String  // app | dataType | record
+  target      String? // dataType 名或 recordId，scope=app 时为 null
+  workflowId  String
+  document    String  // JSON
+  description String?
+  isActive    Int     @default(1)
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App   @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("WorkflowCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, scope, target, workflowId])
+  @@index([appId, scope, isActive])
 }
 
 // ============================================================================

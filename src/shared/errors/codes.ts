@@ -43,6 +43,10 @@ export const ErrorCodes = {
   POLICY_FORBIDDEN: { http: 403, message: "操作被权限策略拒绝" },
   POLICY_INVALID_DOCUMENT: { http: 400, message: "权限策略文档不合法" },
 
+  // BUSINESS
+  BUSINESS_INVALID_RULE: { http: 400, message: "业务规则文档不合法" },
+  BUSINESS_WORKFLOW_FORBIDDEN: { http: 403, message: "业务流程状态流转被拒绝" },
+
   // FILE
   FILE_NOT_FOUND: { http: 404, message: "文件不存在" },
   FILE_TOO_LARGE: { http: 413, message: "文件超过大小上限" },
