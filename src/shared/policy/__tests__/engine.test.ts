@@ -290,3 +290,154 @@ describe("PolicyEngine.evaluate — string document parsing", () => {
     expect(d.allow).toBe(false);
   });
 });
+
+describe("PolicyEngine.evaluate — v2 document", () => {
+  it("allows a matching rule by subject and field", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "public-title",
+          effect: "allow" as const,
+          actions: ["read" as const],
+          subjects: ["$public"],
+          resource: { fields: ["data.title"] }
+        }
+      ]
+    };
+
+    const d = PolicyEngine.evaluate(
+      { documents: [doc], action: "read", fieldPath: "data.title" },
+      ctx({ userId: null })
+    );
+
+    expect(d.allow).toBe(true);
+    expect(d.matchedRuleId).toBe("public-title");
+  });
+
+  it("does not apply field-scoped rules to whole-record decisions", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "public-title",
+          effect: "allow" as const,
+          actions: ["read" as const],
+          subjects: ["$public"],
+          resource: { fields: ["data.title"] }
+        }
+      ]
+    };
+
+    const d = PolicyEngine.evaluate(
+      { documents: [doc], action: "read" },
+      ctx({ userId: null })
+    );
+
+    expect(d.allow).toBe(false);
+  });
+
+  it("supports using against current data", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "published-read",
+          effect: "allow" as const,
+          actions: ["read" as const],
+          subjects: ["$public"],
+          using: { "data.status": "published" }
+        }
+      ]
+    };
+
+    expect(
+      PolicyEngine.evaluate(
+        { documents: [doc], action: "read", currentValue: { status: "published" } },
+        ctx({ userId: null })
+      ).allow
+    ).toBe(true);
+
+    expect(
+      PolicyEngine.evaluate(
+        { documents: [doc], action: "read", currentValue: { status: "draft" } },
+        ctx({ userId: null })
+      ).allow
+    ).toBe(false);
+  });
+
+  it("supports check against next data", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "owner-create",
+          effect: "allow" as const,
+          actions: ["create" as const],
+          subjects: ["$all"],
+          check: { "data.ownerId": "$userId" }
+        }
+      ]
+    };
+
+    expect(
+      PolicyEngine.evaluate(
+        { documents: [doc], action: "create", dataValue: { ownerId: "u1" } },
+        ctx({ userId: "u1" })
+      ).allow
+    ).toBe(true);
+
+    expect(
+      PolicyEngine.evaluate(
+        { documents: [doc], action: "create", dataValue: { ownerId: "u2" } },
+        ctx({ userId: "u1" })
+      ).allow
+    ).toBe(false);
+  });
+
+  it("keeps write fallback for v2 documents", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "owner-write",
+          effect: "allow" as const,
+          actions: ["write" as const],
+          subjects: ["$all"]
+        }
+      ]
+    };
+
+    const d = PolicyEngine.evaluate(
+      { documents: [doc], action: "set" },
+      ctx({ userId: "u1" })
+    );
+
+    expect(d.allow).toBe(true);
+  });
+});
+
+describe("PolicyEngine.filterReadable — nested fields", () => {
+  it("keeps only readable nested fields", () => {
+    const doc = {
+      version: 2 as const,
+      rules: [
+        {
+          id: "public-nested",
+          effect: "allow" as const,
+          actions: ["read" as const],
+          subjects: ["$public"],
+          resource: { fields: ["data.profile.name"] }
+        }
+      ]
+    };
+
+    const data = {
+      profile: { name: "Alice", email: "a@example.com" },
+      private: "secret"
+    };
+
+    const r = PolicyEngine.filterReadable(data, [doc], ctx({ userId: null }));
+    expect(r).toEqual({ profile: { name: "Alice" } });
+  });
+});

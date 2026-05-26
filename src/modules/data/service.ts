@@ -1,11 +1,7 @@
 import { ApiError } from "@/shared/errors";
-import { bus } from "@/shared/bus";
 import { prisma } from "@/shared/prisma";
-import { compileSchemaCached, formatAjvErrors } from "@/shared/validator";
-import type { AuthContext } from "@/shared/policy";
-import { SchemaService } from "@/modules/schema";
-
-const now = () => Math.floor(Date.now() / 1000);
+import { PolicyEngine, type AuthContext, type PolicyAction } from "@/shared/policy";
+import { DataPipeline } from "./pipeline";
 
 export interface RecordEnvelope<T = unknown> {
   id: string;
@@ -53,11 +49,6 @@ function asObject(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function actorId(actor: AuthContext): string {
-  if (!actor.userId) throw new ApiError("AUTH_INVALID_TOKEN");
-  return actor.userId;
-}
-
 function pickFields(data: unknown, fields?: string[]): unknown {
   if (!fields || fields.length === 0) return data;
   const source = asObject(data);
@@ -75,6 +66,26 @@ function envelope(record: StoredRecord, select?: string[]): RecordEnvelope {
     dataType: record.dataType,
     ownerId: record.ownerId,
     data: pickFields(data, select),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt
+  };
+}
+
+function snapshotEnvelope(record: {
+  id: string;
+  appId: string;
+  dataType: string;
+  ownerId: string | null;
+  data: unknown;
+  createdAt: number;
+  updatedAt: number;
+}, select?: string[]): RecordEnvelope {
+  return {
+    id: record.id,
+    appId: record.appId,
+    dataType: record.dataType,
+    ownerId: record.ownerId,
+    data: pickFields(record.data, select),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -108,63 +119,161 @@ function sortRecords(records: StoredRecord[], orderBy?: Record<string, "asc" | "
   });
 }
 
-async function validateData(appId: string, dataType: string, data: unknown) {
-  const schema = await SchemaService.tryLoadActive(appId, dataType);
-  if (!schema) throw new ApiError("SCHEMA_REQUIRED");
-  const validate = compileSchemaCached(schema.id, schema.jsonSchema);
-  const target = asObject(data);
-  if (!validate(target)) {
-    throw new ApiError("SCHEMA_INVALID", { details: { errors: formatAjvErrors(validate.errors) } });
-  }
-  return { data: target, schemaVersionId: schema.id };
-}
-
 function assertRecordScope(record: StoredRecord, appId: string, dataType: string) {
   if (record.appId !== appId || record.dataType !== dataType) throw new ApiError("DATA_RECORD_NOT_FOUND");
 }
 
-function applyOp(data: Record<string, unknown>, op: FieldOp) {
-  if (!/^[A-Za-z0-9_.-]+$/.test(op.path)) {
-    throw new ApiError("DATA_QUERY_INVALID", { message: "字段路径不合法" });
-  }
-  const key = op.path;
-  switch (op.kind) {
-    case "set":
-      data[key] = op.value;
-      break;
-    case "unset":
-      delete data[key];
-      break;
-    case "increment": {
-      const prev = data[key];
-      const base = typeof prev === "number" ? prev : 0;
-      data[key] = base + op.by;
-      break;
-    }
-    case "push": {
-      const prev = data[key];
-      const next = Array.isArray(prev) ? [...prev] : [];
-      if (!op.uniq || !next.some((item) => JSON.stringify(item) === JSON.stringify(op.value))) {
-        next.push(op.value);
-      }
-      data[key] = next;
-      break;
-    }
-  }
-}
-
 function normalizeQueryArgs(
   input:
-    | { appId: string; dataType: string; dsl: DataQuery }
+    | { appId: string; dataType: string; dsl: DataQuery; actor?: AuthContext }
     | string,
   dataType?: string,
   q?: DataQuery
 ) {
   if (typeof input === "string") {
     if (!dataType) throw new ApiError("DATA_QUERY_INVALID");
-    return { appId: input, dataType, dsl: q ?? {} };
+    return { appId: input, dataType, dsl: q ?? {}, actor: undefined };
   }
   return input;
+}
+
+function anonymousActor(appId: string): AuthContext {
+  return {
+    userId: null,
+    role: null,
+    systemAdmin: false,
+    appAdmin: false,
+    appId,
+    authType: "restricted",
+    ownerId: null,
+    origin: "sdk"
+  };
+}
+
+async function loadPolicyDocuments(appId: string, dataType: string, recordId?: string) {
+  const where = [
+    { scope: "app" as const, target: null as string | null },
+    { scope: "dataType" as const, target: dataType },
+    ...(recordId ? [{ scope: "record" as const, target: recordId }] : [])
+  ];
+  const docs = await prisma.policyDocument.findMany({
+    where: { appId, OR: where as Array<{ scope: string; target: string | null }> }
+  });
+  const orderKey = { app: 0, dataType: 1, record: 2 };
+  return docs
+    .sort(
+      (a, b) =>
+        (orderKey as Record<string, number>)[a.scope]! -
+        (orderKey as Record<string, number>)[b.scope]!
+    )
+    .map((d) => d.document);
+}
+
+function readableEnvelope(
+  record: StoredRecord,
+  docs: string[],
+  actor: AuthContext,
+  select?: string[]
+): RecordEnvelope | null {
+  const data = asObject(parseJson(record.data));
+  const scopedActor = { ...actor, ownerId: record.ownerId };
+  const whole = PolicyEngine.evaluate(
+    { documents: docs, action: "read", currentValue: data },
+    scopedActor
+  );
+
+  if (whole.allow) return envelope(record, select);
+
+  const filteredData = PolicyEngine.filterReadable(data, docs, scopedActor);
+  if (Object.keys(filteredData).length === 0) return null;
+
+  return {
+    id: record.id,
+    appId: record.appId,
+    dataType: record.dataType,
+    ownerId: record.ownerId,
+    data: pickFields(filteredData, select),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt
+  };
+}
+
+function normalizeDataPath(path: string): string[] {
+  if (!/^[A-Za-z0-9_.-]+$/.test(path)) {
+    throw new ApiError("DATA_QUERY_INVALID", { message: "字段路径不合法" });
+  }
+  const value = path.startsWith("data.") ? path.slice("data.".length) : path;
+  const parts = value.split(".").filter(Boolean);
+  if (parts.length === 0) throw new ApiError("DATA_QUERY_INVALID", { message: "字段路径不合法" });
+  return parts;
+}
+
+function ensureObjectContainer(target: Record<string, unknown>, key: string): Record<string, unknown> {
+  const current = target[key];
+  if (current && typeof current === "object" && !Array.isArray(current)) {
+    return current as Record<string, unknown>;
+  }
+  const next: Record<string, unknown> = {};
+  target[key] = next;
+  return next;
+}
+
+function writeAtPath(data: Record<string, unknown>, parts: string[], value: unknown) {
+  let cursor = data;
+  for (const part of parts.slice(0, -1)) cursor = ensureObjectContainer(cursor, part);
+  const leaf = parts[parts.length - 1];
+  if (!leaf) throw new ApiError("DATA_QUERY_INVALID");
+  cursor[leaf] = value;
+}
+
+function readAtPath(data: Record<string, unknown>, parts: string[]): unknown {
+  let cursor: unknown = data;
+  for (const part of parts) {
+    if (cursor == null || typeof cursor !== "object") return undefined;
+    cursor = (cursor as Record<string, unknown>)[part];
+  }
+  return cursor;
+}
+
+function deleteAtPath(data: Record<string, unknown>, parts: string[]) {
+  let cursor: unknown = data;
+  for (const part of parts.slice(0, -1)) {
+    if (cursor == null || typeof cursor !== "object") return;
+    cursor = (cursor as Record<string, unknown>)[part];
+  }
+  const leaf = parts[parts.length - 1];
+  if (leaf && cursor && typeof cursor === "object") delete (cursor as Record<string, unknown>)[leaf];
+}
+
+function applyOp(data: Record<string, unknown>, op: FieldOp): string {
+  const parts = normalizeDataPath(op.path);
+  const policyFieldPath = `data.${parts[0]}`;
+
+  switch (op.kind) {
+    case "set":
+      writeAtPath(data, parts, op.value);
+      break;
+    case "unset":
+      deleteAtPath(data, parts);
+      break;
+    case "increment": {
+      const prev = readAtPath(data, parts);
+      const base = typeof prev === "number" ? prev : 0;
+      writeAtPath(data, parts, base + op.by);
+      break;
+    }
+    case "push": {
+      const prev = readAtPath(data, parts);
+      const next = Array.isArray(prev) ? [...prev] : [];
+      if (!op.uniq || !next.some((item) => JSON.stringify(item) === JSON.stringify(op.value))) {
+        next.push(op.value);
+      }
+      writeAtPath(data, parts, next);
+      break;
+    }
+  }
+
+  return policyFieldPath;
 }
 
 export class DataService {
@@ -173,7 +282,9 @@ export class DataService {
     dataType?: string,
     q?: DataQuery
   ) {
-    const { appId, dataType: type, dsl } = normalizeQueryArgs(input, dataType, q);
+    const { appId, dataType: type, dsl, actor: providedActor } = normalizeQueryArgs(input, dataType, q);
+    const actor = providedActor ?? anonymousActor(appId);
+    const docs = await loadPolicyDocuments(appId, type);
     const limit = Math.min(Math.max(dsl.limit ?? 50, 1), 200);
     const records = await prisma.record.findMany({
       where: { appId, dataType: type, deletedAt: null },
@@ -185,41 +296,29 @@ export class DataService {
       records.filter((record) => matchesWhere(parseJson(record.data), dsl.where)),
       dsl.orderBy
     );
-    const page = filtered.slice(0, limit);
-    const nextCursor = filtered.length > limit ? page[page.length - 1]?.id : undefined;
-    return { records: page.map((record) => envelope(record, dsl.select)), nextCursor };
+    const readable = filtered
+      .map((record) => readableEnvelope(record, docs, actor, dsl.select))
+      .filter((record): record is RecordEnvelope => record !== null);
+    const page = readable.slice(0, limit);
+    const nextCursor = readable.length > limit ? page[page.length - 1]?.id : undefined;
+    return { records: page, nextCursor };
   }
 
   static async create(
     input: { appId: string; dataType: string; data: unknown; ownerId?: string | null },
     context: { actor: AuthContext }
   ) {
-    const validated = await validateData(input.appId, input.dataType, input.data);
-    const userId = actorId(context.actor);
-    const t = now();
-    const record = await prisma.record.create({
-      data: {
+    const result = await DataPipeline.execute(
+      {
+        op: "create",
         appId: input.appId,
         dataType: input.dataType,
-        ownerId: input.ownerId ?? userId,
-        data: JSON.stringify(validated.data),
-        schemaVersionId: validated.schemaVersionId,
-        createdAt: t,
-        updatedAt: t,
-        createdById: userId,
-        updatedById: userId
-      }
-    });
-    bus.emit("record.created", {
-      appId: record.appId,
-      dataType: record.dataType,
-      recordId: record.id,
-      ownerId: record.ownerId,
-      data: parseJson(record.data),
-      actorId: userId,
-      at: t
-    });
-    return envelope(record);
+        ownerId: input.ownerId ?? context.actor.userId,
+        data: asObject(input.data)
+      },
+      { actor: context.actor }
+    );
+    return snapshotEnvelope(result.record);
   }
 
   static async getById(input: {
@@ -231,7 +330,11 @@ export class DataService {
     const record = await RecordRepository.findById(input.recordId);
     if (!record) throw new ApiError("DATA_RECORD_NOT_FOUND");
     assertRecordScope(record, input.appId, input.dataType);
-    return envelope(record);
+    const actor = input.actor ?? anonymousActor(input.appId);
+    const docs = await loadPolicyDocuments(input.appId, input.dataType, input.recordId);
+    const readable = readableEnvelope(record, docs, actor);
+    if (!readable) throw new ApiError("POLICY_FORBIDDEN");
+    return readable;
   }
 
   static async get(recordId: string) {
@@ -250,55 +353,25 @@ export class DataService {
     },
     context: { actor: AuthContext }
   ) {
-    const existing = await RecordRepository.findById(input.recordId);
-    if (!existing) throw new ApiError("DATA_RECORD_NOT_FOUND");
-    assertRecordScope(existing, input.appId, input.dataType);
-    const before = asObject(parseJson(existing.data));
-    const next = input.merge ? { ...before, ...asObject(input.data) } : asObject(input.data);
-    const validated = await validateData(existing.appId, existing.dataType, next);
-    const userId = actorId(context.actor);
-    const t = now();
-    const record = await prisma.record.update({
-      where: { id: existing.id },
-      data: {
-        data: JSON.stringify(validated.data),
-        schemaVersionId: validated.schemaVersionId,
-        updatedAt: t,
-        updatedById: userId
-      }
-    });
-    bus.emit("record.updated", {
-      appId: record.appId,
-      dataType: record.dataType,
-      recordId: record.id,
-      ownerId: record.ownerId,
-      before,
-      after: parseJson(record.data),
-      actorId: userId,
-      at: t
-    });
-    return envelope(record);
+    const result = await DataPipeline.execute(
+      {
+        op: "update",
+        appId: input.appId,
+        dataType: input.dataType,
+        recordId: input.recordId,
+        data: asObject(input.data),
+        merge: input.merge
+      },
+      { actor: context.actor }
+    );
+    return snapshotEnvelope(result.record);
   }
 
   static async delete(
     input: { appId: string; dataType: string; recordId: string },
     context: { actor: AuthContext }
   ) {
-    const existing = await RecordRepository.findById(input.recordId);
-    if (!existing) throw new ApiError("DATA_RECORD_NOT_FOUND");
-    assertRecordScope(existing, input.appId, input.dataType);
-    const userId = actorId(context.actor);
-    const t = now();
-    await prisma.record.update({ where: { id: existing.id }, data: { deletedAt: t, updatedAt: t } });
-    bus.emit("record.deleted", {
-      appId: existing.appId,
-      dataType: existing.dataType,
-      recordId: existing.id,
-      ownerId: existing.ownerId,
-      actorId: userId,
-      at: t
-    });
-    return { id: existing.id };
+    return DataPipeline.deleteRecord(input, { actor: context.actor });
   }
 
   static async fieldOps(
@@ -309,10 +382,26 @@ export class DataService {
     if (!existing) throw new ApiError("DATA_RECORD_NOT_FOUND");
     assertRecordScope(existing, input.appId, input.dataType);
     const next = asObject(parseJson(existing.data));
-    for (const op of input.ops) applyOp(next, op);
-    return this.update(
-      { appId: input.appId, dataType: input.dataType, recordId: input.recordId, data: next, merge: false },
-      context
+    const policyActions: Record<string, PolicyAction> = {};
+
+    for (const op of input.ops) {
+      const fieldPath = applyOp(next, op);
+      policyActions[fieldPath] = op.kind;
+    }
+
+    const result = await DataPipeline.execute(
+      {
+        op: "update",
+        appId: input.appId,
+        dataType: input.dataType,
+        recordId: input.recordId,
+        data: next,
+        merge: false,
+        policyActions
+      },
+      { actor: context.actor }
     );
+
+    return snapshotEnvelope(result.record);
   }
 }

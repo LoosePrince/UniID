@@ -39,6 +39,7 @@ export function ConsoleSidebar({
     ? [
         { href: `/console/apps/${appId}`, label: t("common.overview"), icon: LayoutDashboard },
         { href: `/console/apps/${appId}/schemas`, label: t("common.schemas"), icon: Shield },
+        { href: `/console/apps/${appId}/policies`, label: "Policies", icon: Shield },
         { href: `/console/apps/${appId}/data`, label: t("common.data"), icon: Database },
         { href: `/console/apps/${appId}/files`, label: t("common.files"), icon: Files },
         { href: `/console/apps/${appId}/realtime`, label: t("common.realtime"), icon: Radio },

@@ -30,7 +30,18 @@ export type {
   FileInfo
 } from "./types";
 export { policy } from "./policy";
-export type { PolicyDocumentObject, PolicyFieldRule, PolicyVariable } from "./policy";
+export type {
+  PolicyAction,
+  PolicyCondition,
+  PolicyConditionValue,
+  PolicyDocumentObject,
+  PolicyDocumentV2Object,
+  PolicyFieldRule,
+  PolicyRule,
+  PolicyVariable,
+  LegacyPolicyDocumentObject,
+  RuleInput
+} from "./policy";
 export type { RealtimeChannel } from "./realtime";
 export type { FromQuery } from "./data";
 

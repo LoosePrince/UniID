@@ -54,6 +54,11 @@ async function handler(req: NextRequest): Promise<Response> {
           id: randomUUID(),
           appId: auth.app.id,
           userId: auth.user.id,
+          role: auth.user.role,
+          systemAdmin: auth.user.role === "admin",
+          appAdmin: false,
+          authType: auth.session.authType,
+          origin: "sdk",
           channels: new Set(channels),
           send,
           close: () => {

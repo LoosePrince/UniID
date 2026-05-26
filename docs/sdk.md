@@ -80,9 +80,10 @@ const result = await uniid.functions.invoke<{ ok: boolean }>("myFn", { name: "wo
 ```ts
 import { policy } from "@uniid/sdk";
 
-const doc = policy.withFields({
-  "likes": { read: ["$public"], create: ["$dynamic:likes.$user"] }
-});
+const doc = policy.document([
+  policy.rule({ id: "public-read-likes", actions: "read", subjects: "$public", fields: "data.likes" }),
+  policy.dynamicOwnerKey({ field: "data.likes.*", path: "likes.$user", actions: ["set", "unset", "push"] })
+]);
 ```
 
 ## React

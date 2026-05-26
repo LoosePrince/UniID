@@ -12,7 +12,7 @@
  */
 
 import type { AuthContext } from "@/shared/policy/variables";
-import { PolicyEngine } from "@/shared/policy";
+import { PolicyEngine, type PolicyAction } from "@/shared/policy";
 import { ApiError } from "@/shared/errors";
 import { prisma } from "@/shared/prisma";
 import { bus } from "@/shared/bus";
@@ -40,6 +40,8 @@ export interface DataPipelineInput {
   data: Record<string, unknown>;
   /** update 时是否合并（默认替换） */
   merge?: boolean;
+  /** 字段操作入口可传入 data.<topKey> -> increment/push/set/unset 的动作语义。 */
+  policyActions?: Record<string, PolicyAction>;
 }
 
 export interface DataPipelineRunCtx {
@@ -147,15 +149,34 @@ export class DataPipeline {
     // 6) PolicyEngine
     let beforeSnapshot: unknown = null;
     if (input.op === "create") {
+      const actor = {
+        ...ctx.actor,
+        ownerId: input.ownerId ?? ctx.actor.userId
+      };
       const decision = PolicyEngine.evaluate(
-        { documents: docs, action: "create" },
-        {
-          ...ctx.actor,
-          ownerId: input.ownerId ?? ctx.actor.userId
-        }
+        { documents: docs, action: "create", dataValue: envelope.data },
+        actor
       );
       if (!decision.allow) {
         throw new ApiError("POLICY_FORBIDDEN", { details: decision });
+      }
+
+      for (const [k, value] of Object.entries(envelope.data)) {
+        const fieldPath = `data.${k}`;
+        const fieldDecision = PolicyEngine.evaluate(
+          {
+            documents: docs,
+            action: "create",
+            fieldPath,
+            dataValue: value
+          },
+          actor
+        );
+        if (!fieldDecision.allow) {
+          throw new ApiError("POLICY_FORBIDDEN", {
+            details: { fieldPath, decision: fieldDecision }
+          });
+        }
       }
     } else {
       if (!input.recordId) throw new ApiError("DATA_RECORD_NOT_FOUND");
@@ -164,23 +185,32 @@ export class DataPipeline {
         throw new ApiError("DATA_RECORD_NOT_FOUND");
       }
       const actor = { ...ctx.actor, ownerId: existing.ownerId };
-      // 全记录 update 权限
-      const decision = PolicyEngine.evaluate({ documents: docs, action: "update" }, actor);
-      if (!decision.allow) {
-        // 不直接拒绝；下一步对每个变更字段单独校验
-      }
-
       const currentData = (existing.data ?? {}) as Record<string, unknown>;
       beforeSnapshot = currentData;
-      const nextData = (envelope.data ?? {}) as Record<string, unknown>;
-      const changedKeys = new Set<string>([...Object.keys(currentData), ...Object.keys(nextData)]);
+      const submittedData = (envelope.data ?? {}) as Record<string, unknown>;
+      const finalData = input.merge
+        ? { ...currentData, ...submittedData }
+        : submittedData;
+
+      const wholeDecision = PolicyEngine.evaluate(
+        {
+          documents: docs,
+          action: "update",
+          currentValue: currentData,
+          dataValue: finalData
+        },
+        actor
+      );
+
+      const changedKeys = new Set<string>([...Object.keys(currentData), ...Object.keys(finalData)]);
 
       for (const k of changedKeys) {
         const before = currentData[k];
-        const after = nextData[k];
+        const after = finalData[k];
         if (JSON.stringify(before) === JSON.stringify(after)) continue;
         const fieldPath = `data.${k}`;
-        const action = after === undefined ? "delete" : before === undefined ? "create" : "update";
+        const action = input.policyActions?.[fieldPath] ??
+          (after === undefined ? "delete" : before === undefined ? "create" : "update");
         const fieldDecision = PolicyEngine.evaluate(
           {
             documents: docs,
@@ -191,17 +221,13 @@ export class DataPipeline {
           },
           actor
         );
-        if (!fieldDecision.allow) {
+        if (!wholeDecision.allow && !fieldDecision.allow) {
           throw new ApiError("POLICY_FORBIDDEN", {
             details: { fieldPath, decision: fieldDecision }
           });
         }
       }
 
-      // merge / replace
-      const finalData = input.merge
-        ? { ...currentData, ...nextData }
-        : nextData;
       envelope.data = finalData;
     }
 

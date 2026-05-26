@@ -14,6 +14,8 @@
 import { randomUUID } from "node:crypto";
 import { bus } from "@/shared/bus";
 import type { DomainEventEnvelope } from "@/shared/bus";
+import { prisma } from "@/shared/prisma";
+import { PolicyEngine, type AuthContext } from "@/shared/policy";
 
 export type RealtimeEventType = "insert" | "update" | "delete" | "broadcast" | "presence";
 
@@ -30,6 +32,11 @@ interface Subscriber {
   id: string;
   appId: string;
   userId: string | null;
+  role?: string | null;
+  systemAdmin?: boolean;
+  appAdmin?: boolean;
+  authType?: "full" | "restricted";
+  origin?: AuthContext["origin"];
   channels: Set<string>;
   send: (event: string, data: unknown) => void;
   close: () => void;
@@ -93,6 +100,79 @@ function dispatch(channel: string, event: string, payload: unknown, id: string =
   return { id, event, type: eventType(event), channel, payload, at: now() };
 }
 
+async function loadPolicyDocuments(appId: string, dataType: string, recordId?: string) {
+  const where = [
+    { scope: "app" as const, target: null as string | null },
+    { scope: "dataType" as const, target: dataType },
+    ...(recordId ? [{ scope: "record" as const, target: recordId }] : [])
+  ];
+  const docs = await prisma.policyDocument.findMany({
+    where: { appId, OR: where as Array<{ scope: string; target: string | null }> }
+  });
+  const orderKey = { app: 0, dataType: 1, record: 2 };
+  return docs
+    .sort(
+      (a, b) =>
+        (orderKey as Record<string, number>)[a.scope]! -
+        (orderKey as Record<string, number>)[b.scope]!
+    )
+    .map((d) => d.document);
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function subscriberActor(sub: Subscriber, ownerId: string | null): AuthContext {
+  return {
+    userId: sub.userId,
+    role: sub.role ?? null,
+    systemAdmin: sub.systemAdmin ?? false,
+    appAdmin: sub.appAdmin ?? false,
+    appId: sub.appId,
+    authType: sub.authType ?? "restricted",
+    ownerId,
+    origin: sub.origin ?? "sdk"
+  };
+}
+
+async function filterRecordPayload(env: DomainEventEnvelope, sub: Subscriber) {
+  const payload = env.payload as {
+    appId?: string;
+    dataType?: string;
+    recordId?: string;
+    ownerId?: string | null;
+    data?: unknown;
+    before?: unknown;
+    after?: unknown;
+  };
+  if (!payload.appId || !payload.dataType) return env.payload;
+  const docs = await loadPolicyDocuments(payload.appId, payload.dataType, payload.recordId);
+  const actor = subscriberActor(sub, payload.ownerId ?? null);
+
+  if (env.name === "record.created" && payload.data !== undefined) {
+    const data = asObject(payload.data);
+    const whole = PolicyEngine.evaluate({ documents: docs, action: "read", currentValue: data }, actor);
+    const visible = whole.allow ? data : PolicyEngine.filterReadable(data, docs, actor);
+    if (Object.keys(visible).length === 0) return null;
+    return { ...payload, data: visible };
+  }
+
+  if (env.name === "record.updated" && payload.after !== undefined) {
+    const after = asObject(payload.after);
+    const before = asObject(payload.before);
+    const whole = PolicyEngine.evaluate({ documents: docs, action: "read", currentValue: after }, actor);
+    const visibleAfter = whole.allow ? after : PolicyEngine.filterReadable(after, docs, actor);
+    if (Object.keys(visibleAfter).length === 0) return null;
+    const visibleBefore = whole.allow ? before : PolicyEngine.filterReadable(before, docs, actor);
+    return { ...payload, before: visibleBefore, after: visibleAfter };
+  }
+
+  return payload;
+}
+
 bus.on("record.created", (env) => fanout(env, recordChannels(env)));
 bus.on("record.updated", (env) => fanout(env, recordChannels(env)));
 bus.on("record.deleted", (env) => fanout(env, recordChannels(env)));
@@ -104,7 +184,11 @@ function fanout(env: DomainEventEnvelope, channels: string[]) {
     if (sub.appId !== (env.payload as { appId?: string }).appId) continue;
     for (const ch of sub.channels) {
       if (set.has(ch)) {
-        sub.send("message", dispatch(ch, env.name, env.payload, env.id));
+        filterRecordPayload(env, sub)
+          .then((payload) => {
+            if (payload != null) sub.send("message", dispatch(ch, env.name, payload, env.id));
+          })
+          .catch(() => {});
         break;
       }
     }

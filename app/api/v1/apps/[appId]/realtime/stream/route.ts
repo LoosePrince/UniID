@@ -53,6 +53,11 @@ async function handler(req: NextRequest, ctx: { params: Record<string, string | 
           id: randomUUID(),
           appId: params.appId,
           userId: auth.user.id,
+          role: auth.user.role,
+          systemAdmin: auth.user.role === "admin",
+          appAdmin: true,
+          authType: "full",
+          origin: "system",
           channels: new Set(channels),
           send,
           close: () => {
