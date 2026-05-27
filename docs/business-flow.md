@@ -195,6 +195,35 @@ Policy：这个人有没有权限执行 publish。
 Workflow：当前状态能不能从 reviewing 变成 published。
 ```
 
+运行时入口：
+
+```txt
+POST /api/v1/data/record/{recordId}/transition
+POST /api/v1/apps/{appId}/data/{dataType}/records/{recordId}/transition
+```
+
+请求体：
+
+```json
+{
+  "transition": "submit",
+  "data": { "status": "reviewing" },
+  "metadata": { "source": "editor" },
+  "merge": true
+}
+```
+
+也可以使用 `action` 字段表达同一语义：
+
+```json
+{
+  "action": "publish",
+  "data": { "publishedAt": 1710000000 }
+}
+```
+
+`metadata` 进入 CommandContext，供 explain、审计和后续业务层使用，不会直接落到记录数据。状态字段的变更必须通过 transition/action 入口完成，普通 update 直接改状态字段会被 Workflow 拒绝。
+
 ## Function
 
 Function 承载复杂逻辑：
@@ -231,6 +260,22 @@ id / appId / type / resourceType / resourceId / actor / before / after / diff / 
 - Webhook：按事件和 filter 投递。
 - Function trigger：按事件触发函数。
 - Audit：记录关键动作和 explain 摘要。
+
+事件源统一通过持久化 Outbox 发布。运行时启动后会挂载 Realtime、Audit、Webhooks 和 Function event trigger，并对 pending/failed outbox 做一次 replay。这样 API 写入和异步消费使用同一份事件事实，不再出现“API 已过滤但 SSE 泄露”或“内存事件丢失后无法补偿”的双轨问题。
+
+## Console
+
+控制台的 `Business` 页面聚合两类业务文档：
+
+- `Mutation Rules`：适合点赞计数、评论计数、同记录冗余字段维护。
+- `Workflows`：适合文章发布、订单流转、审批状态机。
+
+页面提供：
+
+- 常见模板。
+- app / dataType / record scope。
+- JSON 高级编辑。
+- Flow Simulator，用 CommandContext 预览当前文档的执行结果。
 
 ## 统一写入生命周期
 

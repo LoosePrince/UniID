@@ -52,6 +52,30 @@ await uniid.from("post").ops(created.id, [{ type: "increment", path: "data.likes
 await uniid.from("post").delete(created.id);
 ```
 
+## Business actions / Workflow
+
+业务状态流转走 `transition()` 或 `action()`，请求体会进入后端统一 Command，并由 Policy、Mutation Rule、Workflow 和最终 Schema 校验共同处理。
+
+```ts
+await uniid.from("article").transition(created.id, "submit", {
+  data: { status: "reviewing" },
+  metadata: { source: "editor" }
+});
+
+await uniid.from("article").action(created.id, "publish", {
+  data: { publishedAt: Math.floor(Date.now() / 1000) }
+});
+```
+
+`metadata` 只进入业务上下文，不会直接写入记录。`merge` 默认由服务端按 `true` 处理，需要替换语义时可显式传入 `merge: false`。
+
+```ts
+await uniid.from("order").transition(order.id, "ship", {
+  data: { status: "shipped", shippedAt: Math.floor(Date.now() / 1000) },
+  merge: true
+});
+```
+
 ## Files
 
 ```ts

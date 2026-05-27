@@ -102,6 +102,15 @@ export interface FieldOp {
   value?: unknown;
 }
 
+export interface TransitionOptions<T = unknown> {
+  /** 状态流转时附带的数据补丁，默认按 merge 语义合并。 */
+  data?: Partial<T>;
+  /** 只进入 CommandContext，不会直接写入记录。 */
+  metadata?: Record<string, unknown>;
+  /** 默认由后端按 true 处理。 */
+  merge?: boolean;
+}
+
 export interface UploadOptions {
   appId?: string;
   visibility?: "private" | "public";

@@ -5,7 +5,7 @@
  */
 import { request } from "./http";
 import type { AuthNamespace } from "./auth";
-import type { FieldOp, FromQueryOptions, RecordEnvelope, UniIDOptions } from "./types";
+import type { FieldOp, FromQueryOptions, RecordEnvelope, TransitionOptions, UniIDOptions } from "./types";
 
 function toOrderByRecord(
   orderBy: FromQueryOptions["orderBy"]
@@ -111,6 +111,14 @@ export class FromQuery<T = unknown> {
     return this.client.ops<T>(recordId, ops);
   }
 
+  async transition(recordId: string, transition: string, options: TransitionOptions<T> = {}): Promise<RecordEnvelope<T>> {
+    return this.client.transition<T>(recordId, transition, options);
+  }
+
+  async action(recordId: string, action: string, options: TransitionOptions<T> = {}): Promise<RecordEnvelope<T>> {
+    return this.client.action<T>(recordId, action, options);
+  }
+
   async get(recordId: string): Promise<RecordEnvelope<T> | null> {
     return this.client.get<T>(recordId);
   }
@@ -123,6 +131,8 @@ interface DataClientInternals {
   replace<T>(recordId: string, data: T): Promise<RecordEnvelope<T>>;
   delete(recordId: string): Promise<{ id: string }>;
   ops<T>(recordId: string, ops: FieldOp[]): Promise<RecordEnvelope<T>>;
+  transition<T>(recordId: string, transition: string, options?: TransitionOptions<T>): Promise<RecordEnvelope<T>>;
+  action<T>(recordId: string, action: string, options?: TransitionOptions<T>): Promise<RecordEnvelope<T>>;
   get<T>(recordId: string): Promise<RecordEnvelope<T> | null>;
 }
 
@@ -209,6 +219,44 @@ export class DataNamespace implements DataClientInternals {
       {
         method: "POST",
         body: { ops },
+        headers: this.auth.authHeader()
+      }
+    );
+    return unwrapRecord<T>(raw);
+  }
+
+  async transition<T>(recordId: string, transition: string, options: TransitionOptions<T> = {}): Promise<RecordEnvelope<T>> {
+    await this.auth.ensureFreshToken();
+    const raw = await request<unknown>(
+      this.opts.url,
+      `/api/v1/data/record/${encodeURIComponent(recordId)}/transition`,
+      {
+        method: "POST",
+        body: {
+          transition,
+          data: options.data ?? {},
+          metadata: options.metadata,
+          merge: options.merge
+        },
+        headers: this.auth.authHeader()
+      }
+    );
+    return unwrapRecord<T>(raw);
+  }
+
+  async action<T>(recordId: string, action: string, options: TransitionOptions<T> = {}): Promise<RecordEnvelope<T>> {
+    await this.auth.ensureFreshToken();
+    const raw = await request<unknown>(
+      this.opts.url,
+      `/api/v1/data/record/${encodeURIComponent(recordId)}/transition`,
+      {
+        method: "POST",
+        body: {
+          action,
+          data: options.data ?? {},
+          metadata: options.metadata,
+          merge: options.merge
+        },
         headers: this.auth.authHeader()
       }
     );

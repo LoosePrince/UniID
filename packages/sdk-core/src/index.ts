@@ -26,6 +26,7 @@ export type {
   FromQueryOptions,
   RecordEnvelope,
   FieldOp,
+  TransitionOptions,
   UploadOptions,
   FileInfo
 } from "./types";
