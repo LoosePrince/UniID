@@ -48,6 +48,7 @@ model User {
   fileShares      FileShareToken[]   @relation("FileShareCreatedBy")
   functions       FunctionDefinition[] @relation("FnCreatedBy")
   fnDeployments   FunctionDeployment[] @relation("FnDeploymentBy")
+  functionEventTriggers FunctionEventTrigger[] @relation("FnEventTriggerCreatedBy")
   cronJobs        CronJob[]          @relation("CronCreatedBy")
   webhooks        Webhook[]          @relation("HookCreatedBy")
   auditLogs       AuditLog[]
@@ -143,11 +144,13 @@ model App {
   records        Record[]
   files          FileObject[]
   functions      FunctionDefinition[]
+  functionEventTriggers FunctionEventTrigger[]
   cronJobs       CronJob[]
   webhooks       Webhook[]
   quota          Quota?
   quotaUsage     QuotaUsage[]
   auditLogs      AuditLog[]
+  eventOutbox    EventOutbox[]
 
   @@index([ownerId, status])
 }
@@ -438,6 +441,7 @@ model FunctionDefinition {
   activeDeploymentId String?
   invocations  FunctionInvocation[]
   cronJobs     CronJob[]
+  eventTriggers FunctionEventTrigger[]
 
   @@unique([appId, name])
 }
@@ -476,6 +480,27 @@ model FunctionInvocation {
   deployment FunctionDeployment? @relation(fields: [deploymentId], references: [id])
 
   @@index([fnId, createdAt])
+}
+
+model FunctionEventTrigger {
+  id          String  @id @default(cuid())
+  appId       String
+  fnId        String
+  name        String
+  events      String  // JSON 数组 ["record.created", "record.*", ...]
+  filter      String? // JSON: { dataType?, where? }
+  isActive    Int     @default(1)
+  createdAt   Int
+  updatedAt   Int
+  createdById String?
+
+  app       App                @relation(fields: [appId], references: [id], onDelete: Cascade)
+  fn        FunctionDefinition @relation(fields: [fnId], references: [id], onDelete: Cascade)
+  createdBy User?              @relation("FnEventTriggerCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([appId, name])
+  @@index([appId, isActive])
+  @@index([fnId, isActive])
 }
 
 // ============================================================================
@@ -548,6 +573,30 @@ model WebhookDelivery {
 
   @@index([status, nextRetryAt])
   @@index([webhookId, createdAt])
+}
+
+model EventOutbox {
+  id             String  @id @default(cuid())
+  appId          String?
+  eventType      String
+  resourceType   String?
+  resourceId     String?
+  payload        String  // JSON
+  status         String  @default("pending") // pending | dispatched | failed | dlq
+  attempts       Int     @default(0)
+  nextAttemptAt  Int?
+  dispatchedAt   Int?
+  errorMessage   String?
+  causedByEventId String?
+  createdAt      Int
+  updatedAt      Int
+
+  app App? @relation(fields: [appId], references: [id], onDelete: Cascade)
+
+  @@index([appId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([resourceType, resourceId])
 }
 
 // ============================================================================

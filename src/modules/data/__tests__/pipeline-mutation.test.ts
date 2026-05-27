@@ -22,7 +22,7 @@ vi.mock("@/modules/schema", () => ({
 
 vi.mock("@/shared/bus", () => ({
   bus: {
-    emit: vi.fn()
+    publish: vi.fn()
   }
 }));
 

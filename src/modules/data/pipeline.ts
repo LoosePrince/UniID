@@ -375,7 +375,7 @@ export class DataPipeline {
     // 8) event
     const at = Math.floor(Date.now() / 1000);
     if (input.op === "create") {
-      bus.emit("record.created", {
+      await bus.publish("record.created", {
         appId: record.appId,
         dataType: record.dataType,
         recordId: record.id,
@@ -385,7 +385,7 @@ export class DataPipeline {
         at
       });
     } else {
-      bus.emit("record.updated", {
+      await bus.publish("record.updated", {
         appId: record.appId,
         dataType: record.dataType,
         recordId: record.id,
@@ -434,7 +434,7 @@ export class DataPipeline {
       changeSet
     };
     await RecordRepository.softDelete(input.recordId);
-    bus.emit("record.deleted", {
+    await bus.publish("record.deleted", {
       appId: existing.appId,
       dataType: existing.dataType,
       recordId: existing.id,

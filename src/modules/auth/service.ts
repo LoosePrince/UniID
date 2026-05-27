@@ -152,7 +152,7 @@ export class AuthService {
 
     const refresh = await issueRefreshToken({ userId: input.userId, sessionId: session.id });
 
-    bus.emit("authorization.granted", {
+    await bus.publish("authorization.granted", {
       userId: input.userId,
       appId: input.appId,
       authType: input.authType,
@@ -218,7 +218,7 @@ export class AuthService {
         data: { revokedAt: t }
       })
     ]);
-    bus.emit("authorization.revoked", { userId, appId, at: t });
+    await bus.publish("authorization.revoked", { userId, appId, at: t });
   }
 
   static async revokeBySessionId(sessionId: string): Promise<void> {

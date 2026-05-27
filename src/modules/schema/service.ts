@@ -142,7 +142,7 @@ export class SchemaService {
     ]);
     invalidateSchemaCache(versionId);
     const v = await prisma.schemaVersion.findUnique({ where: { id: versionId }, select: { version: true } });
-    if (v) bus.emit("schema.activated", { appId, dataType, version: v.version, at: now() });
+    if (v) await bus.publish("schema.activated", { appId, dataType, version: v.version, at: now() });
   }
 
   static async listVersions(appId: string, dataType: string) {

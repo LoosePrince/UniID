@@ -121,7 +121,7 @@ export class FileService {
       }
     });
 
-    bus.emit("file.uploaded", {
+    await bus.publish("file.uploaded", {
       appId: input.appId,
       ownerId: input.ownerId,
       fileId: row.id,
@@ -248,7 +248,7 @@ export class FileService {
     if (file.appId) {
       await QuotaService.releaseStorage(file.appId, file.size).catch(() => {});
     }
-    bus.emit("file.deleted", { appId: file.appId, ownerId: file.ownerId, fileId, at: t });
+    await bus.publish("file.deleted", { appId: file.appId, ownerId: file.ownerId, fileId, at: t });
   }
 
   static async list(input: { appId?: string; ownerId?: string; limit?: number }) {
@@ -399,7 +399,7 @@ export class FileService {
       data: { size: totalSize, uploadId: null, updatedAt: t }
     });
 
-    bus.emit("file.uploaded", {
+    await bus.publish("file.uploaded", {
       appId: updated.appId,
       ownerId: updated.ownerId,
       fileId: updated.id,

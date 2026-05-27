@@ -10,12 +10,10 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const [{ CronService }, { WebhooksService }, { ensureAuditListenersBooted }] = await Promise.all([
+  const [{ CronService }, { bootEventRuntime }] = await Promise.all([
     import("./src/modules/cron"),
-    import("./src/modules/webhooks"),
-    import("./src/shared/audit")
+    import("./src/shared/bus/runtime")
   ]);
-  ensureAuditListenersBooted();
-  WebhooksService.ensureBoot();
+  await bootEventRuntime();
   await CronService.boot();
 }
