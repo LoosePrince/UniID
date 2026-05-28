@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireConsoleAuth } from "@/shared/iam";
 import { AppService } from "@/modules/apps";
 import { ConsoleTopbar } from "@/ui/console/topbar";
 import { ConsoleSidebarShell } from "@/ui/console/sidebar-shell";
+import { ConsolePageLoading, PageTransition } from "@/ui/navigation";
 
 export default async function ConsoleLayout({ children }: { children: React.ReactNode }) {
   let auth;
@@ -23,7 +25,9 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <ConsoleSidebarShell isSystemAdmin={auth.user.role === "admin"} />
         <main className="relative min-w-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(119,111,218,0.07),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.45),rgba(251,249,244,0))] dark:bg-[radial-gradient(circle_at_top_left,rgba(99,109,180,0.08),transparent_28%),linear-gradient(180deg,rgba(20,29,36,0.72),rgba(11,17,23,0))]">
-          {children}
+          <Suspense fallback={<ConsolePageLoading />}>
+            <PageTransition variant="console">{children}</PageTransition>
+          </Suspense>
         </main>
       </div>
     </div>

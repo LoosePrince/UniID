@@ -13,8 +13,8 @@ import {
 } from "@/ui/primitives";
 import { ThemeToggle } from "@/ui/theme";
 import { Home, LogOut, Search, Settings, User as UserIcon } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { TransitionLink, useNavigationTransition } from "@/ui/navigation";
 import { AppSwitcher, type AppOption } from "./app-switcher";
 import { CommandPalette } from "./command-palette";
 
@@ -42,7 +42,7 @@ function useSectionLabel() {
 }
 
 export function ConsoleTopbar(props: ConsoleTopbarProps) {
-  const router = useRouter();
+  const { navigate } = useNavigationTransition();
   const { t } = useI18n();
   const currentAppId = useCurrentAppId();
   const sectionLabel = useSectionLabel();
@@ -51,7 +51,7 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
     try {
       await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" });
       toast.success(t("topbar.loggedOut"));
-      router.replace("/login");
+      navigate("/login", "replace");
     } catch {
       toast.error(t("topbar.logoutFailed"));
     }
@@ -60,12 +60,12 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/60 bg-cream-50/72 px-5 shadow-[0_10px_30px_rgba(19,17,14,0.04)] backdrop-blur-xl supports-[backdrop-filter]:bg-cream-50/60 dark:border-slate-700/60 dark:bg-slate-950/72 dark:shadow-[0_10px_30px_rgba(0,0,0,0.16)] dark:supports-[backdrop-filter]:bg-slate-950/60">
       <div className="flex min-w-0 items-center gap-3">
-        <Link href="/console" className="group flex items-center gap-2.5">
+        <TransitionLink href="/console" className="group flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink-900 text-xs font-bold text-cream-50 shadow-[0_12px_26px_rgba(19,17,14,0.16),inset_0_1px_0_rgba(255,255,255,0.12)] transition-transform group-hover:-translate-y-0.5">
             U
           </span>
           <span className="hidden text-sm font-semibold tracking-tight sm:inline">{t("app.consoleName")}</span>
-        </Link>
+        </TransitionLink>
         <span className="hidden text-ink-200 dark:text-slate-700 sm:inline">/</span>
         <span className="hidden rounded-full border border-ink-200/70 bg-white/50 px-2.5 py-1 text-xs font-medium text-ink-500 shadow-xs sm:inline-flex dark:border-slate-700/60 dark:bg-slate-900/50 dark:text-slate-400">
           {sectionLabel}
@@ -107,15 +107,15 @@ export function ConsoleTopbar(props: ConsoleTopbarProps) {
               <span className="">{props.user.role}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => router.push("/")}>
+            <DropdownMenuItem onSelect={() => navigate("/")}>
               <Home className="h-3.5 w-3.5" />
               {t("topbar.goHome")}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => router.push("/console/account")}>
+            <DropdownMenuItem onSelect={() => navigate("/console/account")}>
               <UserIcon className="h-3.5 w-3.5" />
               {t("common.accountCenter")}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => router.push("/console/account/settings")}>
+            <DropdownMenuItem onSelect={() => navigate("/console/account/settings")}>
               <Settings className="h-3.5 w-3.5" />
               {t("topbar.accountSettings")}
             </DropdownMenuItem>

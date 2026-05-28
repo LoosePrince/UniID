@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { TransitionLink } from "@/ui/navigation";
 import {
   LayoutDashboard,
   Database,
@@ -103,7 +103,7 @@ export function ConsoleSidebar({
 function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
   return (
-    <Link
+    <TransitionLink
       href={item.href}
       className={cn(
         "group relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-[background,color,box-shadow,transform] duration-200",
@@ -121,6 +121,6 @@ function SidebarLink({ item, active }: { item: NavItem; active: boolean }) {
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="truncate">{item.label}</span>
-    </Link>
+    </TransitionLink>
   );
 }

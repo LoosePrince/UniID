@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import { getServerI18n, resolveCurrentLocale } from "@/shared/i18n";
 import { I18nProvider } from "@/ui/i18n";
 import { Toaster } from "@/ui/primitives";
+import { NavigationTransitionProvider, PageLoading, RouteProgress } from "@/ui/navigation";
 import { ThemeProvider, ThemeScript } from "@/ui/theme";
 import "./globals.css";
 
@@ -40,8 +42,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ThemeScript />
         <I18nProvider locale={locale}>
           <ThemeProvider>
-            {children}
-            <Toaster />
+            <NavigationTransitionProvider>
+              <RouteProgress />
+              <Suspense fallback={<PageLoading />}>
+                {children}
+              </Suspense>
+              <Toaster />
+            </NavigationTransitionProvider>
           </ThemeProvider>
         </I18nProvider>
       </body>

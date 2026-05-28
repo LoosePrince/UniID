@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import {
   Button,
@@ -14,6 +13,7 @@ import {
   cn
 } from "@/ui/primitives";
 import { useI18n } from "@/ui/i18n";
+import { useNavigationTransition } from "@/ui/navigation";
 
 export interface AppOption {
   id: string;
@@ -22,7 +22,7 @@ export interface AppOption {
 }
 
 export function AppSwitcher({ apps, currentAppId }: { apps: AppOption[]; currentAppId?: string }) {
-  const router = useRouter();
+  const { navigate } = useNavigationTransition();
   const { t } = useI18n();
   const current = apps.find((a) => a.id === currentAppId);
 
@@ -44,7 +44,7 @@ export function AppSwitcher({ apps, currentAppId }: { apps: AppOption[]; current
         {apps.map((a) => (
           <DropdownMenuItem
             key={a.id}
-            onSelect={() => router.push(`/console/apps/${a.id}`)}
+            onSelect={() => navigate(`/console/apps/${a.id}`)}
             className={cn("flex items-center justify-between")}
           >
             <span className="min-w-0 flex flex-col">
@@ -56,7 +56,7 @@ export function AppSwitcher({ apps, currentAppId }: { apps: AppOption[]; current
         ))}
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onSelect={() => router.push("/console/apps/new")}
+          onSelect={() => navigate("/console/apps/new")}
           className="text-accent-600 focus:text-accent-800 data-[highlighted]:text-accent-800 dark:text-accent-200 dark:focus:text-accent-100 dark:data-[highlighted]:text-accent-100"
         >
           <Plus className="h-3.5 w-3.5" />

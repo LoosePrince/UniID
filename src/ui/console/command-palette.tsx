@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
   Search,
@@ -18,9 +17,10 @@ import {
 } from "lucide-react";
 import { useI18n } from "@/ui/i18n";
 import { Dialog, DialogContent, DialogTitle } from "@/ui/primitives";
+import { useNavigationTransition } from "@/ui/navigation";
 
 export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: () => void }) {
-  const router = useRouter();
+  const { navigate } = useNavigationTransition();
   const { t } = useI18n();
   const [open, setOpen] = React.useState(false);
 
@@ -77,7 +77,7 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
                     value={`${it.label} ${it.hint}`}
                     onSelect={() => {
                       setOpen(false);
-                      router.push(dest);
+                      navigate(dest);
                     }}
                     className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ink-700 aria-selected:bg-ink-900 aria-selected:text-cream-50 data-[selected=true]:bg-ink-900 data-[selected=true]:text-cream-50 dark:text-slate-300 dark:aria-selected:bg-slate-700/80 dark:aria-selected:text-slate-100 dark:data-[selected=true]:bg-slate-700/80 dark:data-[selected=true]:text-slate-100 [&[aria-selected=true]_svg]:text-current [&[data-selected=true]_svg]:text-current"
                   >
@@ -93,7 +93,7 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
                 value={t("common.accountCenter")}
                 onSelect={() => {
                   setOpen(false);
-                  router.push("/console/account");
+                  navigate("/console/account");
                 }}
                 className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-ink-700 aria-selected:bg-ink-900 aria-selected:text-cream-50 data-[selected=true]:bg-ink-900 data-[selected=true]:text-cream-50 dark:text-slate-300 dark:aria-selected:bg-slate-700/80 dark:aria-selected:text-slate-100 dark:data-[selected=true]:bg-slate-700/80 dark:data-[selected=true]:text-slate-100 [&[aria-selected=true]_svg]:text-current [&[data-selected=true]_svg]:text-current"
               >
