@@ -67,7 +67,7 @@ function now() {
 function normalizeTarget(scope: PolicyScope, target?: string | null): string | null {
   if (scope === "app") return null;
   const value = target?.trim();
-  if (!value) throw new ApiError("POLICY_INVALID_DOCUMENT", { message: "dataType/record scope 必须提供 target" });
+  if (!value) throw new ApiError("POLICY_INVALID_DOCUMENT", { message: "error.detail.scopeTargetRequired" });
   return value;
 }
 
@@ -295,7 +295,7 @@ export class PolicyAdminService {
     const policy = await prisma.policyDocument.findFirst({
       where: scopeTargetWhere(appId, scope, target)
     });
-    if (!policy) throw new ApiError("POLICY_INVALID_DOCUMENT", { message: "未找到可预览迁移的 PolicyDocument" });
+    if (!policy) throw new ApiError("POLICY_INVALID_DOCUMENT", { message: "error.detail.policyMigrationNotFound" });
     return safeParseDocument(policy.document);
   }
 }

@@ -35,6 +35,12 @@ const uiMessagesZh: MessageDictionary = {
     "common.confirm": "确认",
     "common.cron": "定时",
     "common.webhooks": "Webhooks",
+    "common.policies": "Policies",
+    "common.business": "Business",
+    "common.preview": "Preview",
+    "common.copy": "复制",
+    "common.copied": "已复制",
+    "common.selectPlaceholder": "请选择",
 
     "http.status": "状态 {status}",
 
@@ -355,6 +361,12 @@ const uiMessagesEn: MessageDictionary = {
     "common.confirm": "Confirm",
     "common.cron": "Cron",
     "common.webhooks": "Webhooks",
+    "common.policies": "Policies",
+    "common.business": "Business",
+    "common.preview": "Preview",
+    "common.copy": "Copy",
+    "common.copied": "Copied",
+    "common.selectPlaceholder": "Select…",
 
     "http.status": "Status {status}",
 

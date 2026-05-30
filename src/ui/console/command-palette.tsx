@@ -13,7 +13,8 @@ import {
   Webhook,
   Radio,
   LogOut,
-  Shield
+  Shield,
+  Workflow
 } from "lucide-react";
 import { useI18n } from "@/ui/i18n";
 import { Dialog, DialogContent, DialogTitle } from "@/ui/primitives";
@@ -27,6 +28,8 @@ export function CommandPalette({ appId, onLogout }: { appId?: string; onLogout: 
   const items = [
     { label: t("commandPalette.dataBrowser"), icon: Database, hint: "data" },
     { label: t("common.schemas"), icon: Shield, hint: "schemas" },
+    { label: t("common.policies"), icon: Shield, hint: "policies" },
+    { label: t("common.business"), icon: Workflow, hint: "business" },
     { label: t("common.files"), icon: Files, hint: "files" },
     { label: t("common.functions"), icon: Code2, hint: "functions" },
     { label: t("common.cron"), icon: Clock, hint: "cron" },

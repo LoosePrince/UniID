@@ -51,7 +51,7 @@ export class AppService {
   static async create(input: CreateAppInput) {
     const owner = await prisma.user.findUnique({ where: { id: input.ownerId } });
     if (!owner || owner.deletedAt) {
-      throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "owner 用户不存在或已禁用" });
+      throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "error.detail.ownerUserNotFound" });
     }
 
     const adminIds = [...new Set(input.adminIds ?? [])].filter((id) => id !== input.ownerId);
@@ -61,7 +61,7 @@ export class AppService {
         select: { id: true }
       });
       if (admins.length !== adminIds.length) {
-        throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "管理员用户不存在或已禁用" });
+        throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "error.detail.adminUserNotFound" });
       }
     }
 
@@ -103,7 +103,7 @@ export class AppService {
     await this.requireOwnerOrAdmin(app.ownerId, app.admins, actorUserId, actorRole === "admin");
     if (patch.primaryDomain && patch.primaryDomain !== app.primaryDomain) {
       if (actorRole !== "admin") {
-        throw new ApiError("APP_FORBIDDEN", { message: "仅 UniID 系统管理员可修改主域名" });
+        throw new ApiError("APP_FORBIDDEN", { message: "error.detail.systemAdminOnlyPrimaryDomain" });
       }
       const taken = await prisma.app.findUnique({ where: { primaryDomain: patch.primaryDomain } });
       if (taken) throw new ApiError("APP_DOMAIN_TAKEN");
@@ -118,7 +118,7 @@ export class AppService {
     const app = await this.get(appId);
     await this.requireOwnerOrAdmin(app.ownerId, app.admins, actorUserId, actorRole === "admin");
     if (actorRole !== "admin") {
-      throw new ApiError("APP_FORBIDDEN", { message: "仅 UniID 系统管理员可绑定域名" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.systemAdminOnlyBindDomain" });
     }
     const exists = await prisma.appDomain.findUnique({ where: { host } });
     if (exists) throw new ApiError("APP_DOMAIN_TAKEN");
@@ -131,7 +131,7 @@ export class AppService {
     const app = await this.get(appId);
     await this.requireOwnerOrAdmin(app.ownerId, app.admins, actorUserId, actorRole === "admin");
     if (actorRole !== "admin") {
-      throw new ApiError("APP_FORBIDDEN", { message: "仅 UniID 系统管理员可解绑域名" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.systemAdminOnlyUnbindDomain" });
     }
     await prisma.appDomain.delete({ where: { id: domainId } });
   }
@@ -141,10 +141,10 @@ export class AppService {
     await this.requireOwnerOrAdmin(app.ownerId, app.admins, actorUserId);
     const target = await prisma.user.findUnique({ where: { username } });
     if (!target || target.deletedAt) {
-      throw new ApiError("AUTH_INVALID_CREDENTIALS", { message: "用户不存在" });
+      throw new ApiError("AUTH_INVALID_CREDENTIALS", { message: "error.detail.userNotFound" });
     }
     if (target.id === app.ownerId) {
-      throw new ApiError("APP_FORBIDDEN", { message: "owner 已具备全部权限" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.ownerAlreadyFullAccess" });
     }
     return prisma.appAdmin.upsert({
       where: { appId_userId: { appId, userId: target.id } },
@@ -157,7 +157,7 @@ export class AppService {
     const app = await this.get(appId);
     await this.requireOwnerOrAdmin(app.ownerId, app.admins, actorUserId);
     if (targetUserId === app.ownerId) {
-      throw new ApiError("APP_FORBIDDEN", { message: "owner 不能从成员中移除" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.ownerCannotRemoveSelf" });
     }
     await prisma.appAdmin.delete({
       where: { appId_userId: { appId, userId: targetUserId } }
@@ -168,7 +168,7 @@ export class AppService {
   static async destroy(appId: string, actorUserId: string) {
     const app = await this.get(appId);
     if (app.ownerId !== actorUserId) {
-      throw new ApiError("APP_FORBIDDEN", { message: "仅 owner 可删除应用" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.ownerOnlyDeleteApp" });
     }
     await prisma.app.delete({ where: { id: appId } });
   }

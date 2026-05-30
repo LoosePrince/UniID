@@ -115,7 +115,7 @@ export async function requireSdkAuth(req: NextRequest): Promise<SdkAuthContext> 
   if (!session) throw new ApiError("AUTH_SESSION_NOT_FOUND");
   if (session.revokedAt) throw new ApiError("AUTH_SESSION_REVOKED");
   if (session.app.status !== "active") {
-    throw new ApiError("APP_FORBIDDEN", { message: "应用已被暂停或归档" });
+    throw new ApiError("APP_FORBIDDEN", { message: "error.detail.appSuspendedOrArchived" });
   }
 
   const authz = await prisma.authorization.findUnique({

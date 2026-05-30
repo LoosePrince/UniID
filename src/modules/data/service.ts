@@ -200,11 +200,11 @@ function readableEnvelope(
 
 function normalizeDataPath(path: string): string[] {
   if (!/^[A-Za-z0-9_.-]+$/.test(path)) {
-    throw new ApiError("DATA_QUERY_INVALID", { message: "字段路径不合法" });
+    throw new ApiError("DATA_QUERY_INVALID", { message: "error.detail.fieldPathInvalid" });
   }
   const value = path.startsWith("data.") ? path.slice("data.".length) : path;
   const parts = value.split(".").filter(Boolean);
-  if (parts.length === 0) throw new ApiError("DATA_QUERY_INVALID", { message: "字段路径不合法" });
+  if (parts.length === 0) throw new ApiError("DATA_QUERY_INVALID", { message: "error.detail.fieldPathInvalid" });
   return parts;
 }
 

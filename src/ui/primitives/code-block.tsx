@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
+import { useI18n } from "@/ui/i18n";
 import { Button } from "./button";
 import { cn } from "./utils";
 
@@ -20,6 +21,7 @@ export function CodeBlock({
   className,
   ...props
 }: CodeBlockProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
 
   async function copy() {
@@ -54,7 +56,7 @@ export function CodeBlock({
             onClick={copy}
           >
             {copied ? <Check /> : <Copy />}
-            {copied ? "已复制" : "复制"}
+            {copied ? t("common.copied") : t("common.copy")}
           </Button>
         </div>
       )}

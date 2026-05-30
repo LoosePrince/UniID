@@ -24,6 +24,7 @@ import {
   Textarea,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 export interface PolicyRuleModel {
   id: string;
@@ -77,62 +78,47 @@ type ApiErrorResponse = { error?: { message?: string; details?: unknown } };
 
 const EMPTY_POLICY: PolicyDocumentV2Model = { version: 2, rules: [] };
 
-const TEMPLATES: Array<{ id: string; label: string; description: string; document: PolicyDocumentV2Model }> = [
-  {
-    id: "public-read",
-    label: "公开只读",
-    description: "所有人可读取，写入仍默认拒绝。",
-    document: {
-      version: 2,
-      rules: [{ id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null }]
-    }
+const TEMPLATE_DOCUMENTS: Record<string, PolicyDocumentV2Model> = {
+  "public-read": {
+    version: 2,
+    rules: [{ id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null }]
   },
-  {
-    id: "owner-only",
-    label: "用户私有",
-    description: "只有 owner 可读写和删除。",
-    document: {
-      version: 2,
-      rules: [
-        { id: "owner-read", effect: "allow", actions: ["read"], subjects: ["$owner"], using: null, check: null },
-        { id: "owner-write", effect: "allow", actions: ["create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$owner"], using: null, check: null }
-      ]
-    }
+  "owner-only": {
+    version: 2,
+    rules: [
+      { id: "owner-read", effect: "allow", actions: ["read"], subjects: ["$owner"], using: null, check: null },
+      { id: "owner-write", effect: "allow", actions: ["create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$owner"], using: null, check: null }
+    ]
   },
-  {
-    id: "public-read-owner-write",
-    label: "公开读，作者写",
-    description: "内容公开可读，创建者或 owner 维护。",
-    document: {
-      version: 2,
-      rules: [
-        { id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null },
-        { id: "owner-write", effect: "allow", actions: ["create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$owner"], using: null, check: null }
-      ]
-    }
+  "public-read-owner-write": {
+    version: 2,
+    rules: [
+      { id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null },
+      { id: "owner-write", effect: "allow", actions: ["create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$owner"], using: null, check: null }
+    ]
   },
-  {
-    id: "admin-manage",
-    label: "管理员管理",
-    description: "应用管理员具备全动作权限。",
-    document: {
-      version: 2,
-      rules: [{ id: "app-admin-manage", effect: "allow", actions: ["read", "create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$app_admin"], using: null, check: null }]
-    }
+  "admin-manage": {
+    version: 2,
+    rules: [{ id: "app-admin-manage", effect: "allow", actions: ["read", "create", "update", "delete", "set", "unset", "push", "increment"], subjects: ["$app_admin"], using: null, check: null }]
   },
-  {
-    id: "dynamic-like",
-    label: "动态点赞/投票",
-    description: "用户只能维护自己的动态路径。",
-    document: {
-      version: 2,
-      rules: [
-        { id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null },
-        { id: "self-like", effect: "allow", actions: ["set", "unset", "push"], subjects: ["$dynamic:likes.$user"], resource: { fields: ["data.likes.*"] }, using: null, check: null }
-      ]
-    }
+  "dynamic-like": {
+    version: 2,
+    rules: [
+      { id: "public-read", effect: "allow", actions: ["read"], subjects: ["$public"], using: null, check: null },
+      { id: "self-like", effect: "allow", actions: ["set", "unset", "push"], subjects: ["$dynamic:likes.$user"], resource: { fields: ["data.likes.*"] }, using: null, check: null }
+    ]
   }
-];
+};
+
+const TEMPLATE_IDS = ["public-read", "owner-only", "public-read-owner-write", "admin-manage", "dynamic-like"] as const;
+
+const TEMPLATE_I18N_KEY: Record<(typeof TEMPLATE_IDS)[number], string> = {
+  "public-read": "publicRead",
+  "owner-only": "ownerOnly",
+  "public-read-owner-write": "publicReadOwnerWrite",
+  "admin-manage": "adminManage",
+  "dynamic-like": "dynamicLike"
+};
 
 const ACTION_OPTIONS = ["read", "create", "update", "delete", "set", "unset", "push", "increment"];
 
@@ -140,13 +126,17 @@ function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function parseJsonObject(source: string, label: string) {
+function parseJsonObject(
+  source: string,
+  label: string,
+  t: (key: string, values?: Record<string, string>) => string
+) {
   try {
     const value = JSON.parse(source);
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return value as Record<string, unknown>;
   } catch {
-    throw new Error(`${label} 必须是 JSON object`);
+    throw new Error(t("common.jsonMustBeObjectLabel", { label }));
   }
 }
 
@@ -190,12 +180,23 @@ function schemaFieldPaths(schema: DataSchemaSummaryModel | null) {
 
 export function PolicyManagementPanel({ appId, policies, schemas }: { appId: string; policies: PolicySummaryModel[]; schemas: DataSchemaSummaryModel[] }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const templates = React.useMemo(
+    () =>
+      TEMPLATE_IDS.map((id) => ({
+        id,
+        label: t(`policy.template.${TEMPLATE_I18N_KEY[id]}.label`),
+        description: t(`policy.template.${TEMPLATE_I18N_KEY[id]}.description`),
+        document: TEMPLATE_DOCUMENTS[id]
+      })),
+    [t]
+  );
   const [scope, setScope] = React.useState<Scope>("app");
   const [target, setTarget] = React.useState("");
   const [recordDataType, setRecordDataType] = React.useState(schemas[0]?.dataType ?? "");
   const [description, setDescription] = React.useState("");
   const [documentText, setDocumentText] = React.useState(formatJson(EMPTY_POLICY));
-  const [selectedTemplate, setSelectedTemplate] = React.useState(TEMPLATES[0]?.id ?? "public-read");
+  const [selectedTemplate, setSelectedTemplate] = React.useState<(typeof TEMPLATE_IDS)[number]>("public-read");
   const [busy, setBusy] = React.useState(false);
   const [explainResult, setExplainResult] = React.useState<unknown>(null);
   const [migrationPreview, setMigrationPreview] = React.useState<unknown>(null);
@@ -220,7 +221,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
   }
 
   function applyTemplate() {
-    const template = TEMPLATES.find((item) => item.id === selectedTemplate);
+    const template = templates.find((item) => item.id === selectedTemplate);
     if (!template) return;
     setDocumentText(formatJson(template.document));
     if (!description) setDescription(template.description);
@@ -229,7 +230,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
   async function savePolicy() {
     let document: Record<string, unknown>;
     try {
-      document = parseJsonObject(documentText, "PolicyDocument");
+      document = parseJsonObject(documentText, "PolicyDocument", t);
     } catch (err) {
       toast.error(String((err as Error).message));
       return;
@@ -242,8 +243,8 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
         body: JSON.stringify({ scope, target: currentTarget, description, document })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(apiMessage(json, "保存失败"));
-      toast.success("Policy 已保存");
+      if (!res.ok) throw new Error(apiMessage(json, t("policy.saveFailed")));
+      toast.success(t("policy.saved"));
       router.refresh();
     } catch (err) {
       toast.error(String((err as Error).message));
@@ -256,7 +257,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
     let document: Record<string, unknown> | undefined;
     if (documentText.trim()) {
       try {
-        document = parseJsonObject(documentText, "PolicyDocument");
+        document = parseJsonObject(documentText, "PolicyDocument", t);
       } catch (err) {
         toast.error(String((err as Error).message));
         return;
@@ -270,7 +271,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
         body: JSON.stringify({ scope, target: currentTarget, document })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(apiMessage(json, "预览失败"));
+      if (!res.ok) throw new Error(apiMessage(json, t("policy.previewFailed")));
       setMigrationPreview(json);
     } catch (err) {
       toast.error(String((err as Error).message));
@@ -283,8 +284,8 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
     let currentValue: Record<string, unknown>;
     let dataValue: Record<string, unknown>;
     try {
-      currentValue = parseJsonObject(String(formData.get("currentValue") || "{}"), "oldData");
-      dataValue = parseJsonObject(String(formData.get("dataValue") || "{}"), "newData");
+      currentValue = parseJsonObject(String(formData.get("currentValue") || "{}"), "oldData", t);
+      dataValue = parseJsonObject(String(formData.get("dataValue") || "{}"), "newData", t);
     } catch (err) {
       toast.error(String((err as Error).message));
       return;
@@ -315,7 +316,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
         })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(apiMessage(json, "模拟失败"));
+      if (!res.ok) throw new Error(apiMessage(json, t("policy.simulateFailed")));
       setExplainResult(json);
     } catch (err) {
       toast.error(String((err as Error).message));
@@ -328,46 +329,44 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
     <div className="container-page space-y-6 py-8">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Policies</h1>
-          <p className="mt-1 max-w-3xl text-sm text-ink-500 dark:text-slate-400">
-            管理 app / dataType / record 三层策略，保存时统一写入 v2，运行时仍兼容旧版 default + fields。
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">{t("policy.title")}</h1>
+          <p className="mt-1 max-w-3xl text-sm text-ink-500 dark:text-slate-400">{t("policy.description")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={previewMigration} loading={busy}>
-            <Wand2 /> 预览迁移
+            <Wand2 /> {t("policy.previewMigration")}
           </Button>
           <Button onClick={savePolicy} loading={busy}>
-            <Save /> 保存策略
+            <Save /> {t("policy.savePolicy")}
           </Button>
         </div>
       </header>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <PolicyMetric label="Policy 文档" value={String(policies.length)} />
-        <PolicyMetric label="DataType" value={String(schemas.length)} />
-        <PolicyMetric label="当前规则" value={String((currentPolicy?.normalized.rules ?? EMPTY_POLICY.rules).length)} />
+        <PolicyMetric label={t("policy.metric.documents")} value={String(policies.length)} />
+        <PolicyMetric label={t("policy.metric.dataTypes")} value={String(schemas.length)} />
+        <PolicyMetric label={t("policy.metric.rules")} value={String((currentPolicy?.normalized.rules ?? EMPTY_POLICY.rules).length)} />
       </section>
 
       <Tabs defaultValue="editor">
         <TabsList>
-          <TabsTrigger value="editor">策略编辑</TabsTrigger>
-          <TabsTrigger value="fields">字段权限</TabsTrigger>
-          <TabsTrigger value="simulator">Simulator</TabsTrigger>
+          <TabsTrigger value="editor">{t("policy.tab.editor")}</TabsTrigger>
+          <TabsTrigger value="fields">{t("policy.tab.fields")}</TabsTrigger>
+          <TabsTrigger value="simulator">{t("policy.tab.simulator")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="editor" className="mt-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <Card>
             <CardHeader>
-              <CardTitle>作用域</CardTitle>
-              <CardDescription>按 app → dataType → record 顺序组合。</CardDescription>
+              <CardTitle>{t("policy.scope.title")}</CardTitle>
+              <CardDescription>{t("policy.scope.description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Field label="Scope">
                 <Select value={scope} onValueChange={(value) => selectScope(value as Scope)} options={[
-                  { value: "app", label: "app default" },
-                  { value: "dataType", label: "dataType default" },
-                  { value: "record", label: "record override" }
+                  { value: "app", label: t("policy.scope.app") },
+                  { value: "dataType", label: t("policy.scope.dataType") },
+                  { value: "record", label: t("policy.scope.record") }
                 ]} />
               </Field>
               {scope === "dataType" ? (
@@ -376,21 +375,21 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
                 </Field>
               ) : scope === "record" ? (
                 <>
-                  <Field label="Record ID" help="record override 通常来自记录 __permissions，这里用于直接管理 PolicyDocument 表。">
+                  <Field label="Record ID" help={t("policy.recordIdHelp")}>
                     <Input value={target} onChange={(event) => setTarget(event.target.value)} placeholder="record id" />
                   </Field>
-                  <Field label="DataType for simulator" help="record scope 模拟时用于补齐 app → dataType → record 组合链。">
+                  <Field label="DataType for simulator" help={t("policy.dataTypeForSimulatorHelp")}>
                     <Select value={recordDataType} onValueChange={setRecordDataType} options={schemas.map((schema) => ({ value: schema.dataType, label: schema.dataType }))} />
                   </Field>
                 </>
               ) : null}
-              <Field label="Description">
-                <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="策略说明" />
+              <Field label={t("common.description")}>
+                <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("policy.descriptionPlaceholder")} />
               </Field>
-              <Field label="模板">
+              <Field label={t("policy.template")}>
                 <div className="flex gap-2">
-                  <Select value={selectedTemplate} onValueChange={setSelectedTemplate} options={TEMPLATES.map((template) => ({ value: template.id, label: template.label }))} />
-                  <Button variant="secondary" onClick={applyTemplate}>应用</Button>
+                  <Select value={selectedTemplate} onValueChange={(value) => setSelectedTemplate(value as (typeof TEMPLATE_IDS)[number])} options={templates.map((template) => ({ value: template.id, label: template.label }))} />
+                  <Button variant="secondary" onClick={applyTemplate}>{t("policy.applyTemplate")}</Button>
                 </div>
               </Field>
             </CardContent>
@@ -398,8 +397,8 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
 
           <Card>
             <CardHeader>
-              <CardTitle>JSON 高级模式</CardTitle>
-              <CardDescription>直接编辑 PolicyDocument v2。旧版文档可通过“预览迁移”查看归一化结果。</CardDescription>
+              <CardTitle>{t("policy.jsonTitle")}</CardTitle>
+              <CardDescription>{t("policy.jsonDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea value={documentText} onChange={(event) => setDocumentText(event.target.value)} className="min-h-[520px] font-mono text-xs" spellCheck={false} />
@@ -410,20 +409,20 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
         <TabsContent value="fields" className="mt-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <Card>
             <CardHeader>
-              <CardTitle>字段清单</CardTitle>
-              <CardDescription>来自当前 active schema。</CardDescription>
+              <CardTitle>{t("policy.fields.title")}</CardTitle>
+              <CardDescription>{t("policy.fields.description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              {fields.length === 0 ? <p className="text-sm text-ink-500">选择 dataType 后显示字段路径。</p> : fields.map((field) => <Badge key={field} tone="neutral" className="mr-1 mt-1 font-mono">{field}</Badge>)}
+              {fields.length === 0 ? <p className="text-sm text-ink-500">{t("policy.fields.empty")}</p> : fields.map((field) => <Badge key={field} tone="neutral" className="mr-1 mt-1 font-mono">{field}</Badge>)}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>字段规则速写</CardTitle>
-              <CardDescription>把字段路径填入 resource.fields，即可限定某条 rule 的作用范围。</CardDescription>
+              <CardTitle>{t("policy.fieldRules.title")}</CardTitle>
+              <CardDescription>{t("policy.fieldRules.description")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-ink-600 dark:text-slate-300">
-              <p>示例：公开读取标题和摘要，其他字段继续默认拒绝。</p>
+              <p>{t("policy.fieldRules.example")}</p>
               <pre className="overflow-auto rounded-xl border border-ink-200/70 bg-cream-100/70 p-4 text-xs dark:border-slate-700 dark:bg-slate-900/60">{formatJson({ id: "public-read-title", effect: "allow", actions: ["read"], subjects: ["$public"], resource: { fields: ["data.title", "data.summary"] }, using: null, check: null })}</pre>
             </CardContent>
           </Card>
@@ -432,8 +431,8 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
         <TabsContent value="simulator" className="mt-4 grid gap-4 lg:grid-cols-[420px_minmax(0,1fr)]">
           <Card>
             <CardHeader>
-              <CardTitle>Policy Simulator</CardTitle>
-              <CardDescription>选择身份、动作和数据，查看 allow/deny 与 trace。</CardDescription>
+              <CardTitle>{t("policy.simulator.title")}</CardTitle>
+              <CardDescription>{t("policy.simulator.description")}</CardDescription>
             </CardHeader>
             <CardContent>
               <form action={runExplain} className="space-y-4">
@@ -449,21 +448,21 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
                 <label className="flex items-center gap-2 text-sm"><input name="systemAdmin" type="checkbox" /> systemAdmin</label>
                 <Field label="oldData / currentValue"><Textarea name="currentValue" defaultValue="{}" className="font-mono text-xs" /></Field>
                 <Field label="newData / dataValue"><Textarea name="dataValue" defaultValue="{}" className="font-mono text-xs" /></Field>
-                <Button type="submit" loading={busy}><Play /> 运行模拟</Button>
+                <Button type="submit" loading={busy}><Play /> {t("policy.simulator.run")}</Button>
               </form>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Explain Trace</CardTitle>
-              <CardDescription>展示最终决策和规则匹配过程。</CardDescription>
+              <CardTitle>{t("policy.explain.title")}</CardTitle>
+              <CardDescription>{t("policy.explain.description")}</CardDescription>
             </CardHeader>
             <CardContent>
               {explainResult ? (
                 <pre className="max-h-[680px] overflow-auto rounded-xl border border-ink-200/70 bg-cream-100/70 p-4 text-xs dark:border-slate-700 dark:bg-slate-900/60">{formatJson(explainResult)}</pre>
               ) : (
-                <p className="text-sm text-ink-500">运行模拟后显示结果。</p>
+                <p className="text-sm text-ink-500">{t("policy.simulator.empty")}</p>
               )}
             </CardContent>
           </Card>
@@ -473,7 +472,7 @@ export function PolicyManagementPanel({ appId, policies, schemas }: { appId: str
       {migrationPreview ? (
         <Callout tone="info">
           <CheckCircle2 />
-          <CalloutTitle>迁移预览</CalloutTitle>
+          <CalloutTitle>{t("policy.migrationPreview.title")}</CalloutTitle>
           <CalloutDescription>
             <pre className="mt-3 max-h-96 overflow-auto rounded-xl bg-white/60 p-3 text-xs dark:bg-slate-950/40">{formatJson(migrationPreview)}</pre>
           </CalloutDescription>

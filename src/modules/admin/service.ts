@@ -52,7 +52,7 @@ export class AdminService {
       where: { id: userId },
       select: { username: true, email: true, displayName: true, locale: true }
     });
-    if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "用户不存在" });
+    if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "error.detail.userNotFound" });
 
     const data: { username?: string; email?: string | null; displayName?: string | null; locale?: string; updatedAt: number } = {
       updatedAt: now()
@@ -79,12 +79,12 @@ export class AdminService {
       });
       return after;
     } catch {
-      throw new ApiError("AUTH_INVALID_CREDENTIALS", { message: "用户名或邮箱已被占用" });
+      throw new ApiError("AUTH_INVALID_CREDENTIALS", { message: "error.detail.usernameEmailTaken" });
     }
   }
 
   static async deleteUser(actorId: string, userId: string) {
-    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "不能删除自己" });
+    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "error.detail.cannotDeleteSelf" });
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -101,7 +101,7 @@ export class AdminService {
         }
       }
     });
-    if (!user) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "用户不存在" });
+    if (!user) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "error.detail.userNotFound" });
 
     const hasAssets =
       user._count.appsOwned > 0 ||
@@ -110,7 +110,7 @@ export class AdminService {
       user._count.recordsOwned > 0 ||
       user._count.filesOwned > 0;
     if (hasAssets) {
-      throw new ApiError("APP_FORBIDDEN", { message: "该用户仍有关联应用、授权、记录或文件，请先禁用或迁移资产" });
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.userHasAssets" });
     }
 
     await prisma.user.delete({ where: { id: userId } });
@@ -124,9 +124,9 @@ export class AdminService {
   }
 
   static async disableUser(actorId: string, userId: string) {
-    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "不能禁用自己" });
+    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "error.detail.cannotDisableSelf" });
     const before = await prisma.user.findUnique({ where: { id: userId } });
-    if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "用户不存在" });
+    if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND", { message: "error.detail.userNotFound" });
     const after = await prisma.user.update({
       where: { id: userId },
       data: { deletedAt: now() }
@@ -164,7 +164,7 @@ export class AdminService {
   }
 
   static async setRole(actorId: string, userId: string, role: "user" | "admin") {
-    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "不能修改自己角色" });
+    if (actorId === userId) throw new ApiError("APP_FORBIDDEN", { message: "error.detail.cannotChangeOwnRole" });
     const before = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (!before) throw new ApiError("AUTH_SESSION_NOT_FOUND");
     const after = await prisma.user.update({

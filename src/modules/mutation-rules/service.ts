@@ -74,7 +74,7 @@ function ruleOrder(scope: string): number {
 function normalizeTarget(scope: MutationRuleScope, target?: string | null): string | null {
   if (scope === "app") return null;
   const value = target?.trim();
-  if (!value) throw new ApiError("BUSINESS_INVALID_RULE", { message: "dataType/record scope 必须提供 target" });
+  if (!value) throw new ApiError("BUSINESS_INVALID_RULE", { message: "error.detail.scopeTargetRequired" });
   return value;
 }
 
@@ -83,7 +83,7 @@ function parseDocument(value: string | MutationRuleDocument): MutationRuleDocume
     return mutationRuleDocumentSchema.parse(typeof value === "string" ? JSON.parse(value) : value);
   } catch (error) {
     throw new ApiError("BUSINESS_INVALID_RULE", {
-      message: "MutationRuleDocument 不合法",
+      message: "error.detail.mutationRuleDocumentInvalid",
       details: error
     });
   }

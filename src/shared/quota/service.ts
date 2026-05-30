@@ -91,13 +91,13 @@ export class QuotaService {
     });
 
     if (metric === "apiCalls" && usage.apiCalls > quota.dailyApiCalls) {
-      throw new ApiError("QUOTA_EXCEEDED", { message: "已超出每日 API 调用配额" });
+      throw new ApiError("QUOTA_EXCEEDED", { message: "error.detail.quotaDailyApiExceeded" });
     }
     if (metric === "fnInvocations" && usage.fnInvocations > quota.fnInvocationsDaily) {
-      throw new ApiError("QUOTA_EXCEEDED", { message: "已超出每日函数调用配额" });
+      throw new ApiError("QUOTA_EXCEEDED", { message: "error.detail.quotaDailyFnExceeded" });
     }
     if (metric === "storageBytes" && usage.storageBytes > quota.monthlyStorageBytes) {
-      throw new ApiError("QUOTA_EXCEEDED", { message: "已超出每月存储配额" });
+      throw new ApiError("QUOTA_EXCEEDED", { message: "error.detail.quotaMonthlyStorageExceeded" });
     }
 
     return usage;

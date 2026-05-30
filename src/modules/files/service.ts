@@ -292,7 +292,7 @@ export class FileService {
         ACL: input.visibility === "public" ? "public-read" : undefined
       })
     );
-    if (!mp.UploadId) throw new ApiError("FILE_UPLOAD_FAILED", { message: "S3 did not return UploadId" });
+    if (!mp.UploadId) throw new ApiError("FILE_UPLOAD_FAILED", { message: "error.detail.s3NoUploadId" });
 
     const row = await prisma.fileObject.create({
       data: {
@@ -320,12 +320,12 @@ export class FileService {
     actorId: string;
   }): Promise<{ etag: string; partNumber: number; size: number }> {
     if (input.partNumber < 1 || input.partNumber > 10_000) {
-      throw new ApiError("FILE_MULTIPART_INVALID", { message: "partNumber 必须在 1..10000" });
+      throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartPartNumberRange" });
     }
     const file = await prisma.fileObject.findUnique({ where: { id: input.fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
-    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "文件已完成上传" });
+    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartAlreadyComplete" });
 
     const res = await getS3InternalClient().send(
       new UploadPartCommand({
@@ -337,7 +337,7 @@ export class FileService {
         ContentLength: input.body.byteLength
       })
     );
-    if (!res.ETag) throw new ApiError("FILE_UPLOAD_FAILED", { message: "UploadPart 未返回 ETag" });
+    if (!res.ETag) throw new ApiError("FILE_UPLOAD_FAILED", { message: "error.detail.multipartUploadPartNoEtag" });
 
     await prisma.fileChunk.upsert({
       where: { uploadId_partNumber: { uploadId: file.uploadId, partNumber: input.partNumber } },
@@ -362,14 +362,14 @@ export class FileService {
     const file = await prisma.fileObject.findUnique({ where: { id: input.fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
-    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "文件已完成上传" });
+    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartAlreadyComplete" });
 
     const parts = await prisma.fileChunk.findMany({
       where: { uploadId: file.uploadId },
       orderBy: { partNumber: "asc" }
     });
     if (parts.length === 0) {
-      throw new ApiError("FILE_MULTIPART_INVALID", { message: "没有任何已上传分片" });
+      throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartNoParts" });
     }
 
     await getS3InternalClient().send(
@@ -424,7 +424,7 @@ export class FileService {
     const file = await prisma.fileObject.findUnique({ where: { id: input.fileId } });
     if (!file) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
-    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "文件没有进行中的 multipart 上传" });
+    if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartNoActiveUpload" });
 
     await getS3InternalClient()
       .send(new AbortMultipartUploadCommand({

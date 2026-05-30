@@ -20,6 +20,7 @@ import {
   Textarea,
   toast
 } from "@/ui/primitives";
+import { useI18n } from "@/ui/i18n";
 
 type Scope = "app" | "dataType" | "record";
 type BusinessKind = "mutation-rules" | "workflows";
@@ -46,88 +47,74 @@ export interface BusinessSchemaSummaryModel {
   updatedAt: number;
 }
 
-const MUTATION_TEMPLATES = [
-  {
-    id: "article-like-up",
-    label: "点赞计数 +1",
-    description: "用户设置自己的 data.likes.{userId} 后，自动维护 data.likeCount。",
-    document: {
-      version: 1,
-      id: "article-like-count-up",
-      dataType: "article",
-      description: "点赞后维护 likeCount",
-      on: ["data.likes.*.set"],
-      when: { "before.exists": false, "after.exists": true },
-      then: [{ type: "increment", path: "data.likeCount", by: 1 }]
-    }
+const MUTATION_TEMPLATE_DOCUMENTS: Record<string, Record<string, unknown>> = {
+  "article-like-up": {
+    version: 1,
+    id: "article-like-count-up",
+    dataType: "article",
+    description: "Maintain likeCount after a like",
+    on: ["data.likes.*.set"],
+    when: { "before.exists": false, "after.exists": true },
+    then: [{ type: "increment", path: "data.likeCount", by: 1 }]
   },
-  {
-    id: "article-like-down",
-    label: "取消点赞计数 -1",
-    description: "用户 unset 自己的 data.likes.{userId} 后，自动扣减 data.likeCount。",
-    document: {
-      version: 1,
-      id: "article-like-count-down",
-      dataType: "article",
-      description: "取消点赞后维护 likeCount",
-      on: ["data.likes.*.unset"],
-      when: { "before.exists": true, "after.exists": false },
-      then: [{ type: "increment", path: "data.likeCount", by: -1 }]
-    }
+  "article-like-down": {
+    version: 1,
+    id: "article-like-count-down",
+    dataType: "article",
+    description: "Maintain likeCount after unlike",
+    on: ["data.likes.*.unset"],
+    when: { "before.exists": true, "after.exists": false },
+    then: [{ type: "increment", path: "data.likeCount", by: -1 }]
   },
-  {
-    id: "comment-count",
-    label: "评论计数",
-    description: "新增评论位时维护 data.commentCount。",
-    document: {
-      version: 1,
-      id: "article-comment-count-up",
-      dataType: "article",
-      description: "新增评论后维护 commentCount",
-      on: ["data.comments.*.set"],
-      when: { "before.exists": false, "after.exists": true },
-      then: [{ type: "increment", path: "data.commentCount", by: 1 }]
-    }
+  "comment-count": {
+    version: 1,
+    id: "article-comment-count-up",
+    dataType: "article",
+    description: "Maintain commentCount after a new comment",
+    on: ["data.comments.*.set"],
+    when: { "before.exists": false, "after.exists": true },
+    then: [{ type: "increment", path: "data.commentCount", by: 1 }]
   }
-];
+};
 
-const WORKFLOW_TEMPLATES = [
-  {
+const WORKFLOW_TEMPLATE_DOCUMENTS: Record<string, Record<string, unknown>> = {
+  "article-publishing": {
+    version: 1,
     id: "article-publishing",
-    label: "文章发布流",
-    description: "作者提交审核，应用管理员发布或退回。",
-    document: {
-      version: 1,
-      id: "article-publishing",
-      dataType: "article",
-      stateField: "data.status",
-      transitions: [
-        { id: "submit-review", from: "draft", to: "reviewing", action: "submit", subjects: ["$owner"] },
-        { id: "publish", from: "reviewing", to: "published", action: "publish", subjects: ["$app_admin"] },
-        { id: "reject", from: "reviewing", to: "draft", action: "reject", subjects: ["$app_admin"] }
-      ]
-    }
+    dataType: "article",
+    stateField: "data.status",
+    transitions: [
+      { id: "submit-review", from: "draft", to: "reviewing", action: "submit", subjects: ["$owner"] },
+      { id: "publish", from: "reviewing", to: "published", action: "publish", subjects: ["$app_admin"] },
+      { id: "reject", from: "reviewing", to: "draft", action: "reject", subjects: ["$app_admin"] }
+    ]
   },
-  {
+  "order-flow": {
+    version: 1,
     id: "order-flow",
-    label: "订单流转",
-    description: "订单从待支付到已支付、发货、完成。",
-    document: {
-      version: 1,
-      id: "order-flow",
-      dataType: "order",
-      stateField: "data.status",
-      transitions: [
-        { id: "pay", from: "pending", to: "paid", action: "pay", subjects: ["$owner"] },
-        { id: "ship", from: "paid", to: "shipped", action: "ship", subjects: ["$app_admin"] },
-        { id: "complete", from: "shipped", to: "completed", action: "complete", subjects: ["$owner", "$app_admin"] }
-      ]
-    }
+    dataType: "order",
+    stateField: "data.status",
+    transitions: [
+      { id: "pay", from: "pending", to: "paid", action: "pay", subjects: ["$owner"] },
+      { id: "ship", from: "paid", to: "shipped", action: "ship", subjects: ["$app_admin"] },
+      { id: "complete", from: "shipped", to: "completed", action: "complete", subjects: ["$owner", "$app_admin"] }
+    ]
   }
-];
+};
 
-const DEFAULT_MUTATION_TEMPLATE = MUTATION_TEMPLATES[0]!;
-const DEFAULT_WORKFLOW_TEMPLATE = WORKFLOW_TEMPLATES[0]!;
+const MUTATION_TEMPLATE_IDS = ["article-like-up", "article-like-down", "comment-count"] as const;
+const WORKFLOW_TEMPLATE_IDS = ["article-publishing", "order-flow"] as const;
+
+const MUTATION_TEMPLATE_I18N: Record<(typeof MUTATION_TEMPLATE_IDS)[number], string> = {
+  "article-like-up": "likeUp",
+  "article-like-down": "likeDown",
+  "comment-count": "commentCount"
+};
+
+const WORKFLOW_TEMPLATE_I18N: Record<(typeof WORKFLOW_TEMPLATE_IDS)[number], string> = {
+  "article-publishing": "articlePublishing",
+  "order-flow": "orderFlow"
+};
 
 const SAMPLE_COMMAND = {
   actor: {
@@ -160,13 +147,17 @@ function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function parseJsonObject(source: string, label: string) {
+function parseJsonObject(
+  source: string,
+  label: string,
+  t: (key: string, values?: Record<string, string>) => string
+) {
   try {
     const value = JSON.parse(source);
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return value as Record<string, unknown>;
   } catch {
-    throw new Error(`${label} 必须是 JSON object`);
+    throw new Error(t("common.jsonMustBeObjectLabel", { label }));
   }
 }
 
@@ -205,35 +196,63 @@ export function BusinessRulesPanel({
   schemas: BusinessSchemaSummaryModel[];
 }) {
   const router = useRouter();
+  const { t } = useI18n();
+  const mutationTemplates = React.useMemo(
+    () =>
+      MUTATION_TEMPLATE_IDS.map((id) => ({
+        id,
+        label: t(`business.template.${MUTATION_TEMPLATE_I18N[id]}.label`),
+        description: t(`business.template.${MUTATION_TEMPLATE_I18N[id]}.description`),
+        docDescription: t(`business.template.${MUTATION_TEMPLATE_I18N[id]}.docDescription`),
+        document: {
+          ...MUTATION_TEMPLATE_DOCUMENTS[id],
+          description: t(`business.template.${MUTATION_TEMPLATE_I18N[id]}.docDescription`)
+        }
+      })),
+    [t]
+  );
+  const workflowTemplates = React.useMemo(
+    () =>
+      WORKFLOW_TEMPLATE_IDS.map((id) => ({
+        id,
+        label: t(`business.template.${WORKFLOW_TEMPLATE_I18N[id]}.label`),
+        description: t(`business.template.${WORKFLOW_TEMPLATE_I18N[id]}.description`),
+        document: WORKFLOW_TEMPLATE_DOCUMENTS[id]
+      })),
+    [t]
+  );
   const [kind, setKind] = React.useState<BusinessKind>("mutation-rules");
   const [scope, setScope] = React.useState<Scope>("dataType");
   const [target, setTarget] = React.useState(firstDataType(schemas));
   const [description, setDescription] = React.useState("");
   const [isActive, setIsActive] = React.useState(true);
-  const [documentText, setDocumentText] = React.useState(formatJson(DEFAULT_MUTATION_TEMPLATE.document));
-  const [templateId, setTemplateId] = React.useState(DEFAULT_MUTATION_TEMPLATE.id);
+  const [documentText, setDocumentText] = React.useState(formatJson(mutationTemplates[0]?.document ?? {}));
+  const [templateId, setTemplateId] = React.useState<string>(MUTATION_TEMPLATE_IDS[0]);
   const [commandText, setCommandText] = React.useState(formatJson(SAMPLE_COMMAND));
   const [previewResult, setPreviewResult] = React.useState<unknown>(null);
   const [busy, setBusy] = React.useState(false);
 
   const rows = normalizeRows(kind === "mutation-rules" ? mutationRules : workflows);
-  const templates = kind === "mutation-rules" ? MUTATION_TEMPLATES : WORKFLOW_TEMPLATES;
+  const templates = kind === "mutation-rules" ? mutationTemplates : workflowTemplates;
   const currentTarget = scope === "app" ? null : target || null;
 
   React.useEffect(() => {
-    const nextTemplate = kind === "mutation-rules" ? DEFAULT_MUTATION_TEMPLATE : DEFAULT_WORKFLOW_TEMPLATE;
+    const nextTemplates = kind === "mutation-rules" ? mutationTemplates : workflowTemplates;
+    const nextTemplate = nextTemplates[0];
+    if (!nextTemplate) return;
     setTemplateId(nextTemplate.id);
     setDocumentText(formatJson(nextTemplate.document));
     setDescription(nextTemplate.description);
     setPreviewResult(null);
-  }, [kind]);
+  }, [kind, mutationTemplates, workflowTemplates]);
 
   function applyTemplate() {
     const template = templates.find((item) => item.id === templateId);
     if (!template) return;
     setDocumentText(formatJson(template.document));
     setDescription(template.description);
-    const dataType = typeof template.document.dataType === "string" ? template.document.dataType : firstDataType(schemas);
+    const doc = template.document as Record<string, unknown>;
+    const dataType = typeof doc.dataType === "string" ? doc.dataType : firstDataType(schemas);
     if (scope !== "app") setTarget(dataType);
   }
 
@@ -249,8 +268,9 @@ export function BusinessRulesPanel({
 
   async function saveDocument() {
     let document: Record<string, unknown>;
+    const documentLabel = kind === "mutation-rules" ? "MutationRuleDocument" : "WorkflowDocument";
     try {
-      document = parseJsonObject(documentText, kind === "mutation-rules" ? "MutationRuleDocument" : "WorkflowDocument");
+      document = parseJsonObject(documentText, documentLabel, t);
     } catch (err) {
       toast.error(String((err as Error).message));
       return;
@@ -264,8 +284,8 @@ export function BusinessRulesPanel({
         body: JSON.stringify({ scope, target: currentTarget, description, isActive, document })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(apiMessage(json, "保存失败"));
-      toast.success(kind === "mutation-rules" ? "Mutation Rule 已保存" : "Workflow 已保存");
+      if (!res.ok) throw new Error(apiMessage(json, t("common.saveFailed")));
+      toast.success(kind === "mutation-rules" ? t("business.mutationRuleSaved") : t("business.workflowSaved"));
       router.refresh();
     } catch (err) {
       toast.error(String((err as Error).message));
@@ -277,9 +297,10 @@ export function BusinessRulesPanel({
   async function previewDocument() {
     let document: Record<string, unknown>;
     let command: Record<string, unknown>;
+    const documentLabel = kind === "mutation-rules" ? "MutationRuleDocument" : "WorkflowDocument";
     try {
-      document = parseJsonObject(documentText, kind === "mutation-rules" ? "MutationRuleDocument" : "WorkflowDocument");
-      command = parseJsonObject(commandText, "CommandContext");
+      document = parseJsonObject(documentText, documentLabel, t);
+      command = parseJsonObject(commandText, "CommandContext", t);
     } catch (err) {
       toast.error(String((err as Error).message));
       return;
@@ -293,7 +314,7 @@ export function BusinessRulesPanel({
         body: JSON.stringify({ documents: [document], command })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(apiMessage(json, "Preview 失败"));
+      if (!res.ok) throw new Error(apiMessage(json, t("business.previewFailed")));
       setPreviewResult(json.data ?? json);
     } catch (err) {
       toast.error(String((err as Error).message));
@@ -304,9 +325,9 @@ export function BusinessRulesPanel({
 
   function scopeOptions() {
     return [
-      { value: "app", label: "App 默认" },
-      { value: "dataType", label: "DataType" },
-      { value: "record", label: "Record Override" }
+      { value: "app", label: t("business.scope.app") },
+      { value: "dataType", label: t("business.scope.dataType") },
+      { value: "record", label: t("business.scope.record") }
     ];
   }
 
@@ -314,25 +335,23 @@ export function BusinessRulesPanel({
     <div className="container-page py-8 space-y-6">
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">Business</h1>
-          <Badge tone="accent">Rules & Flow</Badge>
+          <h1 className="text-xl font-semibold tracking-tight">{t("business.title")}</h1>
+          <Badge tone="accent">{t("business.badge")}</Badge>
         </div>
-        <p className="max-w-3xl text-sm leading-6 text-ink-500 dark:text-slate-400">
-          这里管理业务分层中不属于 Policy 的部分：Mutation Rule 负责同记录派生字段，Workflow 负责状态机和业务动作。Policy 仍只负责授权判断。
-        </p>
+        <p className="max-w-3xl text-sm leading-6 text-ink-500 dark:text-slate-400">{t("business.description")}</p>
       </header>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Business Rules</CardTitle>
-            <CardDescription>使用模板快速生成文档，也可以直接编辑 JSON。</CardDescription>
+            <CardTitle>{t("business.rulesTitle")}</CardTitle>
+            <CardDescription>{t("business.rulesDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs value={kind} onValueChange={(value) => setKind(value as BusinessKind)}>
               <TabsList>
-                <TabsTrigger value="mutation-rules">Mutation Rules</TabsTrigger>
-                <TabsTrigger value="workflows">Workflows</TabsTrigger>
+                <TabsTrigger value="mutation-rules">{t("business.tab.mutationRules")}</TabsTrigger>
+                <TabsTrigger value="workflows">{t("business.tab.workflows")}</TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -340,7 +359,7 @@ export function BusinessRulesPanel({
               <Field label="Scope">
                 <Select value={scope} options={scopeOptions()} onValueChange={(value) => setScope(value as Scope)} />
               </Field>
-              <Field label="Target" help={scope === "app" ? "App scope 不需要 target" : "DataType 或 Record ID"}>
+              <Field label="Target" help={scope === "app" ? t("business.targetHelpApp") : t("business.targetHelpOther")}>
                 {scope === "dataType" && schemas.length > 0 ? (
                   <Select
                     value={target}
@@ -351,17 +370,20 @@ export function BusinessRulesPanel({
                   <Input value={scope === "app" ? "" : target} onChange={(event) => setTarget(event.target.value)} disabled={scope === "app"} />
                 )}
               </Field>
-              <Field label="状态">
+              <Field label={t("business.status")}>
                 <Select
                   value={isActive ? "active" : "disabled"}
-                  options={[{ value: "active", label: "Active" }, { value: "disabled", label: "Disabled" }]}
+                  options={[
+                    { value: "active", label: t("common.active") },
+                    { value: "disabled", label: t("common.disabled") }
+                  ]}
                   onValueChange={(value) => setIsActive(value === "active")}
                 />
               </Field>
             </div>
 
             <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-              <Field label="模板">
+              <Field label={t("business.template")}>
                 <Select
                   value={templateId}
                   options={templates.map((template) => ({ value: template.id, label: template.label }))}
@@ -371,12 +393,12 @@ export function BusinessRulesPanel({
               <div className="flex items-end">
                 <Button variant="secondary" onClick={applyTemplate} className="w-full md:w-auto">
                   <Wand2 />
-                  应用模板
+                  {t("business.applyTemplate")}
                 </Button>
               </div>
             </div>
 
-            <Field label="Description">
+            <Field label={t("common.description")}>
               <Input value={description} onChange={(event) => setDescription(event.target.value)} />
             </Field>
 
@@ -392,11 +414,11 @@ export function BusinessRulesPanel({
             <div className="flex flex-wrap gap-2">
               <Button onClick={saveDocument} loading={busy}>
                 <Save />
-                保存
+                {t("common.save")}
               </Button>
               <Button variant="secondary" onClick={previewDocument} loading={busy}>
                 <Play />
-                Preview
+                {t("common.preview")}
               </Button>
             </div>
           </CardContent>
@@ -405,13 +427,13 @@ export function BusinessRulesPanel({
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>已配置文档</CardTitle>
-              <CardDescription>点击任意文档可载入编辑区。</CardDescription>
+              <CardTitle>{t("business.configuredTitle")}</CardTitle>
+              <CardDescription>{t("business.configuredDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {rows.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-ink-200 px-4 py-8 text-center text-sm text-ink-500 dark:border-slate-700 dark:text-slate-400">
-                  暂无配置
+                  {t("business.empty")}
                 </div>
               ) : (
                 rows.map((row) => (
@@ -425,7 +447,7 @@ export function BusinessRulesPanel({
                       <span className="truncate font-mono text-xs text-ink-800 dark:text-slate-100">
                         {documentId(row.document, row.id)}
                       </span>
-                      <Badge tone={row.isActive ? "success" : "neutral"}>{row.isActive ? "active" : "disabled"}</Badge>
+                      <Badge tone={row.isActive ? "success" : "neutral"}>{row.isActive ? t("common.active") : t("common.disabled")}</Badge>
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1 text-2xs text-ink-500 dark:text-slate-400">
                       <span>{row.scope}</span>
@@ -441,8 +463,8 @@ export function BusinessRulesPanel({
 
           <Card>
             <CardHeader>
-              <CardTitle>Flow Simulator</CardTitle>
-              <CardDescription>用 CommandContext 预览当前文档对变更的影响。</CardDescription>
+              <CardTitle>{t("business.simulatorTitle")}</CardTitle>
+              <CardDescription>{t("business.simulatorDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Field label="CommandContext">
@@ -459,7 +481,7 @@ export function BusinessRulesPanel({
                 </pre>
               ) : (
                 <div className="rounded-lg border border-dashed border-ink-200 px-4 py-8 text-center text-sm text-ink-500 dark:border-slate-700 dark:text-slate-400">
-                  点击 Preview 后显示结果
+                  {t("business.simulatorEmpty")}
                 </div>
               )}
             </CardContent>

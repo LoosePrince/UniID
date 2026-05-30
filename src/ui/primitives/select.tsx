@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
+import { useI18n } from "@/ui/i18n";
 import { cn } from "./utils";
 
 export interface SelectOptionModel {
@@ -200,16 +201,18 @@ export const Select = React.forwardRef<React.ElementRef<typeof SelectPrimitive.T
       onValueChange,
       open,
       options,
-      placeholder = "请选择",
+      placeholder,
       required,
       value,
       ...triggerProps
     },
     ref
   ) {
+    const { t } = useI18n();
     const nativeOptions = React.useMemo(() => collectOptions(children), [children]);
     const entries = options ?? nativeOptions;
     const hasEntries = Boolean(options) || nativeOptions.length > 0;
+    const resolvedPlaceholder = placeholder ?? t("common.selectPlaceholder");
 
     function handleValueChange(nextValue: string) {
       onValueChange?.(nextValue);
@@ -233,7 +236,7 @@ export const Select = React.forwardRef<React.ElementRef<typeof SelectPrimitive.T
         dir={dir}
       >
         <SelectTrigger ref={ref} invalid={invalid} aria-required={required || undefined} className={className} {...triggerProps}>
-          <SelectValue placeholder={placeholder} />
+          <SelectValue placeholder={resolvedPlaceholder} />
         </SelectTrigger>
         <SelectContent className={contentClassName}>
           {hasEntries ? entries.map((entry) => renderEntry(entry)) : children}
