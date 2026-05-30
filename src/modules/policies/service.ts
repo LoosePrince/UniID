@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ApiError } from "@/shared/errors";
+import type { SupportedLocale } from "@/shared/i18n/config";
+import { translate } from "@/shared/i18n/core";
 import { prisma } from "@/shared/prisma";
 import {
   normalizePolicyDocument,
@@ -118,20 +120,20 @@ function buildActor(appId: string, actor: PolicyExplainInput["actor"]): AuthCont
   };
 }
 
-function migrationWarnings(document: PolicyDocument) {
+function migrationWarnings(document: PolicyDocument, locale: SupportedLocale) {
   const warnings: string[] = [];
   if ("version" in document && document.version === 2) {
-    warnings.push("document 已经是 v2，无需迁移");
+    warnings.push(translate(locale, "policy.migration.alreadyV2"));
     return warnings;
   }
 
   const legacy = document as LegacyPolicyDocument;
   if (legacy.default?.write && legacy.default.write.length > 0) {
-    warnings.push("v1 default.write 会作为兼容动作保留；新 UI 建议拆分为 create/update/set/push/increment/unset");
+    warnings.push(translate(locale, "policy.migration.defaultWriteKept"));
   }
   for (const [field, block] of Object.entries(legacy.fields ?? {})) {
     if (block.write && block.write.length > 0) {
-      warnings.push(`v1 fields.${field}.write 会作为兼容动作保留；新 UI 建议拆分为具体写动作`);
+      warnings.push(translate(locale, "policy.migration.fieldWriteKept", { field }));
     }
   }
   return warnings;
@@ -266,13 +268,13 @@ export class PolicyAdminService {
     };
   }
 
-  static async previewMigration(appId: string, input: PolicyPreviewMigrationInput) {
+  static async previewMigration(appId: string, input: PolicyPreviewMigrationInput, locale: SupportedLocale) {
     const source = input.document ?? (await this.loadSingleDocument(appId, input.scope ?? "app", normalizeTarget(input.scope ?? "app", input.target)));
     const parsed = parsePolicyDocument(source);
     return {
       source: parsed,
       normalized: normalizePolicyDocument(parsed),
-      warnings: migrationWarnings(parsed)
+      warnings: migrationWarnings(parsed, locale)
     };
   }
 

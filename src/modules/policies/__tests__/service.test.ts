@@ -12,6 +12,7 @@ vi.mock("@/shared/prisma", () => ({
 }));
 
 import { prisma } from "@/shared/prisma";
+import { createI18n } from "@/shared/i18n";
 import { PolicyAdminService } from "../service";
 
 type PolicyRow = {
@@ -136,11 +137,16 @@ describe("PolicyAdminService", () => {
   });
 
   it("previews migration from provided legacy document", async () => {
-    const preview = await PolicyAdminService.previewMigration("app1", {
-      document: { default: { read: ["$public"], write: ["$owner"] } }
-    });
+    const { t } = createI18n("zh-CN");
+    const preview = await PolicyAdminService.previewMigration(
+      "app1",
+      {
+        document: { default: { read: ["$public"], write: ["$owner"] } }
+      },
+      "zh-CN"
+    );
 
     expect(preview.normalized.version).toBe(2);
-    expect(preview.warnings).toContain("v1 default.write 会作为兼容动作保留；新 UI 建议拆分为 create/update/set/push/increment/unset");
+    expect(preview.warnings).toContain(t("policy.migration.defaultWriteKept"));
   });
 });
