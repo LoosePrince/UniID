@@ -123,6 +123,7 @@ jobs:
         env:
           PAGES_OUT: _site
           PAGES_PREV: _pages_prev
+          PAGES_BASE_PATH: /${{ github.event.repository.name }}/
           PACK_ON_VERSION: "1"
           FORCE_OVERWRITE: ${{ github.event_name == 'workflow_dispatch' && inputs.force_overwrite == true && '1' || '' }}
         run: node scripts/prepare-sdk-pages.mjs
