@@ -14,6 +14,9 @@ function buildConfig(endpoint: string | undefined): S3ClientConfig {
     region: c.S3_REGION,
     forcePathStyle: c.S3_FORCE_PATH_STYLE,
     endpoint: endpoint || undefined,
+  // 避免 presigned GetObject URL 附带 x-amz-checksum-mode（部分 S3 兼容网关未实现该校验）
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
     credentials:
       c.S3_ACCESS_KEY && c.S3_SECRET_KEY
         ? { accessKeyId: c.S3_ACCESS_KEY, secretAccessKey: c.S3_SECRET_KEY }
