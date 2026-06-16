@@ -1,7 +1,16 @@
+const isLowMemBuild = process.env.UNIID_LOW_MEM_BUILD === "1";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  ...(isLowMemBuild
+    ? {
+        eslint: { ignoreDuringBuilds: true },
+        typescript: { ignoreBuildErrors: true },
+      }
+    : {}),
   experimental: {
+    ...(isLowMemBuild ? { cpus: 1 } : {}),
     // QuickJS sandbox runs as wasm; allow large bodies for file uploads.
     // node-cron 内部用到 worker_threads/child_process，不能让 webpack 静态打包。
     serverComponentsExternalPackages: [
@@ -16,6 +25,12 @@ const nextConfig = {
     instrumentationHook: true,
   },
   webpack: (config, { isServer }) => {
+    if (isLowMemBuild) {
+      config.parallelism = 1;
+      if (config.cache && typeof config.cache === "object") {
+        config.cache = { ...config.cache, maxMemoryGenerations: 1 };
+      }
+    }
     if (isServer) {
       const externals = Array.isArray(config.externals)
         ? config.externals
