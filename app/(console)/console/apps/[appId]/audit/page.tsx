@@ -1,27 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Activity, Clock3, Filter, Network, Search, UserRound } from "lucide-react";
 import { normalizeLocale, createI18n } from "@/shared/i18n";
 import { requireConsoleAuth } from "@/shared/iam";
 import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
 import { AuditService } from "@/shared/audit";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableShell
-} from "@/ui/primitives";
+import { Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input } from "@/ui/primitives";
 
 interface PageProps {
   params: { appId: string };
@@ -42,12 +27,12 @@ function toEpoch(value: string | undefined, endOfDay = false): number | undefine
   return Math.floor(date.getTime() / 1000);
 }
 
-function preview(value: string | null | undefined) {
+function preview(value: string | null | undefined, limit = 900) {
   if (!value) return "";
   try {
-    return JSON.stringify(JSON.parse(value), null, 2).slice(0, 600);
+    return JSON.stringify(JSON.parse(value), null, 2).slice(0, limit);
   } catch {
-    return value.slice(0, 600);
+    return value.slice(0, limit);
   }
 }
 
@@ -60,9 +45,17 @@ function filterHref(appId: string, patch: Record<string, string | undefined>) {
   return `/console/apps/${appId}/audit${suffix ? `?${suffix}` : ""}`;
 }
 
+function actionTone(action: string): "success" | "warning" | "danger" | "neutral" | "accent" {
+  if (/\b(delete|revoke|disable|destroy|abort)\b/i.test(action)) return "danger";
+  if (/\b(create|upload|enable|verify|restore)\b/i.test(action)) return "success";
+  if (/\b(update|rotate|patch|migrate)\b/i.test(action)) return "warning";
+  if (/\b(login|auth|session)\b/i.test(action)) return "accent";
+  return "neutral";
+}
+
 export default async function AuditPage({ params, searchParams }: PageProps) {
   const auth = await requireConsoleAuth();
-  const { t, formatDateTime } = createI18n(normalizeLocale(auth.user.locale));
+  const { t, formatDateTime, formatNumber } = createI18n(normalizeLocale(auth.user.locale));
   const app = await prisma.app.findUnique({
     where: { id: params.appId },
     include: { admins: true }
@@ -96,113 +89,163 @@ export default async function AuditPage({ params, searchParams }: PageProps) {
     limit
   });
   const nextCursor = logs.length === limit ? logs[logs.length - 1]?.id : undefined;
+  const activeFilterCount = Object.entries(filters).filter(([key, value]) => key !== "cursor" && Boolean(value)).length;
+  const resourceTypes = Array.from(new Set(logs.map((log) => log.resourceType))).slice(0, 8);
 
   return (
     <div className="container-page py-8 space-y-6">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">{t("common.auditLogs")}</h1>
-        <p className="text-sm text-ink-500 mt-1">{t("page.audit.description")}</p>
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">{t("common.auditLogs")}</h1>
+          <p className="mt-1 text-sm text-ink-500 dark:text-slate-400">{t("page.audit.description")}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={activeFilterCount > 0 ? "accent" : "neutral"}>
+            {activeFilterCount > 0 ? t("page.audit.filters", { count: formatNumber(activeFilterCount) }) : t("page.audit.unfiltered")}
+          </Badge>
+          <Badge tone="neutral">{t("page.audit.loaded", { count: formatNumber(logs.length) })}</Badge>
+        </div>
       </header>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t("page.audit.filterTitle")}</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Filter className="h-4 w-4" />
+            {t("page.audit.filterTitle")}
+          </CardTitle>
           <CardDescription>{t("page.audit.filterDescription")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form className="grid gap-3 lg:grid-cols-6">
-            <Input className="lg:col-span-2" name="q" defaultValue={filters.q} placeholder={t("page.audit.searchPlaceholder")} />
-            <Input name="action" defaultValue={filters.action} placeholder={t("page.audit.actionPlaceholder")} />
-            <Input name="resourceType" defaultValue={filters.resourceType} placeholder={t("page.audit.resourceTypePlaceholder")} />
-            <Input name="resourceId" defaultValue={filters.resourceId} placeholder={t("page.audit.resourceIdPlaceholder")} />
-            <Input name="userId" defaultValue={filters.userId} placeholder={t("page.audit.userIdPlaceholder")} />
-            <label className="grid gap-1 text-xs text-ink-500">
+        <CardContent className="space-y-4">
+          <form className="grid gap-3 lg:grid-cols-12">
+            <label className="relative block lg:col-span-4">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400 dark:text-slate-500" />
+              <Input className="pl-9" name="q" defaultValue={filters.q} placeholder={t("page.audit.searchPlaceholder")} />
+            </label>
+            <Input className="lg:col-span-2" name="action" defaultValue={filters.action} placeholder={t("page.audit.actionPlaceholder")} />
+            <Input
+              className="lg:col-span-2"
+              name="resourceType"
+              defaultValue={filters.resourceType}
+              placeholder={t("page.audit.resourceTypePlaceholder")}
+            />
+            <Input className="lg:col-span-2" name="resourceId" defaultValue={filters.resourceId} placeholder={t("page.audit.resourceIdPlaceholder")} />
+            <Input className="lg:col-span-2" name="userId" defaultValue={filters.userId} placeholder={t("page.audit.userIdPlaceholder")} />
+            <label className="grid gap-1 text-xs text-ink-500 dark:text-slate-400 lg:col-span-2">
               {t("page.audit.fromLabel")}
               <Input type="date" name="from" defaultValue={filters.from} />
             </label>
-            <label className="grid gap-1 text-xs text-ink-500">
+            <label className="grid gap-1 text-xs text-ink-500 dark:text-slate-400 lg:col-span-2">
               {t("page.audit.toLabel")}
               <Input type="date" name="to" defaultValue={filters.to} />
             </label>
-            <div className="flex items-end gap-2 lg:col-span-4">
+            <div className="flex items-end gap-2 lg:col-span-8">
               <Button type="submit">{t("page.audit.apply")}</Button>
               <Button asChild type="button" variant="ghost">
                 <Link href={`/console/apps/${app.id}/audit`}>{t("page.audit.reset")}</Link>
               </Button>
             </div>
           </form>
+
+          {resourceTypes.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {resourceTypes.map((type) => (
+                <Button key={type} asChild size="xs" variant={filters.resourceType === type ? "secondary" : "outline"}>
+                  <Link href={filterHref(app.id, { ...filters, resourceType: type, cursor: undefined })}>{type}</Link>
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t("page.audit.resultsTitle")}</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4" />
+            {t("page.audit.resultsTitle")}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {logs.length === 0 ? (
-            <div className="py-12 text-center text-sm text-ink-500">{t("page.audit.empty")}</div>
+            <div className="rounded-lg border border-dashed border-ink-200/80 py-12 text-center text-sm text-ink-500 dark:border-slate-700 dark:text-slate-400">
+              {t("page.audit.empty")}
+            </div>
           ) : (
-            <TableShell>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("page.audit.colTime")}</TableHead>
-                    <TableHead>{t("page.audit.colAction")}</TableHead>
-                    <TableHead>{t("page.audit.colResource")}</TableHead>
-                    <TableHead>{t("page.audit.colActor")}</TableHead>
-                    <TableHead>{t("page.audit.colChange")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap text-xs">{formatDateTime(log.createdAt)}</TableCell>
-                      <TableCell>
-                        <Badge tone="neutral">{log.action}</Badge>
-                        {(log.ip || log.requestId) && (
-                          <div className="mt-1 text-2xs text-ink-400">
-                            {t("page.audit.network")}: {[log.ip, log.requestId].filter(Boolean).join(" · ")}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[220px]">
-                        <div className="font-mono text-xs text-ink-800 dark:text-slate-200">{log.resourceType}</div>
-                        {log.resourceId && <div className="truncate font-mono text-2xs text-ink-400">{log.resourceId}</div>}
-                      </TableCell>
-                      <TableCell className="max-w-[180px] truncate font-mono text-xs">
-                        {log.userId ?? "system"}
-                      </TableCell>
-                      <TableCell className="max-w-[420px]">
-                        <div className="grid gap-2 text-2xs lg:grid-cols-2">
-                          {log.before && (
-                            <div className="min-w-0 rounded-md bg-cream-100/70 p-2 dark:bg-slate-800/70">
-                              <div className="mb-1 font-medium text-ink-500">{t("page.audit.before")}</div>
-                              <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono">{preview(log.before)}</pre>
-                            </div>
-                          )}
-                          {log.after && (
-                            <div className="min-w-0 rounded-md bg-cream-100/70 p-2 dark:bg-slate-800/70">
-                              <div className="mb-1 font-medium text-ink-500">{t("page.audit.after")}</div>
-                              <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono">{preview(log.after)}</pre>
-                            </div>
-                          )}
+            <div className="space-y-3">
+              {logs.map((log) => (
+                <article
+                  key={log.id}
+                  className="grid gap-4 rounded-lg border border-ink-100 bg-white/45 p-4 dark:border-slate-700/70 dark:bg-slate-900/30 lg:grid-cols-[minmax(220px,0.72fr)_minmax(0,1fr)]"
+                >
+                  <div className="min-w-0 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone={actionTone(log.action)}>{log.action}</Badge>
+                      <Badge tone="neutral">{log.resourceType}</Badge>
+                    </div>
+                    <div className="space-y-1 text-xs text-ink-500 dark:text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {formatDateTime(log.createdAt)}
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserRound className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate font-mono">{log.userId ?? "system"}</span>
+                      </div>
+                      {(log.ip || log.requestId) && (
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Network className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate font-mono">{[log.ip, log.requestId].filter(Boolean).join(" / ")}</span>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableShell>
+                      )}
+                    </div>
+                    {log.resourceId ? (
+                      <Link
+                        className="block truncate font-mono text-2xs text-accent-600 hover:underline dark:text-accent-300"
+                        href={filterHref(app.id, { ...filters, resourceId: log.resourceId, cursor: undefined })}
+                      >
+                        {log.resourceId}
+                      </Link>
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0">
+                    {!log.before && !log.after ? (
+                      <div className="rounded-md border border-ink-100 bg-cream-50/70 px-3 py-6 text-center text-xs text-ink-400 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-500">
+                        {t("page.audit.noPayload")}
+                      </div>
+                    ) : (
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        {log.before ? <PayloadBlock title={t("page.audit.before")} value={preview(log.before)} /> : null}
+                        {log.after ? <PayloadBlock title={t("page.audit.after")} value={preview(log.after)} /> : null}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
           {nextCursor && (
-            <div className="mt-3 flex justify-end">
-              <Button asChild variant="ghost">
-                <Link href={filterHref(app.id, { ...filters, cursor: nextCursor })}>Next</Link>
+            <div className="mt-4 flex justify-end">
+              <Button asChild variant="outline">
+                <Link href={filterHref(app.id, { ...filters, cursor: nextCursor })}>{t("page.audit.nextPage")}</Link>
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function PayloadBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <details className="group min-w-0 rounded-md border border-ink-100 bg-cream-50/70 p-3 dark:border-slate-700 dark:bg-slate-950/30" open>
+      <summary className="cursor-pointer text-xs font-medium text-ink-600 marker:text-ink-400 dark:text-slate-300">
+        {title}
+      </summary>
+      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words font-mono text-2xs leading-5 text-ink-700 dark:text-slate-300">
+        {value}
+      </pre>
+    </details>
   );
 }

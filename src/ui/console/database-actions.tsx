@@ -7,12 +7,14 @@ import {
   Copy,
   Database,
   Eye,
+  Filter,
   HardDrive,
   KeyRound,
   Plus,
   RefreshCw,
   RotateCcw,
   Save,
+  Search,
   Table2,
   Trash2,
   UploadCloud,
@@ -165,6 +167,7 @@ interface TableInfo {
 
 const DEFAULT_SQL = "select sqlite_version() as version";
 const EMPTY_JSON = "{\n  \n}";
+type DatabaseStatusFilter = "all" | "active" | "disabled" | "deleted";
 
 function apiMessage(json: ApiErrorResponse, fallback: string) {
   return json.error?.message ?? fallback;
@@ -177,24 +180,31 @@ function statusTone(status: string): "success" | "warning" | "danger" | "neutral
   return "neutral";
 }
 
+function databaseStatusLabel(status: string, t: (key: string) => string) {
+  if (status === "active") return t("appDatabases.status.active");
+  if (status === "disabled") return t("appDatabases.status.disabled");
+  if (status === "deleted") return t("appDatabases.status.deleted");
+  return status;
+}
+
 function asPrettyJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
-function parseJsonValue(source: string, fallback: unknown, label: string) {
+function parseJsonValue(source: string, fallback: unknown, label: string, invalidMessage?: string) {
   const trimmed = source.trim();
   if (!trimmed) return fallback;
   try {
     return JSON.parse(trimmed) as unknown;
   } catch {
-    throw new Error(`${label} must be valid JSON.`);
+    throw new Error(invalidMessage ?? `${label} must be valid JSON.`);
   }
 }
 
-function parseJsonObject(source: string, label: string) {
-  const parsed = parseJsonValue(source, {}, label);
+function parseJsonObject(source: string, label: string, invalidMessage?: string, objectMessage?: string) {
+  const parsed = parseJsonValue(source, {}, label, invalidMessage);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON object.`);
+    throw new Error(objectMessage ?? `${label} must be a JSON object.`);
   }
   return parsed as Record<string, unknown>;
 }
@@ -204,16 +214,22 @@ function truncate(value: string | null | undefined, length = 100) {
   return value.length > length ? `${value.slice(0, length)}...` : value;
 }
 
-function databaseOptions(databases: DatabaseSummary[]) {
+function databaseOptions(databases: DatabaseSummary[], t: (key: string) => string) {
   return databases.map((db) => ({
     value: db.id,
-    label: `${db.name} (${db.status})`,
+    label: `${db.name} (${databaseStatusLabel(db.status, t)})`,
     disabled: db.status !== "active" || Boolean(db.deletedAt)
   }));
 }
 
 async function readJson<T>(res: Response): Promise<T> {
   return (await res.json().catch(() => ({}))) as T;
+}
+
+function matchesDatabaseStatus(database: DatabaseSummary, filter: DatabaseStatusFilter) {
+  if (filter === "all") return true;
+  if (filter === "deleted") return database.status === "deleted" || Boolean(database.deletedAt);
+  return database.status === filter && !database.deletedAt;
 }
 
 export function DatabasesWorkspace({
@@ -233,6 +249,8 @@ export function DatabasesWorkspace({
   const router = useRouter();
   const [databases, setDatabases] = React.useState(initialDatabases);
   const [selectedId, setSelectedId] = React.useState(initialDatabases[0]?.id ?? "");
+  const [query, setQuery] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<DatabaseStatusFilter>("all");
   const [secret, setSecret] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -242,7 +260,24 @@ export function DatabasesWorkspace({
     if (!selectedId && initialDatabases[0]) setSelectedId(initialDatabases[0].id);
   }, [initialDatabases, selectedId]);
 
-  const selected = databases.find((db) => db.id === selectedId) ?? databases[0] ?? null;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredDatabases = React.useMemo(
+    () =>
+      databases.filter((database) => {
+        const haystack = [database.name, database.filename, database.status, database.note, database.id].filter(Boolean).join(" ").toLowerCase();
+        return matchesDatabaseStatus(database, statusFilter) && (!normalizedQuery || haystack.includes(normalizedQuery));
+      }),
+    [databases, normalizedQuery, statusFilter]
+  );
+
+  React.useEffect(() => {
+    if (filteredDatabases.length === 0) return;
+    if (!filteredDatabases.some((database) => database.id === selectedId)) {
+      setSelectedId(filteredDatabases[0]?.id ?? "");
+    }
+  }, [filteredDatabases, selectedId]);
+
+  const selected = filteredDatabases.find((db) => db.id === selectedId) ?? filteredDatabases[0] ?? null;
 
   async function refreshList(nextSelectedId?: string) {
     const res = await fetch(`/api/v1/apps/${appId}/databases`, { credentials: "include" });
@@ -271,7 +306,7 @@ export function DatabasesWorkspace({
       }
       setSecret(json.secret ?? null);
       await refreshList(json.database.id);
-      toast.success("Database created", { description: json.database.name });
+      toast.success(t("appDatabases.toast.created"), { description: json.database.name });
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
@@ -343,7 +378,7 @@ export function DatabasesWorkspace({
       const json = await readJson<ApiErrorResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
       await refreshList();
-      toast.success(permanent ? "Database permanently deleted" : "Database deleted");
+      toast.success(permanent ? t("appDatabases.toast.permanentlyDeleted") : t("appDatabases.toast.deleted"));
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
@@ -370,7 +405,7 @@ export function DatabasesWorkspace({
       }
       setSecret(json.secret);
       await refreshList(databaseId);
-      toast.success("Database key rotated", { description: json.key?.prefix });
+      toast.success(t("appDatabases.toast.keyRotated"), { description: json.key?.prefix });
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
@@ -394,7 +429,7 @@ export function DatabasesWorkspace({
       const json = await readJson<ApiErrorResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
       await refreshList(databaseId);
-      toast.success("Database key revoked");
+      toast.success(t("appDatabases.toast.keyRevoked"));
       router.refresh();
     } catch (err) {
       const message = String((err as Error).message ?? err);
@@ -414,8 +449,8 @@ export function DatabasesWorkspace({
     <div className="space-y-5">
       {secret ? (
         <Callout tone="warning">
-          <CalloutTitle>New database key secret</CalloutTitle>
-          <CalloutDescription>完整 key 只显示这一次，后续只能轮换生成新 key。</CalloutDescription>
+          <CalloutTitle>{t("appDatabases.secretTitle")}</CalloutTitle>
+          <CalloutDescription>{t("appDatabases.secretDescription")}</CalloutDescription>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             <code className="min-w-0 flex-1 overflow-x-auto rounded-md border border-warning-500/20 bg-white/70 px-3 py-2 font-mono text-xs dark:bg-slate-900/40">
               {secret}
@@ -442,8 +477,13 @@ export function DatabasesWorkspace({
           <CreateDatabasePanel onCreate={createDatabase} busy={busy === "create"} />
           <DatabaseList
             databases={databases}
+            filteredDatabases={filteredDatabases}
             selectedId={selected?.id ?? ""}
             onSelect={setSelectedId}
+            query={query}
+            onQueryChange={setQuery}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
             formatDateTime={formatDateTime}
           />
         </div>
@@ -451,21 +491,21 @@ export function DatabasesWorkspace({
         <div className="min-w-0">
           {selected ? (
             <Tabs defaultValue="overview" className="space-y-4">
-              <TabsList className="flex flex-wrap">
+              <TabsList className="flex w-full max-w-full overflow-x-auto">
                 <TabsTrigger value="overview">
-                  <HardDrive className="mr-2 h-4 w-4" /> Overview
+                  <HardDrive className="mr-2 h-4 w-4" /> {t("appDatabases.tab.overview")}
                 </TabsTrigger>
                 <TabsTrigger value="sql">
                   <Code2 className="mr-2 h-4 w-4" /> SQL
                 </TabsTrigger>
                 <TabsTrigger value="tables">
-                  <Table2 className="mr-2 h-4 w-4" /> Tables
+                  <Table2 className="mr-2 h-4 w-4" /> {t("appDatabases.tab.tables")}
                 </TabsTrigger>
                 <TabsTrigger value="migrate">
-                  <UploadCloud className="mr-2 h-4 w-4" /> Migrate
+                  <UploadCloud className="mr-2 h-4 w-4" /> {t("appDatabases.tab.migrate")}
                 </TabsTrigger>
                 <TabsTrigger value="audit">
-                  <Eye className="mr-2 h-4 w-4" /> Audit
+                  <Eye className="mr-2 h-4 w-4" /> {t("appDatabases.tab.audit")}
                 </TabsTrigger>
               </TabsList>
 
@@ -476,7 +516,7 @@ export function DatabasesWorkspace({
                   busy={busy}
                   onPatch={patchDatabase}
                   onDelete={deleteDatabase}
-                  onRestore={(databaseId) => postDatabaseAction(databaseId, "restore", "restore", "Database restored")}
+                  onRestore={(databaseId) => postDatabaseAction(databaseId, "restore", "restore", t("appDatabases.toast.restored"))}
                   onRotateKey={rotateKey}
                   onRevokeKey={revokeKey}
                   formatDateTime={formatDateTime}
@@ -510,7 +550,7 @@ export function DatabasesWorkspace({
           ) : (
             <Card>
               <CardContent className="py-14 text-center text-sm text-ink-500">
-                Create a database to unlock SQL console, table browser, keys, and migration tools.
+                {databases.length === 0 ? t("appDatabases.emptyHint") : t("appDatabases.noMatchHint")}
               </CardContent>
             </Card>
           )}
@@ -527,6 +567,7 @@ function CreateDatabasePanel({
   onCreate: (input: { name: string; note?: string; createKey: boolean; keyLabel?: string }) => Promise<void>;
   busy: boolean;
 }) {
+  const { t } = useI18n();
   const [name, setName] = React.useState("");
   const [note, setNote] = React.useState("");
   const [keyLabel, setKeyLabel] = React.useState("default");
@@ -549,30 +590,30 @@ function CreateDatabasePanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Create database</CardTitle>
-        <CardDescription>每个数据库对应一个独立 SQLite 文件。</CardDescription>
+        <CardTitle className="text-base">{t("appDatabases.createTitle")}</CardTitle>
+        <CardDescription>{t("appDatabases.createDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
-          <Field htmlFor="database-name" label="Name" required>
+          <Field htmlFor="database-name" label={t("common.name")} required>
             <Input id="database-name" required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field htmlFor="database-note" label="Note">
+          <Field htmlFor="database-note" label={t("appDatabases.note")}>
             <Input id="database-note" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field htmlFor="database-create-key" label="Initial key">
+            <Field htmlFor="database-create-key" label={t("appDatabases.initialKey")}>
               <Select
                 id="database-create-key"
                 value={createKey}
                 onValueChange={setCreateKey}
                 options={[
-                  { value: "true", label: "Generate" },
-                  { value: "false", label: "Skip" }
+                  { value: "true", label: t("appDatabases.generate") },
+                  { value: "false", label: t("appDatabases.skip") }
                 ]}
               />
             </Field>
-            <Field htmlFor="database-key-label" label="Key label">
+            <Field htmlFor="database-key-label" label={t("appDatabases.keyLabel")}>
               <Input
                 id="database-key-label"
                 maxLength={80}
@@ -582,8 +623,8 @@ function CreateDatabasePanel({
               />
             </Field>
           </div>
-          <Button type="submit" loading={busy} loadingText="Creating..." disabled={!name.trim()}>
-            <Plus /> Create
+          <Button type="submit" loading={busy} loadingText={t("common.creating")} disabled={!name.trim()}>
+            <Plus /> {t("common.create")}
           </Button>
         </form>
       </CardContent>
@@ -593,28 +634,78 @@ function CreateDatabasePanel({
 
 function DatabaseList({
   databases,
+  filteredDatabases,
   selectedId,
   onSelect,
+  query,
+  onQueryChange,
+  statusFilter,
+  onStatusFilterChange,
   formatDateTime
 }: {
   databases: DatabaseSummary[];
+  filteredDatabases: DatabaseSummary[];
   selectedId: string;
   onSelect: (id: string) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  statusFilter: DatabaseStatusFilter;
+  onStatusFilterChange: (status: DatabaseStatusFilter) => void;
   formatDateTime: (value: number | string | Date) => string;
 }) {
+  const { t, formatNumber } = useI18n();
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Databases</CardTitle>
-        <CardDescription>{databases.length} SQLite assets</CardDescription>
+        <CardTitle className="text-base">{t("appDatabases.listTitle")}</CardTitle>
+        <CardDescription>
+          {t("appDatabases.listSummary", {
+            shown: formatNumber(filteredDatabases.length),
+            total: formatNumber(databases.length)
+          })}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400 dark:text-slate-500" />
+            <Input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              className="pl-9"
+              placeholder={t("appDatabases.searchPlaceholder")}
+            />
+          </label>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => onStatusFilterChange(value as DatabaseStatusFilter)}
+              aria-label={t("appDatabases.statusFilter")}
+              options={[
+                { value: "all", label: t("appDatabases.statusAll") },
+                { value: "active", label: databaseStatusLabel("active", t) },
+                { value: "disabled", label: databaseStatusLabel("disabled", t) },
+                { value: "deleted", label: databaseStatusLabel("deleted", t) }
+              ]}
+            />
+            <div className="flex items-center gap-1.5 text-xs text-ink-500 dark:text-slate-400">
+              <Filter className="h-3.5 w-3.5" />
+              {formatNumber(filteredDatabases.length)}
+            </div>
+          </div>
+        </div>
+
         {databases.length === 0 ? (
           <div className="rounded-md border border-ink-100 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">
-            No databases yet.
+            {t("appDatabases.empty")}
           </div>
         ) : null}
-        {databases.map((db) => (
+        {databases.length > 0 && filteredDatabases.length === 0 ? (
+          <div className="rounded-md border border-dashed border-ink-200/80 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">
+            {t("appDatabases.noMatch")}
+          </div>
+        ) : null}
+        {filteredDatabases.map((db) => (
           <button
             key={db.id}
             type="button"
@@ -628,10 +719,12 @@ function DatabaseList({
           >
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate font-medium">{db.name}</span>
-              <Badge tone={statusTone(db.status)}>{db.status}</Badge>
+              <Badge tone={statusTone(db.status)}>{databaseStatusLabel(db.status, t)}</Badge>
             </div>
             <div className="mt-1 truncate font-mono text-2xs text-ink-400">{db.filename}</div>
-            <div className="mt-2 text-2xs text-ink-500">Updated {formatDateTime(db.updatedAt)}</div>
+            <div className="mt-2 text-2xs text-ink-500" suppressHydrationWarning>
+              {t("appDatabases.updatedAt", { time: formatDateTime(db.updatedAt) })}
+            </div>
           </button>
         ))}
       </CardContent>
@@ -662,6 +755,7 @@ function DatabaseOverview({
   formatDateTime: (value: number | string | Date) => string;
   formatBytes: (value: number, options?: { decimals?: number }) => string;
 }) {
+  const { t } = useI18n();
   const [stats, setStats] = React.useState<StatsResponse["stats"] | null>(null);
   const [statsError, setStatsError] = React.useState<string | null>(null);
   const [statsBusy, setStatsBusy] = React.useState(false);
@@ -709,24 +803,34 @@ function DatabaseOverview({
     setEditOpen(false);
   }
 
+  const [requestOrigin, setRequestOrigin] = React.useState("<origin>");
+  React.useEffect(() => {
+    setRequestOrigin(window.location.origin);
+  }, []);
+
   const sampleKey = database.keys?.find((key) => !key.revokedAt);
-  const curl = `curl -X POST ${typeof window === "undefined" ? "" : window.location.origin}/api/query \\\n  -H "Authorization: Bearer <lsq_database_key>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"sql":"select sqlite_version() as version","mode":"read"}'`;
+  const curl = `curl -X POST ${requestOrigin}/api/query \\\n  -H "Authorization: Bearer <lsq_database_key>" \\\n  -H "Content-Type: application/json" \\\n  -d '{"sql":"select sqlite_version() as version","mode":"read"}'`;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <MetricCard icon={HardDrive} label="File size" value={statsBusy ? "Loading..." : stats ? formatBytes(stats.sizeBytes) : "—"} />
-        <MetricCard icon={Table2} label="Tables" value={stats ? String(stats.tableCount) : "—"} />
+        <MetricCard
+          icon={HardDrive}
+          label={t("appDatabases.metric.fileSize")}
+          value={statsBusy ? t("appDatabases.loading") : stats ? formatBytes(stats.sizeBytes) : "—"}
+        />
+        <MetricCard icon={Table2} label={t("appDatabases.metric.tables")} value={stats ? String(stats.tableCount) : "—"} />
         <MetricCard
           icon={Database}
-          label="Last access"
-          value={database.lastAccessAt ? formatDateTime(database.lastAccessAt) : "Never"}
+          label={t("appDatabases.metric.lastAccess")}
+          value={database.lastAccessAt ? formatDateTime(database.lastAccessAt) : t("appDatabases.never")}
+          valueHydrationSafe
         />
       </div>
 
       {statsError ? (
         <Callout tone="danger">
-          <CalloutTitle>Stats unavailable</CalloutTitle>
+          <CalloutTitle>{t("appDatabases.statsUnavailable")}</CalloutTitle>
           <CalloutDescription>{statsError}</CalloutDescription>
         </Callout>
       ) : null}
@@ -738,32 +842,32 @@ function DatabaseOverview({
               <CardTitle className="text-base">{database.name}</CardTitle>
               <CardDescription className="font-mono">{database.id}</CardDescription>
             </div>
-            <Badge tone={statusTone(database.status)}>{database.status}</Badge>
+            <Badge tone={statusTone(database.status)}>{databaseStatusLabel(database.status, t)}</Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
-            <InfoLine label="Filename" value={database.filename} mono />
-            <InfoLine label="Created" value={formatDateTime(database.createdAt)} />
-            <InfoLine label="Updated" value={formatDateTime(database.updatedAt)} />
-            <InfoLine label="Deleted" value={database.deletedAt ? formatDateTime(database.deletedAt) : "—"} />
+            <InfoLine label={t("appDatabases.filename")} value={database.filename} mono />
+            <InfoLine label={t("appDatabases.created")} value={formatDateTime(database.createdAt)} hydrationSafe />
+            <InfoLine label={t("appDatabases.updated")} value={formatDateTime(database.updatedAt)} hydrationSafe />
+            <InfoLine label={t("appDatabases.deleted")} value={database.deletedAt ? formatDateTime(database.deletedAt) : "—"} hydrationSafe />
           </div>
           {database.note ? <p className="text-sm text-ink-600 dark:text-slate-300">{database.note}</p> : null}
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
-              <Save /> Edit
+              <Save /> {t("common.edit")}
             </Button>
             {database.status === "deleted" || database.deletedAt ? (
               <Button variant="outline" size="sm" loading={busy === "restore"} onClick={() => onRestore(database.id)}>
-                <RotateCcw /> Restore
+                <RotateCcw /> {t("appDatabases.restore")}
               </Button>
             ) : (
               <Button variant="danger" size="sm" loading={busy === "delete"} onClick={() => onDelete(database.id)}>
-                <Trash2 /> Soft delete
+                <Trash2 /> {t("appDatabases.softDelete")}
               </Button>
             )}
             <Button variant="danger" size="sm" loading={busy === "permanent"} onClick={() => onDelete(database.id, true)}>
-              <XCircle /> Permanent delete
+              <XCircle /> {t("appDatabases.permanentDelete")}
             </Button>
           </div>
         </CardContent>
@@ -771,30 +875,30 @@ function DatabaseOverview({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Database keys</CardTitle>
-          <CardDescription>外部接口使用 `Authorization: Bearer lsq_...` 访问对应数据库。</CardDescription>
+          <CardTitle className="text-base">{t("appDatabases.keysTitle")}</CardTitle>
+          <CardDescription>{t("appDatabases.keysDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Input value={keyLabel} maxLength={80} onChange={(e) => setKeyLabel(e.target.value)} aria-label="New key label" />
+            <Input value={keyLabel} maxLength={80} onChange={(e) => setKeyLabel(e.target.value)} aria-label={t("appDatabases.newKeyLabel")} />
             <Button size="sm" loading={busy === "rotate-key"} onClick={() => onRotateKey(database.id, undefined, keyLabel)}>
-              <KeyRound /> Create / rotate key
+              <KeyRound /> {t("appDatabases.createRotateKey")}
             </Button>
           </div>
           {(database.keys ?? []).length === 0 ? (
             <div className="rounded-md border border-ink-100 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">
-              No keys yet.
+              {t("appDatabases.noKeys")}
             </div>
           ) : (
             <TableShell>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Prefix</TableHead>
-                    <TableHead>Last used</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("appDatabases.key.label")}</TableHead>
+                    <TableHead>{t("appDatabases.key.prefix")}</TableHead>
+                    <TableHead>{t("appDatabases.key.lastUsed")}</TableHead>
+                    <TableHead>{t("common.status")}</TableHead>
+                    <TableHead className="text-right">{t("appDatabases.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -802,9 +906,13 @@ function DatabaseOverview({
                     <TableRow key={key.id}>
                       <TableCell>{key.label}</TableCell>
                       <TableCell className="font-mono text-xs">{key.prefix}...</TableCell>
-                      <TableCell className="text-xs">{key.lastUsedAt ? formatDateTime(key.lastUsedAt) : "Never"}</TableCell>
+                      <TableCell className="text-xs" suppressHydrationWarning>
+                        {key.lastUsedAt ? formatDateTime(key.lastUsedAt) : t("appDatabases.never")}
+                      </TableCell>
                       <TableCell>
-                        <Badge tone={key.revokedAt ? "danger" : "success"}>{key.revokedAt ? "revoked" : "active"}</Badge>
+                        <Badge tone={key.revokedAt ? "danger" : "success"}>
+                          {key.revokedAt ? t("appDatabases.status.revoked") : t("appDatabases.status.active")}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1.5">
@@ -814,7 +922,7 @@ function DatabaseOverview({
                             loading={busy === "rotate-key"}
                             onClick={() => onRotateKey(database.id, key.id, key.label)}
                           >
-                            <RefreshCw /> Rotate
+                            <RefreshCw /> {t("appDatabases.rotate")}
                           </Button>
                           <Button
                             size="xs"
@@ -823,7 +931,7 @@ function DatabaseOverview({
                             loading={busy === "revoke-key"}
                             onClick={() => onRevokeKey(database.id, key.id)}
                           >
-                            Revoke
+                            {t("common.revoke")}
                           </Button>
                         </div>
                       </TableCell>
@@ -838,8 +946,8 @@ function DatabaseOverview({
           </pre>
           {!sampleKey ? (
             <Callout tone="warning">
-              <CalloutTitle>No active key</CalloutTitle>
-              <CalloutDescription>Create or rotate a key before using `/api/query` or `/api/transaction`.</CalloutDescription>
+              <CalloutTitle>{t("appDatabases.noActiveKeyTitle")}</CalloutTitle>
+              <CalloutDescription>{t("appDatabases.noActiveKeyDescription")}</CalloutDescription>
             </Callout>
           ) : null}
         </CardContent>
@@ -849,34 +957,34 @@ function DatabaseOverview({
         <DialogContent>
           <form onSubmit={save}>
             <DialogHeader>
-              <DialogTitle>Edit database</DialogTitle>
+              <DialogTitle>{t("appDatabases.editTitle")}</DialogTitle>
               <DialogDescription>{database.id}</DialogDescription>
             </DialogHeader>
             <DialogBody className="space-y-4">
-              <Field htmlFor="edit-database-name" label="Name" required>
+              <Field htmlFor="edit-database-name" label={t("common.name")} required>
                 <Input id="edit-database-name" required value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
-              <Field htmlFor="edit-database-note" label="Note">
+              <Field htmlFor="edit-database-note" label={t("appDatabases.note")}>
                 <Input id="edit-database-note" value={note} onChange={(e) => setNote(e.target.value)} />
               </Field>
-              <Field htmlFor="edit-database-status" label="Status">
+              <Field htmlFor="edit-database-status" label={t("common.status")}>
                 <Select
                   id="edit-database-status"
                   value={status}
                   onValueChange={setStatus}
                   options={[
-                    { value: "active", label: "active" },
-                    { value: "disabled", label: "disabled" }
+                    { value: "active", label: t("appDatabases.status.active") },
+                    { value: "disabled", label: t("appDatabases.status.disabled") }
                   ]}
                 />
               </Field>
             </DialogBody>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setEditOpen(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button type="submit" loading={busy === "update"} disabled={!name.trim()}>
-                Save
+                {t("common.save")}
               </Button>
             </DialogFooter>
           </form>
@@ -889,11 +997,13 @@ function DatabaseOverview({
 function MetricCard({
   icon: Icon,
   label,
-  value
+  value,
+  valueHydrationSafe
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
+  valueHydrationSafe?: boolean;
 }) {
   return (
     <Card>
@@ -903,18 +1013,33 @@ function MetricCard({
         </div>
         <div className="min-w-0">
           <div className="text-2xs uppercase tracking-wide text-ink-400">{label}</div>
-          <div className="truncate text-sm font-medium">{value}</div>
+          <div className="truncate text-sm font-medium" suppressHydrationWarning={valueHydrationSafe}>
+            {value}
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function InfoLine({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function InfoLine({
+  label,
+  value,
+  mono,
+  hydrationSafe
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  hydrationSafe?: boolean;
+}) {
   return (
     <div>
       <div className="text-2xs uppercase tracking-wide text-ink-400">{label}</div>
-      <div className={mono ? "mt-1 break-all font-mono text-ink-700 dark:text-slate-300" : "mt-1 text-ink-700 dark:text-slate-300"}>
+      <div
+        suppressHydrationWarning={hydrationSafe}
+        className={mono ? "mt-1 break-all font-mono text-ink-700 dark:text-slate-300" : "mt-1 text-ink-700 dark:text-slate-300"}
+      >
         {value}
       </div>
     </div>
@@ -922,6 +1047,7 @@ function InfoLine({ label, value, mono }: { label: string; value: string; mono?:
 }
 
 function SqlConsole({ appId, database }: { appId: string; database: DatabaseSummary }) {
+  const { t } = useI18n();
   const [sql, setSql] = React.useState(DEFAULT_SQL);
   const [params, setParams] = React.useState("[]");
   const [mode, setMode] = React.useState("read");
@@ -934,7 +1060,7 @@ function SqlConsole({ appId, database }: { appId: string; database: DatabaseSumm
     setBusy(true);
     setError(null);
     try {
-      const parsedParams = parseJsonValue(params, [], "Params");
+      const parsedParams = parseJsonValue(params, [], "Params", t("appDatabases.paramsJsonInvalid"));
       const res = await fetch(`/api/v1/apps/${appId}/databases/${database.id}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -944,11 +1070,11 @@ function SqlConsole({ appId, database }: { appId: string; database: DatabaseSumm
       const json = await readJson<SqlResultResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, `Status ${res.status}`));
       setResult(asPrettyJson(json));
-      toast.success("SQL executed");
+      toast.success(t("appDatabases.sqlExecuted"));
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("SQL failed", { description: message });
+      toast.error(t("appDatabases.sqlFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -957,12 +1083,12 @@ function SqlConsole({ appId, database }: { appId: string; database: DatabaseSumm
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">SQL console</CardTitle>
-        <CardDescription>管理员控制台 SQL 会被审计；外部 key 仍受安全 SQL 策略限制。</CardDescription>
+        <CardTitle className="text-base">{t("appDatabases.sqlTitle")}</CardTitle>
+        <CardDescription>{t("appDatabases.sqlDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
-          <Field htmlFor="sql-mode" label="Mode">
+          <Field htmlFor="sql-mode" label={t("appDatabases.sqlMode")}>
             <Select
               id="sql-mode"
               value={mode}
@@ -984,7 +1110,7 @@ function SqlConsole({ appId, database }: { appId: string; database: DatabaseSumm
               invalid={Boolean(error)}
             />
           </Field>
-          <Field htmlFor="sql-params" label="Params JSON">
+          <Field htmlFor="sql-params" label={t("appDatabases.paramsJson")}>
             <Textarea
               id="sql-params"
               className="min-h-[100px] font-mono text-xs"
@@ -994,7 +1120,7 @@ function SqlConsole({ appId, database }: { appId: string; database: DatabaseSumm
             />
           </Field>
           <Button type="submit" loading={busy} disabled={!sql.trim()}>
-            <Code2 /> Execute
+            <Code2 /> {t("appDatabases.execute")}
           </Button>
         </form>
         {result ? (
@@ -1016,6 +1142,7 @@ function TablesBrowser({
   database: DatabaseSummary;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
 }) {
+  const { t } = useI18n();
   const [tables, setTables] = React.useState<TableInfo[]>([]);
   const [selectedTable, setSelectedTable] = React.useState("");
   const [columns, setColumns] = React.useState<unknown[]>([]);
@@ -1095,7 +1222,12 @@ function TablesBrowser({
     setBusy(true);
     setError(null);
     try {
-      const data = parseJsonObject(rowEditor.data, "Row");
+      const data = parseJsonObject(
+        rowEditor.data,
+        "Row",
+        t("appDatabases.rowJsonInvalid"),
+        t("appDatabases.rowJsonMustObject")
+      );
       const url =
         rowEditor.mode === "create"
           ? `/api/v1/apps/${appId}/databases/${database.id}/tables/${encodeURIComponent(selectedTable)}/rows`
@@ -1109,12 +1241,12 @@ function TablesBrowser({
       const json = await readJson<ApiErrorResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, `Status ${res.status}`));
       setRowEditor(null);
-      toast.success(rowEditor.mode === "create" ? "Row inserted" : "Row updated");
+      toast.success(rowEditor.mode === "create" ? t("appDatabases.rowInserted") : t("appDatabases.rowUpdated"));
       await loadTableDetail(selectedTable);
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("Row save failed", { description: message });
+      toast.error(t("appDatabases.rowSaveFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -1131,12 +1263,12 @@ function TablesBrowser({
       );
       const json = await readJson<ApiErrorResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, `Status ${res.status}`));
-      toast.success("Row deleted");
+      toast.success(t("appDatabases.rowDeleted"));
       await loadTableDetail(selectedTable);
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("Row delete failed", { description: message });
+      toast.error(t("appDatabases.rowDeleteFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -1148,18 +1280,18 @@ function TablesBrowser({
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base">Table browser</CardTitle>
-              <CardDescription>查看表结构、索引和分页行数据。</CardDescription>
+              <CardTitle className="text-base">{t("appDatabases.tableBrowserTitle")}</CardTitle>
+              <CardDescription>{t("appDatabases.tableBrowserDescription")}</CardDescription>
             </div>
             <Button size="sm" variant="outline" onClick={() => loadTables()} loading={busy}>
-              <RefreshCw /> Refresh
+              <RefreshCw /> {t("appDatabases.refresh")}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {error ? (
             <Callout tone="danger">
-              <CalloutTitle>Table operation failed</CalloutTitle>
+              <CalloutTitle>{t("appDatabases.tableOperationFailed")}</CalloutTitle>
               <CalloutDescription>{error}</CalloutDescription>
             </Callout>
           ) : null}
@@ -1167,7 +1299,7 @@ function TablesBrowser({
             <div className="space-y-2">
               {tables.length === 0 ? (
                 <div className="rounded-md border border-ink-100 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">
-                  No tables. Use SQL console to create one.
+                  {t("appDatabases.noTables")}
                 </div>
               ) : null}
               {tables.map((table) => (
@@ -1197,20 +1329,20 @@ function TablesBrowser({
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h3 className="font-mono text-sm font-semibold">{selectedTable}</h3>
-                      <p className="text-xs text-ink-500">{formatNumber(total)} rows</p>
+                      <p className="text-xs text-ink-500">{t("appDatabases.rowsCount", { count: formatNumber(total) })}</p>
                     </div>
                     <Button size="sm" onClick={() => setRowEditor({ mode: "create", data: EMPTY_JSON })}>
-                      <Plus /> Insert row
+                      <Plus /> {t("appDatabases.insertRow")}
                     </Button>
                   </div>
                   <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <JsonPanel title="Columns" value={columns} />
-                    <JsonPanel title="Indexes" value={indexes} />
+                    <JsonPanel title={t("appDatabases.columns")} value={columns} />
+                    <JsonPanel title={t("appDatabases.indexes")} value={indexes} />
                   </div>
                   <RowsTable rows={rows} onEdit={setRowEditor} onDelete={deleteRow} />
                   <div className="flex items-center justify-between gap-3">
                     <Button size="sm" variant="outline" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))}>
-                      Previous
+                      {t("appDatabases.previous")}
                     </Button>
                     <span className="text-xs text-ink-500">
                       {formatNumber(offset + 1)} - {formatNumber(Math.min(offset + limit, total))} / {formatNumber(total)}
@@ -1221,7 +1353,7 @@ function TablesBrowser({
                       disabled={offset + limit >= total}
                       onClick={() => setOffset(offset + limit)}
                     >
-                      Next
+                      {t("appDatabases.next")}
                     </Button>
                   </div>
                 </>
@@ -1236,11 +1368,11 @@ function TablesBrowser({
           {rowEditor ? (
             <form onSubmit={saveRow}>
               <DialogHeader>
-                <DialogTitle>{rowEditor.mode === "create" ? "Insert row" : "Edit row"}</DialogTitle>
+                <DialogTitle>{rowEditor.mode === "create" ? t("appDatabases.insertRow") : t("appDatabases.editRow")}</DialogTitle>
                 <DialogDescription className="font-mono">{selectedTable}</DialogDescription>
               </DialogHeader>
               <DialogBody>
-                <Field htmlFor="row-json" label="Row JSON" required error={error}>
+                <Field htmlFor="row-json" label={t("appDatabases.rowJson")} required error={error}>
                   <Textarea
                     id="row-json"
                     className="min-h-[320px] font-mono text-xs"
@@ -1253,10 +1385,10 @@ function TablesBrowser({
               </DialogBody>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setRowEditor(null)}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button type="submit" loading={busy}>
-                  Save
+                  {t("common.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -1285,9 +1417,14 @@ function RowsTable({
   onEdit: (editor: { mode: "edit"; rowid?: number; data: string }) => void;
   onDelete: (rowid: number) => void;
 }) {
+  const { t } = useI18n();
   const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).slice(0, 8);
   if (rows.length === 0) {
-    return <div className="rounded-md border border-ink-100 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">No rows.</div>;
+    return (
+      <div className="rounded-md border border-ink-100 px-3 py-8 text-center text-sm text-ink-500 dark:border-slate-700">
+        {t("appDatabases.noRows")}
+      </div>
+    );
   }
   return (
     <TableShell>
@@ -1299,7 +1436,7 @@ function RowsTable({
                 {column}
               </TableHead>
             ))}
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-right">{t("appDatabases.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1319,10 +1456,10 @@ function RowsTable({
                       variant="outline"
                       onClick={() => onEdit({ mode: "edit", rowid, data: asPrettyJson(withoutRowid(row)) })}
                     >
-                      Edit
+                      {t("common.edit")}
                     </Button>
                     <Button size="xs" variant="danger" disabled={!Number.isFinite(rowid)} onClick={() => onDelete(rowid)}>
-                      Delete
+                      {t("common.delete")}
                     </Button>
                   </div>
                 </TableCell>
@@ -1356,6 +1493,7 @@ function MigrationPanel({
   bindings: BindingSummary[];
   onMigrated: () => void;
 }) {
+  const { t, formatNumber } = useI18n();
   const [dataType, setDataType] = React.useState(schemas[0]?.dataType ?? "");
   const [databaseId, setDatabaseId] = React.useState(database.id);
   const [tableName, setTableName] = React.useState("");
@@ -1385,12 +1523,14 @@ function MigrationPanel({
       const json = await readJson<MigrationResponse>(res);
       if (!res.ok) throw new Error(apiMessage(json, `Status ${res.status}`));
       setResult(json);
-      toast.success("Data migrated", { description: `${json.records ?? 0} records` });
+      toast.success(t("appDatabases.migrationSucceeded"), {
+        description: t("appDatabases.rowsCount", { count: formatNumber(json.records ?? 0) })
+      });
       onMigrated();
     } catch (err) {
       const message = String((err as Error).message ?? err);
       setError(message);
-      toast.error("Migration failed", { description: message });
+      toast.error(t("appDatabases.migrationFailed"), { description: message });
     } finally {
       setBusy(false);
     }
@@ -1401,10 +1541,8 @@ function MigrationPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Migrate Data API records</CardTitle>
-        <CardDescription>
-          导入后会写入 `external_sql` binding，原 Data API 对该 dataType 禁止继续读写主库，避免双写冲突。
-        </CardDescription>
+        <CardTitle className="text-base">{t("appDatabases.migrationTitle")}</CardTitle>
+        <CardDescription>{t("appDatabases.migrationDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={submit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1419,15 +1557,15 @@ function MigrationPanel({
               }))}
             />
           </Field>
-          <Field htmlFor="migrate-database" label="Target database" required>
-            <Select id="migrate-database" value={databaseId} onValueChange={setDatabaseId} options={databaseOptions(databases)} />
+          <Field htmlFor="migrate-database" label={t("appDatabases.targetDatabase")} required>
+            <Select id="migrate-database" value={databaseId} onValueChange={setDatabaseId} options={databaseOptions(databases, t)} />
           </Field>
-          <Field htmlFor="migrate-table" label="Table name">
+          <Field htmlFor="migrate-table" label={t("appDatabases.tableName")}>
             <Input id="migrate-table" value={tableName} onChange={(e) => setTableName(e.target.value)} placeholder={dataType} />
           </Field>
           <div className="flex items-end">
             <Button type="submit" loading={busy} disabled={!dataType || !databaseId}>
-              <UploadCloud /> Migrate
+              <UploadCloud /> {t("appDatabases.migrate")}
             </Button>
           </div>
         </form>
@@ -1437,8 +1575,8 @@ function MigrationPanel({
             <TableHeader>
               <TableRow>
                 <TableHead>dataType</TableHead>
-                <TableHead>Storage</TableHead>
-                <TableHead>Target</TableHead>
+                <TableHead>{t("appDatabases.storage")}</TableHead>
+                <TableHead>{t("appDatabases.target")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1464,26 +1602,27 @@ function MigrationPanel({
 
         {error ? (
           <Callout tone="danger">
-            <CalloutTitle>Migration failed</CalloutTitle>
+            <CalloutTitle>{t("appDatabases.migrationFailed")}</CalloutTitle>
             <CalloutDescription>{error}</CalloutDescription>
           </Callout>
         ) : null}
-        {result ? <JsonPanel title="Migration result" value={result} /> : null}
+        {result ? <JsonPanel title={t("appDatabases.migrationResult")} value={result} /> : null}
       </CardContent>
     </Card>
   );
 }
 
 function AuditPanel({ audits }: { audits: AuditSummary[] }) {
+  const { t } = useI18n();
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Database audit logs</CardTitle>
-        <CardDescription>最近的数据库、key 和迁移动作。</CardDescription>
+        <CardTitle className="text-base">{t("appDatabases.auditTitle")}</CardTitle>
+        <CardDescription>{t("appDatabases.auditDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         {audits.length === 0 ? (
-          <div className="py-12 text-center text-sm text-ink-500">No audit logs yet.</div>
+          <div className="py-12 text-center text-sm text-ink-500">{t("appDatabases.noAuditLogs")}</div>
         ) : (
           <div className="space-y-2">
             {audits.map((log) => (
