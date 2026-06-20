@@ -10,6 +10,12 @@ vi.mock("@/shared/prisma", () => ({
     },
     workflowDocument: {
       findMany: vi.fn()
+    },
+    dataStorageBinding: {
+      findUnique: vi.fn()
+    },
+    record: {
+      findMany: vi.fn()
     }
   }
 }));
@@ -18,6 +24,13 @@ vi.mock("@/modules/schema", () => ({
   SchemaService: {
     tryLoadActive: vi.fn()
   }
+}));
+
+vi.mock("@/shared/config", () => ({
+  config: () => ({
+    DEFAULT_MAIN_RECORD_LIMIT: 1000,
+    DEFAULT_MAIN_STORAGE_BYTES: 5 * 1024 * 1024
+  })
 }));
 
 vi.mock("@/shared/bus", () => ({
@@ -47,6 +60,8 @@ import { DataPipeline } from "../pipeline";
 const policyDocument = prisma.policyDocument as unknown as { findMany: Mock };
 const mutationRuleDocument = prisma.mutationRuleDocument as unknown as { findMany: Mock };
 const workflowDocument = prisma.workflowDocument as unknown as { findMany: Mock };
+const dataStorageBinding = prisma.dataStorageBinding as unknown as { findUnique: Mock };
+const prismaRecord = prisma.record as unknown as { findMany: Mock };
 const schemaService = SchemaService as unknown as { tryLoadActive: Mock };
 const recordRepository = RecordRepository as unknown as {
   findById: Mock;
@@ -69,6 +84,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mutationRuleDocument.findMany.mockResolvedValue([]);
   workflowDocument.findMany.mockResolvedValue([]);
+  dataStorageBinding.findUnique.mockResolvedValue(null);
+  prismaRecord.findMany.mockResolvedValue([]);
   schemaService.tryLoadActive.mockResolvedValue({
     id: "schema_v1",
     jsonSchema: {

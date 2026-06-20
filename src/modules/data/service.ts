@@ -1,6 +1,7 @@
 import { ApiError } from "@/shared/errors";
 import { prisma } from "@/shared/prisma";
 import { PolicyEngine, type AuthContext, type PolicyAction } from "@/shared/policy";
+import { AppDatabaseService } from "@/modules/app-databases";
 import { DataPipeline } from "./pipeline";
 
 export interface RecordEnvelope<T = unknown> {
@@ -284,6 +285,7 @@ export class DataService {
     q?: DataQuery
   ) {
     const { appId, dataType: type, dsl, actor: providedActor } = normalizeQueryArgs(input, dataType, q);
+    await AppDatabaseService.assertMainStorageReadable(appId, type);
     const actor = providedActor ?? anonymousActor(appId);
     const docs = await loadPolicyDocuments(appId, type);
     const limit = Math.min(Math.max(dsl.limit ?? 50, 1), 200);
@@ -331,6 +333,7 @@ export class DataService {
     const record = await RecordRepository.findById(input.recordId);
     if (!record) throw new ApiError("DATA_RECORD_NOT_FOUND");
     assertRecordScope(record, input.appId, input.dataType);
+    await AppDatabaseService.assertMainStorageReadable(input.appId, input.dataType);
     const actor = input.actor ?? anonymousActor(input.appId);
     const docs = await loadPolicyDocuments(input.appId, input.dataType, input.recordId);
     const readable = readableEnvelope(record, docs, actor);
@@ -341,6 +344,7 @@ export class DataService {
   static async get(recordId: string) {
     const record = await RecordRepository.findById(recordId);
     if (!record) throw new ApiError("DATA_RECORD_NOT_FOUND");
+    await AppDatabaseService.assertMainStorageReadable(record.appId, record.dataType);
     return envelope(record);
   }
 
@@ -410,6 +414,7 @@ export class DataService {
     const existing = await RecordRepository.findById(input.recordId);
     if (!existing) throw new ApiError("DATA_RECORD_NOT_FOUND");
     assertRecordScope(existing, input.appId, input.dataType);
+    await AppDatabaseService.assertMainStorageReadable(input.appId, input.dataType);
     const next = asObject(parseJson(existing.data));
     const policyActions: Record<string, PolicyAction> = {};
     const mutationActions: Record<string, string> = {};

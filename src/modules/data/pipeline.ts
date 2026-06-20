@@ -29,6 +29,7 @@ import {
 } from "@/shared/validator";
 import { SchemaService } from "@/modules/schema";
 import { runSandbox } from "@/shared/sandbox";
+import { AppDatabaseService } from "@/modules/app-databases";
 import { RecordRepository, type RecordSnapshot } from "./repository";
 
 export type DataPipelineOp = "create" | "update";
@@ -145,6 +146,8 @@ async function loadPolicyDocuments(appId: string, dataType: string, recordId?: s
 
 export class DataPipeline {
   static async execute(input: DataPipelineInput, ctx: DataPipelineRunCtx): Promise<DataPipelineResult> {
+    await AppDatabaseService.assertMainStorageReadable(input.appId, input.dataType);
+
     // 1) policy 文档
     const docs = await loadPolicyDocuments(input.appId, input.dataType, input.recordId);
 
@@ -353,6 +356,13 @@ export class DataPipeline {
     }
 
     // 7) persist
+    await AppDatabaseService.assertMainStorageWritable({
+      appId: input.appId,
+      dataType: input.dataType,
+      recordId: input.recordId,
+      data: envelope.data
+    });
+
     let record: RecordSnapshot;
     if (input.op === "create") {
       record = await RecordRepository.create({
@@ -402,6 +412,7 @@ export class DataPipeline {
 
   /** 软删除（仅校验 delete 权限）。 */
   static async deleteRecord(input: { appId: string; dataType: string; recordId: string }, ctx: DataPipelineRunCtx) {
+    await AppDatabaseService.assertMainStorageReadable(input.appId, input.dataType);
     const existing = await RecordRepository.findById(input.recordId);
     if (!existing || existing.appId !== input.appId || existing.dataType !== input.dataType) {
       throw new ApiError("DATA_RECORD_NOT_FOUND");

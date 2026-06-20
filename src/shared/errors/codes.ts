@@ -39,6 +39,17 @@ export const ErrorCodes = {
   DATA_QUERY_LIMIT_EXCEEDED: { http: 400, message: "查询条目超出上限" },
   DATA_QUERY_INVALID: { http: 400, message: "查询条件不合法" },
   DATA_FIELD_NOT_FOUND: { http: 404, message: "字段不存在" },
+  DATA_STORAGE_EXTERNAL_SQL: { http: 409, message: "该 dataType 已迁移到独立 SQL 数据库" },
+  DATA_STORAGE_MAIN_LIMIT_EXCEEDED: { http: 413, message: "默认主库数据量已达到上限，请迁移到独立数据库" },
+
+  // DATABASE 独立 SQLite 数据库
+  DATABASE_NOT_FOUND: { http: 404, message: "数据库不存在" },
+  DATABASE_FORBIDDEN: { http: 403, message: "无权访问该数据库" },
+  DATABASE_DISABLED: { http: 403, message: "数据库已禁用或删除" },
+  DATABASE_KEY_REVOKED: { http: 401, message: "数据库 Key 已被吊销" },
+  DATABASE_SQL_INVALID: { http: 400, message: "SQL 请求不合法" },
+  DATABASE_SQL_FORBIDDEN: { http: 403, message: "SQL 语句被安全策略拒绝" },
+  DATABASE_PATH_INVALID: { http: 400, message: "数据库文件路径不合法" },
 
   // SCHEMA
   SCHEMA_NOT_FOUND: { http: 404, message: "未配置该 dataType 的 Schema" },

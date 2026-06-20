@@ -41,6 +41,10 @@ const envSchema = z.object({
   REALTIME_KEEPALIVE_SECONDS: numberFromString.default("25"),
   REALTIME_REPLAY_WINDOW_SECONDS: numberFromString.default("60"),
 
+  UNIID_DATABASES_DIR: z.string().default("./data/app-databases"),
+  DEFAULT_MAIN_RECORD_LIMIT: numberFromString.default("1000"),
+  DEFAULT_MAIN_STORAGE_BYTES: numberFromString.default("5242880"),
+
   QUOTA_RPS_DEFAULT: numberFromString.default("60"),
   QUOTA_DAILY_API_DEFAULT: numberFromString.default("1000000"),
   QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT: numberFromString.default("10737418240"),

@@ -16,6 +16,7 @@ const uiMessagesZh: MessageDictionary = {
     "common.console": "控制台",
     "common.createApp": "新建应用",
     "common.data": "数据",
+    "common.databases": "数据库",
     "common.docs": "文档",
     "common.files": "文件",
     "common.functions": "函数",
@@ -190,6 +191,7 @@ const uiMessagesZh: MessageDictionary = {
 
     "appData.title": "数据浏览器",
     "appData.description": "按 Schema 浏览与编辑记录。",
+    "appDatabases.description": "管理每个 App 的独立 SQLite 数据库、访问 key、迁移和 SQL 控制台。",
     "appSettings.title": "应用设置",
     "appSettings.description": "域名、配额与危险操作。",
     "appMembers.description": "管理可访问该应用控制台的用户。",
@@ -342,6 +344,7 @@ const uiMessagesEn: MessageDictionary = {
     "common.console": "Console",
     "common.createApp": "Create App",
     "common.data": "Data",
+    "common.databases": "Databases",
     "common.docs": "Docs",
     "common.files": "Files",
     "common.functions": "Functions",
@@ -516,6 +519,7 @@ const uiMessagesEn: MessageDictionary = {
 
     "appData.title": "Data browser",
     "appData.description": "Browse and edit records by schema.",
+    "appDatabases.description": "Manage per-app SQLite databases, access keys, migration, and the SQL console.",
     "appSettings.title": "App settings",
     "appSettings.description": "Domains, quotas, and destructive actions.",
     "appMembers.description": "Manage users who can access this app in the console.",

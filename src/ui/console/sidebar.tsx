@@ -5,6 +5,7 @@ import { TransitionLink } from "@/ui/navigation";
 import {
   LayoutDashboard,
   Database,
+  HardDrive,
   Files,
   Radio,
   Code2,
@@ -44,6 +45,7 @@ export function ConsoleSidebar({
         { href: `/console/apps/${appId}/policies`, label: t("common.policies"), icon: Shield },
         { href: `/console/apps/${appId}/business`, label: t("common.business"), icon: Workflow },
         { href: `/console/apps/${appId}/data`, label: t("common.data"), icon: Database },
+        { href: `/console/apps/${appId}/databases`, label: t("common.databases"), icon: HardDrive },
         { href: `/console/apps/${appId}/files`, label: t("common.files"), icon: Files },
         { href: `/console/apps/${appId}/realtime`, label: t("common.realtime"), icon: Radio },
         { href: `/console/apps/${appId}/functions`, label: t("common.functions"), icon: Code2 },

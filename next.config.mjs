@@ -16,6 +16,7 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       "argon2",
       "quickjs-emscripten",
+      "better-sqlite3",
       "@aws-sdk/client-s3",
       "node-cron",
       "pino",
@@ -39,6 +40,12 @@ const nextConfig = {
           : [];
       // node-cron 内部用到 worker_threads/child_process，必须 require() 在运行时解析。
       externals.push({ "node-cron": "commonjs node-cron" });
+      // better-sqlite3 是原生 Node 扩展，运行时加载，不能被 webpack 静态打包。
+      externals.push(
+        { "better-sqlite3": "commonjs better-sqlite3" },
+        { bindings: "commonjs bindings" },
+        { "file-uri-to-path": "commonjs file-uri-to-path" }
+      );
       // pino / pino-pretty 依赖 Node 内置模块与可选 worker，避免打进 vendor-chunks。
       externals.push(
         { pino: "commonjs pino" },
