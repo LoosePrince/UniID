@@ -37,6 +37,8 @@ class EventBus {
     options?: { causedByEventId?: string | null }
   ): Promise<DomainEventEnvelope<E>> {
     const envelope = await EventOutboxService.create(name, payload, options);
+    const claimed = await EventOutboxService.claimDue(envelope.id);
+    if (!claimed) return envelope;
     try {
       await this.dispatch(envelope, true);
       await EventOutboxService.markDispatched(envelope.id);
@@ -53,6 +55,9 @@ class EventBus {
     let failed = 0;
 
     for (const event of pending) {
+      const claimed = await EventOutboxService.claimDue(event.id);
+      if (!claimed) continue;
+
       const envelope = EventOutboxService.parseEnvelope(event.payload);
       if (!envelope) {
         await EventOutboxService.markFailed(event.id, "Invalid event payload");

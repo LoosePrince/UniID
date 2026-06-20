@@ -8,7 +8,8 @@ import { bus } from "@/shared/bus";
 
 const bodySchema = z.object({
   username: usernameSchema,
-  password: passwordSchema
+  password: passwordSchema,
+  totpCode: z.string().trim().regex(/^\d{6}$/).optional()
 });
 
 export const POST = withCors(
@@ -16,7 +17,7 @@ export const POST = withCors(
   defineRoute({
     schema: { body: bodySchema },
     handler: async ({ body }, { req }) => {
-      const user = await AuthService.login(body.username, body.password);
+      const user = await AuthService.login(body.username, body.password, body.totpCode);
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
       const ua = req.headers.get("user-agent");
 

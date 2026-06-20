@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { resolveOrigin, type CorsPolicyName, type ResolvedOrigin } from "./policy";
 
 const DEFAULT_ALLOWED_METHODS = "GET,POST,PATCH,PUT,DELETE,OPTIONS";
-const DEFAULT_ALLOWED_HEADERS = "Authorization,Content-Type,X-App-Id,X-Request-Id";
+const DEFAULT_ALLOWED_HEADERS = "Authorization,Content-Type,X-App-Id,X-Request-Id,X-UniID-API-Key";
 const DEFAULT_MAX_AGE = "600";
 
 export function applyCorsHeaders(res: NextResponse, resolved: ResolvedOrigin): NextResponse {

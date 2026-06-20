@@ -6,6 +6,7 @@ import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
 import { runSandbox, type SandboxResult } from "@/shared/sandbox";
 import { config } from "@/shared/config";
+import { QuotaService } from "@/shared/quota";
 
 const now = () => Math.floor(Date.now() / 1000);
 const INPUT_PREVIEW_BYTES = 4 * 1024;
@@ -160,6 +161,8 @@ export class FunctionsService {
     const dep = await prisma.functionDeployment.findUnique({ where: { id: fn.activeDeploymentId } });
     if (!dep) throw new ApiError("FUNC_NOT_FOUND");
 
+    await QuotaService.consume(input.appId, "fnInvocations");
+
     const env = fn.env ? safeParseEnv(fn.env) : undefined;
     const result = await runSandbox({
       source: dep.sourceCode,
@@ -167,7 +170,8 @@ export class FunctionsService {
       env,
       timeoutMs: fn.timeoutMs,
       memoryMb: fn.memoryMb,
-      functionName: fn.name
+      functionName: fn.name,
+      appId: input.appId
     });
 
     const inv = await prisma.functionInvocation.create({
@@ -198,6 +202,90 @@ export class FunctionsService {
       take: limit
     });
   }
+
+  static async listEventTriggers(appId: string) {
+    const rows = await prisma.functionEventTrigger.findMany({
+      where: { appId },
+      orderBy: { createdAt: "desc" },
+      include: { fn: { select: { id: true, name: true, isActive: true, activeDeploymentId: true } } }
+    });
+    return rows.map((row) => ({
+      ...row,
+      events: safeParseStringArray(row.events),
+      filterJson: row.filter
+    }));
+  }
+
+  static async createEventTrigger(input: {
+    appId: string;
+    name: string;
+    fnId: string;
+    events: string[];
+    filter?: unknown;
+    isActive?: boolean;
+    createdById?: string;
+  }) {
+    const fn = await prisma.functionDefinition.findFirst({
+      where: { id: input.fnId, appId: input.appId }
+    });
+    if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+    const t = now();
+    return prisma.functionEventTrigger.create({
+      data: {
+        appId: input.appId,
+        name: input.name,
+        fnId: fn.id,
+        events: JSON.stringify(normalizeEvents(input.events)),
+        filter: input.filter === undefined ? null : JSON.stringify(input.filter),
+        isActive: input.isActive === false ? 0 : 1,
+        createdAt: t,
+        updatedAt: t,
+        createdById: input.createdById
+      }
+    });
+  }
+
+  static async updateEventTrigger(input: {
+    appId: string;
+    triggerId: string;
+    name?: string;
+    fnId?: string;
+    events?: string[];
+    filter?: unknown;
+    isActive?: boolean;
+  }) {
+    const existing = await prisma.functionEventTrigger.findFirst({
+      where: { id: input.triggerId, appId: input.appId }
+    });
+    if (!existing) throw new ApiError("FUNC_NOT_FOUND");
+    let fnId = input.fnId;
+    if (fnId) {
+      const fn = await prisma.functionDefinition.findFirst({
+        where: { id: fnId, appId: input.appId }
+      });
+      if (!fn) throw new ApiError("FUNC_NOT_FOUND");
+      fnId = fn.id;
+    }
+    return prisma.functionEventTrigger.update({
+      where: { id: existing.id },
+      data: {
+        name: input.name,
+        fnId,
+        events: input.events ? JSON.stringify(normalizeEvents(input.events)) : undefined,
+        filter: input.filter === undefined ? undefined : input.filter === null ? null : JSON.stringify(input.filter),
+        isActive: input.isActive === undefined ? undefined : input.isActive ? 1 : 0,
+        updatedAt: now()
+      }
+    });
+  }
+
+  static async deleteEventTrigger(appId: string, triggerId: string) {
+    const existing = await prisma.functionEventTrigger.findFirst({
+      where: { id: triggerId, appId }
+    });
+    if (!existing) throw new ApiError("FUNC_NOT_FOUND");
+    await prisma.functionEventTrigger.delete({ where: { id: existing.id } });
+  }
 }
 
 function safeParseEnv(s: string): Record<string, string> | undefined {
@@ -206,4 +294,17 @@ function safeParseEnv(s: string): Record<string, string> | undefined {
     if (p && typeof p === "object") return p as Record<string, string>;
   } catch {}
   return undefined;
+}
+
+function normalizeEvents(events: string[]): string[] {
+  return Array.from(new Set(events.map((event) => event.trim()).filter(Boolean)));
+}
+
+function safeParseStringArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }

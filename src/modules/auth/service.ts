@@ -13,7 +13,12 @@ import {
   ACCESS_TOKEN_TTL_SECONDS,
   issueRefreshToken,
   rotateRefreshToken,
-  revokeSession
+  revokeSession,
+  issueActionToken,
+  verifyActionToken,
+  generateTotpSecret,
+  totpUri,
+  verifyTotp
 } from "@/shared/iam";
 import { bus } from "@/shared/bus";
 
@@ -31,11 +36,15 @@ export interface CreatedSession {
 
 export class AuthService {
   /** 用户登录（UniID 控制台/账号中心使用）；不创建 AppSession，仅校验密码并返回用户。 */
-  static async login(username: string, password: string) {
+  static async login(username: string, password: string, totpCode?: string | null) {
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user || user.deletedAt) throw new ApiError("AUTH_INVALID_CREDENTIALS");
     const ok = await verifyPassword(user.passwordHash, password);
     if (!ok) throw new ApiError("AUTH_INVALID_CREDENTIALS");
+    if (user.twoFactorSecret) {
+      if (!totpCode) throw new ApiError("AUTH_MFA_REQUIRED");
+      if (!verifyTotp(user.twoFactorSecret, totpCode)) throw new ApiError("AUTH_MFA_INVALID");
+    }
     return user;
   }
 
@@ -237,6 +246,123 @@ export class AuthService {
     });
   }
 
+  static async createEmailVerification(userId: string, baseUrl?: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
+    if (!user.email) throw new ApiError("AUTH_EMAIL_REQUIRED");
+    if (user.emailVerifiedAt) throw new ApiError("AUTH_EMAIL_ALREADY_VERIFIED");
+    const token = issueActionToken({
+      purpose: "email_verify",
+      userId: user.id,
+      email: user.email,
+      ttlSeconds: 24 * 60 * 60
+    });
+    return {
+      token,
+      verifyUrl: buildActionUrl(baseUrl, "/api/v1/auth/email/verify", token)
+    };
+  }
+
+  static async verifyEmail(token: string) {
+    const payload = verifyActionToken(token, "email_verify");
+    if (!payload) throw new ApiError("AUTH_INVALID_TOKEN");
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || user.deletedAt) throw new ApiError("AUTH_INVALID_TOKEN");
+    if (!user.email || user.email !== payload.email) throw new ApiError("AUTH_INVALID_TOKEN");
+    if (user.emailVerifiedAt) return { verified: true };
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: now(), updatedAt: now() }
+    });
+    await bus.publish("auth.email_verified", { userId: user.id, email: user.email, at: now() });
+    return { verified: true };
+  }
+
+  static async createPasswordReset(identifier: string, baseUrl?: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ username: identifier }, { email: identifier }]
+      }
+    });
+    if (!user || user.deletedAt || !user.email) {
+      return { sent: true, token: null, resetUrl: null };
+    }
+    const token = issueActionToken({
+      purpose: "password_reset",
+      userId: user.id,
+      email: user.email,
+      ttlSeconds: 60 * 60
+    });
+    return {
+      sent: true,
+      token,
+      resetUrl: buildActionUrl(baseUrl, "/api/v1/auth/password/reset", token)
+    };
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    const payload = verifyActionToken(token, "password_reset");
+    if (!payload) throw new ApiError("AUTH_RESET_TOKEN_INVALID");
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || user.deletedAt || (payload.email && user.email !== payload.email)) {
+      throw new ApiError("AUTH_RESET_TOKEN_INVALID");
+    }
+    const hashed = await hashPassword(newPassword);
+    const t = now();
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: hashed, updatedAt: t }
+      }),
+      prisma.userSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: t }
+      }),
+      prisma.appSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: t }
+      }),
+      prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: t }
+      })
+    ]);
+    await bus.publish("auth.password_reset", { userId: user.id, at: t });
+  }
+
+  static async beginTwoFactorSetup(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
+    const secret = generateTotpSecret();
+    return {
+      secret,
+      otpauthUrl: totpUri({
+        issuer: "UniID",
+        accountName: user.email ?? user.username,
+        secret
+      })
+    };
+  }
+
+  static async enableTwoFactor(userId: string, secret: string, code: string) {
+    if (!verifyTotp(secret, code)) throw new ApiError("AUTH_MFA_INVALID");
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: secret, updatedAt: now() }
+    });
+  }
+
+  static async disableTwoFactor(userId: string, code: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
+    if (!user.twoFactorSecret) return;
+    if (!verifyTotp(user.twoFactorSecret, code)) throw new ApiError("AUTH_MFA_INVALID");
+    await prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecret: null, updatedAt: now() }
+    });
+  }
+
   /** 列出用户在所有 App 的当前授权（仅活跃）。 */
   static async listAuthorizations(userId: string) {
     return prisma.authorization.findMany({
@@ -259,5 +385,16 @@ export class AuthService {
       where: { userId, revokedAt: null },
       orderBy: { createdAt: "desc" }
     });
+  }
+}
+
+function buildActionUrl(baseUrl: string | undefined, path: string, token: string) {
+  if (!baseUrl) return null;
+  try {
+    const url = new URL(path, baseUrl);
+    url.searchParams.set("token", token);
+    return url.toString();
+  } catch {
+    return null;
   }
 }

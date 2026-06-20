@@ -4,6 +4,8 @@ import { prisma } from "@/shared/prisma";
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
 import { AccountProfileForm } from "@/ui/console/account-profile-form";
 import { ChangePasswordForm } from "@/ui/console/change-password-form";
+import { EmailVerificationActions } from "@/ui/console/email-verification-actions";
+import { TwoFactorActions } from "@/ui/console/two-factor-actions";
 
 export default async function ConsoleAccountSettingsPage() {
   const auth = await requireConsoleAuth();
@@ -14,9 +16,11 @@ export default async function ConsoleAccountSettingsPage() {
       id: true,
       username: true,
       email: true,
+      emailVerifiedAt: true,
       displayName: true,
       role: true,
       locale: true,
+      twoFactorSecret: true,
       createdAt: true,
       updatedAt: true
     }
@@ -67,11 +71,31 @@ export default async function ConsoleAccountSettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>邮箱验证</CardTitle>
+          <CardDescription>验证邮箱后可用于找回密码和账号安全通知。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmailVerificationActions email={user?.email ?? null} verifiedAt={user?.emailVerifiedAt ?? null} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t("accountSettings.passwordTitle")}</CardTitle>
           <CardDescription>{t("accountSettings.passwordDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ChangePasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>两步验证</CardTitle>
+          <CardDescription>使用兼容 TOTP 的认证器应用保护控制台登录。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TwoFactorActions enabled={Boolean(user?.twoFactorSecret)} />
         </CardContent>
       </Card>
     </div>

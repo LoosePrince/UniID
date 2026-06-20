@@ -5,6 +5,8 @@ vi.mock("@/shared/prisma", () => ({
     eventOutbox: {
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
+      findUnique: vi.fn(),
       findMany: vi.fn()
     }
   }
@@ -16,12 +18,16 @@ import { bus } from "../event-bus";
 const eventOutbox = prisma.eventOutbox as unknown as {
   create: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  updateMany: ReturnType<typeof vi.fn>;
+  findUnique: ReturnType<typeof vi.fn>;
   findMany: ReturnType<typeof vi.fn>;
 };
 
 describe("EventBus publish", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    eventOutbox.updateMany.mockResolvedValue({ count: 1 });
+    eventOutbox.findUnique.mockResolvedValue({ attempts: 0 });
     bus.clear();
   });
 
@@ -80,7 +86,7 @@ describe("EventBus publish", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: "failed",
-          attempts: { increment: 1 }
+          attempts: 1
         })
       })
     );

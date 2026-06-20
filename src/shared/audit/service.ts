@@ -5,6 +5,7 @@
  */
 import { prisma } from "@/shared/prisma";
 import { logger } from "@/shared/logger";
+import type { Prisma } from "@prisma/client";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -78,15 +79,44 @@ export class AuditService {
     appId?: string;
     userId?: string;
     action?: string;
+    resourceType?: string;
+    resourceId?: string;
+    query?: string;
+    from?: number;
+    to?: number;
     limit?: number;
     cursor?: string;
   }) {
     const take = Math.min(filters.limit ?? 50, 200);
+    const query = filters.query?.trim();
+    const createdAt: Prisma.IntFilter | undefined =
+      filters.from || filters.to
+        ? {
+            ...(filters.from ? { gte: filters.from } : {}),
+            ...(filters.to ? { lte: filters.to } : {})
+          }
+        : undefined;
+
     return prisma.auditLog.findMany({
       where: {
         ...(filters.appId && { appId: filters.appId }),
         ...(filters.userId && { userId: filters.userId }),
-        ...(filters.action && { action: filters.action })
+        ...(filters.action && { action: { contains: filters.action } }),
+        ...(filters.resourceType && { resourceType: filters.resourceType }),
+        ...(filters.resourceId && { resourceId: { contains: filters.resourceId } }),
+        ...(createdAt && { createdAt }),
+        ...(query && {
+          OR: [
+            { action: { contains: query } },
+            { resourceType: { contains: query } },
+            { resourceId: { contains: query } },
+            { before: { contains: query } },
+            { after: { contains: query } },
+            { requestId: { contains: query } },
+            { ip: { contains: query } },
+            { userId: { contains: query } }
+          ]
+        })
       },
       orderBy: { createdAt: "desc" },
       take,

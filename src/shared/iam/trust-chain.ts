@@ -11,6 +11,7 @@ import { prisma } from "../prisma";
 import { ApiError } from "../errors";
 import { verifyAppAccessToken, type AppAccessTokenPayload } from "./jwt";
 import { getCurrentUserSession, type UserSessionDescriptor } from "./session-store";
+import { hashApiKey, isApiKey } from "./api-key";
 import { enforceRateLimit } from "../ratelimit";
 import { QuotaService } from "../quota";
 import { logger } from "../logger";
@@ -45,6 +46,8 @@ export interface ConsoleAuthContext {
 }
 
 function getBearerToken(req: NextRequest): string | null {
+  const apiKey = req.headers.get("x-uniid-api-key");
+  if (apiKey) return apiKey.trim();
   const fromQuery = req.nextUrl.searchParams.get("access_token");
   if (fromQuery) return fromQuery.trim();
   const auth = req.headers.get("authorization");
@@ -55,6 +58,50 @@ function getBearerToken(req: NextRequest): string | null {
     if (match && match[1]) return decodeURIComponent(match[1]);
   }
   return null;
+}
+
+async function enforceAppUsage(appId: string, req: NextRequest) {
+  const quota = await QuotaService.getOrDefault(appId);
+  const ip = clientIp(req);
+  await enforceRateLimit({
+    key: `app:${appId}:ip:${ip}`,
+    capacity: quota.rpsLimit,
+    refillPerSecond: quota.rpsLimit
+  });
+  await QuotaService.consume(appId, "apiCalls", 1).catch((err: unknown) => {
+    if (err instanceof ApiError) throw err;
+    logger.warn({ err }, "quota.consume failed (non-fatal)");
+  });
+}
+
+async function authenticateApiKey(token: string, req: NextRequest): Promise<SdkAuthContext> {
+  const keyHash = hashApiKey(token);
+  const row = await prisma.appApiKey.findUnique({
+    where: { keyHash },
+    include: { app: { include: { owner: true } } }
+  });
+  if (!row) throw new ApiError("AUTH_INVALID_TOKEN");
+  if (row.revokedAt) throw new ApiError("AUTH_API_KEY_REVOKED");
+  if (row.app.status !== "active") {
+    throw new ApiError("APP_FORBIDDEN", { message: "error.detail.appSuspendedOrArchived" });
+  }
+
+  await enforceAppUsage(row.appId, req);
+
+  void prisma.appApiKey
+    .update({ where: { id: row.id }, data: { lastUsedAt: Math.floor(Date.now() / 1000) } })
+    .catch(() => {});
+
+  return {
+    user: { id: row.app.ownerId, username: row.app.owner.username, role: row.app.owner.role },
+    app: { id: row.appId, primaryDomain: row.app.primaryDomain },
+    session: {
+      id: `api_key:${row.id}`,
+      authType: "full",
+      scope: row.scopes ? safeParse(row.scopes) : ["*"]
+    },
+    origin: null
+  };
 }
 
 function extractOriginHost(origin: string): string | null {
@@ -104,6 +151,7 @@ function clientIp(req: NextRequest): string {
 export async function requireSdkAuth(req: NextRequest): Promise<SdkAuthContext> {
   const token = getBearerToken(req);
   if (!token) throw new ApiError("AUTH_INVALID_TOKEN");
+  if (isApiKey(token)) return authenticateApiKey(token, req);
 
   const payload = await verifyAppAccessToken(token);
   const origin = await validateOriginMatch(req, payload);
@@ -129,18 +177,7 @@ export async function requireSdkAuth(req: NextRequest): Promise<SdkAuthContext> 
 
   // Rate limit（按 app+ip 双维度的令牌桶）+ 配额（每日 API 调用）
   // 失败时直接抛 ApiError(RATE_LIMITED) / QUOTA_EXCEEDED。
-  const quota = await QuotaService.getOrDefault(session.appId);
-  const ip = clientIp(req);
-  await enforceRateLimit({
-    key: `app:${session.appId}:ip:${ip}`,
-    capacity: quota.rpsLimit,
-    refillPerSecond: quota.rpsLimit
-  });
-  await QuotaService.consume(session.appId, "apiCalls", 1).catch((err: unknown) => {
-    // 配额超限：直接外抛
-    if (err instanceof ApiError) throw err;
-    logger.warn({ err }, "quota.consume failed (non-fatal)");
-  });
+  await enforceAppUsage(session.appId, req);
 
   void prisma.appSession
     .update({

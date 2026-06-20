@@ -5,7 +5,12 @@ import { prisma } from "@/shared/prisma";
 import { AppService } from "@/modules/apps";
 import { FunctionsService } from "@/modules/functions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Badge } from "@/ui/primitives";
-import { CreateFunctionForm, FunctionRowActions } from "@/ui/console/functions-actions";
+import {
+  CreateEventTriggerForm,
+  CreateFunctionForm,
+  EventTriggerControls,
+  FunctionRowActions
+} from "@/ui/console/functions-actions";
 
 export default async function FunctionsPage({ params }: { params: { appId: string } }) {
   const auth = await requireConsoleAuth();
@@ -19,6 +24,7 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
     await AppService.requireOwnerOrAdmin(app.ownerId, app.admins, auth.user.id);
   }
   const fns = await FunctionsService.listForApp(app.id);
+  const triggers = await FunctionsService.listEventTriggers(app.id);
   const invocationsByFn = new Map(
     await Promise.all(fns.map(async (fn) => [fn.id, await FunctionsService.listInvocations(app.id, fn.id, 5)] as const))
   );
@@ -97,6 +103,65 @@ export default async function FunctionsPage({ params }: { params: { appId: strin
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-base">{t("functions.triggersTitle")}</CardTitle>
+            <CardDescription>{t("functions.triggersDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CreateEventTriggerForm appId={app.id} fns={fns} />
+          </CardContent>
+        </Card>
+
+        <div className="lg:col-span-2 space-y-3">
+          {triggers.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-ink-500">
+                {t("page.functions.triggersEmpty")}
+              </CardContent>
+            </Card>
+          ) : null}
+          {triggers.map((trigger) => (
+            <Card key={trigger.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="font-mono text-sm">{trigger.name}</CardTitle>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge tone={trigger.fn.activeDeploymentId ? "success" : "warning"}>
+                      {trigger.fn.activeDeploymentId ? t("page.functions.deployed") : t("functions.needsDeploy")}
+                    </Badge>
+                    <Badge tone={trigger.isActive ? "success" : "neutral"}>
+                      {trigger.isActive ? t("common.active") : t("common.paused")}
+                    </Badge>
+                  </div>
+                </div>
+                <CardDescription>
+                  {t("functions.triggerFunction", { name: trigger.fn.name })}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs text-ink-500">
+                <div className="flex flex-wrap gap-1.5">
+                  {trigger.events.map((event) => (
+                    <Badge key={event} tone="accent" className="font-mono">
+                      {event}
+                    </Badge>
+                  ))}
+                </div>
+                {trigger.filterJson ? (
+                  <pre className="max-h-[120px] overflow-auto rounded-md border border-ink-100 bg-cream-50 p-2 text-xs text-ink-700">
+                    {trigger.filterJson}
+                  </pre>
+                ) : (
+                  <p>{t("functions.triggerNoFilter")}</p>
+                )}
+                <EventTriggerControls appId={app.id} trigger={trigger} fns={fns} />
               </CardContent>
             </Card>
           ))}

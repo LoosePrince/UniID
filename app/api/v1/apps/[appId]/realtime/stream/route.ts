@@ -22,6 +22,7 @@ async function handler(req: NextRequest, ctx: { params: Record<string, string | 
       .map((item) => item.trim())
       .filter(Boolean);
     const channels = normalizeRealtimeChannels(params.appId, requestedChannels);
+    const lastEventId = req.headers.get("last-event-id") ?? req.nextUrl.searchParams.get("last_event_id");
 
     if (channels.length === 0) {
       throw new ApiError("DATA_QUERY_INVALID", { details: { hint: "channels required" } });
@@ -42,7 +43,8 @@ async function handler(req: NextRequest, ctx: { params: Record<string, string | 
           }
         }
 
-        function send(event: string, data: unknown) {
+        function send(event: string, data: unknown, id?: string) {
+          if (id) write(`id: ${id}\n`);
           write(`event: ${event}\n`);
           write(`data: ${JSON.stringify(data)}\n\n`);
         }
@@ -69,6 +71,11 @@ async function handler(req: NextRequest, ctx: { params: Record<string, string | 
           }
         };
         RealtimeService.addSubscriber(subscriber);
+        void RealtimeService.replay(subscriber, lastEventId)
+          .then((result) => {
+            if (result.missed) send("replay-missed", { lastEventId, at: Date.now() });
+          })
+          .catch(() => {});
 
         keepaliveTimer = setInterval(() => {
           write(`: ping ${Date.now()}\n\n`);

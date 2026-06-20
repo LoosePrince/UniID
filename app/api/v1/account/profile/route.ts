@@ -22,11 +22,17 @@ export const PUT = withCors(
     schema: { body: profileBody },
     handler: async ({ body }) => {
       const auth = await requireConsoleAuth();
+      const current = await prisma.user.findUnique({
+        where: { id: auth.user.id },
+        select: { email: true }
+      });
+      const nextEmail = body.email ? body.email : null;
       const user = await prisma.user.update({
         where: { id: auth.user.id },
         data: {
           displayName: body.displayName,
-          email: body.email ? body.email : null,
+          email: nextEmail,
+          emailVerifiedAt: current?.email === nextEmail ? undefined : null,
           locale: body.locale ?? "zh-CN",
           updatedAt: now()
         },

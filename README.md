@@ -255,7 +255,7 @@ API 前缀：`/api/v1/...`，错误响应为统一 envelope。完整列表见 [d
 
 1. **密钥**：生产环境必须设置强随机 `AUTH_JWT_SECRET` 与 `SESSION_COOKIE_SECRET`，勿提交 `.env`。
 2. **SQLite**：适合单机与小规模；多实例部署需迁移到 PostgreSQL 等并调整 Prisma datasource。
-3. **Cron / Webhook 重试**：当前为**单进程**设计（`node-cron` + `setTimeout` 重试）；水平扩展需外置调度与队列。
+3. **Cron / Webhook / Outbox**：内置进程级 worker 会重放 pending/failed outbox、恢复到期 Webhook 重试，并用数据库短租约降低多实例重复触发；严格高可用水平扩展仍建议接外置调度与队列。
 4. **S3**：文件与分片上传依赖 S3 兼容端点；未配置时仅元数据/数据库能力可用。
 5. **构建**：`npm run build` 已通过；Server 端依赖 `node:` 内置模块与 `node-cron` 已在 `next.config.mjs` 中 externalize。
 

@@ -43,10 +43,13 @@ export const GET = withCors(
           ownerId: app.ownerId,
           owner: app.owner ? { id: app.owner.id, username: app.owner.username } : null,
           createdAt: app.createdAt,
-          domains: app.domains.map((d: { id: string; host: string; verified: number }) => ({
+          domains: app.domains.map((d: { id: string; host: string; verified: number; verifyToken: string | null; createdAt: number }) => ({
             id: d.id,
             host: d.host,
-            verified: d.verified === 1
+            verified: d.verified === 1,
+            verifyToken: d.verifyToken,
+            createdAt: d.createdAt,
+            verification: AppService.domainVerificationRecord(d.host, d.verifyToken)
           })),
           admins: app.admins.map((a: { user: { id: string; username: string } }) => ({
             id: a.user.id,

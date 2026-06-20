@@ -3,6 +3,9 @@ import { prisma } from "@/shared/prisma";
 import type { DomainEventEnvelope, DomainEventMap, DomainEventName } from "./events";
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
+const CLAIM_LEASE_SECONDS = 60;
+const MAX_ATTEMPTS = 8;
+const BACKOFF_SECONDS = [60, 300, 900, 3600, 14_400, 43_200, 86_400, 86_400];
 
 function serialize(value: unknown): string {
   return JSON.stringify(value);
@@ -79,6 +82,7 @@ export class EventOutboxService {
       data: {
         status: "dispatched",
         dispatchedAt: t,
+        nextAttemptAt: null,
         updatedAt: t,
         errorMessage: null
       }
@@ -87,16 +91,40 @@ export class EventOutboxService {
 
   static async markFailed(eventId: string, error: unknown): Promise<void> {
     const t = nowSeconds();
+    const existing = await prisma.eventOutbox.findUnique({
+      where: { id: eventId },
+      select: { attempts: true }
+    });
+    const attempts = (existing?.attempts ?? 0) + 1;
+    const dlq = attempts >= MAX_ATTEMPTS;
+    const wait = BACKOFF_SECONDS[Math.min(attempts - 1, BACKOFF_SECONDS.length - 1)]!;
+
     await prisma.eventOutbox.update({
       where: { id: eventId },
       data: {
-        status: "failed",
-        attempts: { increment: 1 },
+        status: dlq ? "dlq" : "failed",
+        attempts,
         errorMessage: String(error).slice(0, 2048),
-        nextAttemptAt: t + 60,
+        nextAttemptAt: dlq ? null : t + wait,
         updatedAt: t
       }
     });
+  }
+
+  static async claimDue(eventId: string, leaseSeconds = CLAIM_LEASE_SECONDS): Promise<boolean> {
+    const t = nowSeconds();
+    const result = await prisma.eventOutbox.updateMany({
+      where: {
+        id: eventId,
+        status: { in: ["pending", "failed"] },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: t } }]
+      },
+      data: {
+        nextAttemptAt: t + leaseSeconds,
+        updatedAt: t
+      }
+    });
+    return result.count > 0;
   }
 
   static parseEnvelope(value: string): DomainEventEnvelope | null {

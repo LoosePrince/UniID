@@ -11,6 +11,8 @@ const events: DomainEventName[] = [
   "file.deleted",
   "auth.login",
   "auth.logout",
+  "auth.email_verified",
+  "auth.password_reset",
   "authorization.granted",
   "authorization.revoked",
   "schema.activated"

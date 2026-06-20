@@ -10,6 +10,22 @@ import { logger } from "@/shared/logger";
 const now = () => Math.floor(Date.now() / 1000);
 const MAX_ATTEMPTS = 6;
 const BACKOFF_SECONDS = [10, 60, 300, 900, 3600, 14400];
+const RETRY_WORKER_INTERVAL_MS = 30_000;
+const DELIVERY_LEASE_SECONDS = 60;
+
+type RetryWorkerState = {
+  timer: ReturnType<typeof setInterval> | null;
+  running: boolean;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __uniid_webhook_retry_worker__: RetryWorkerState | undefined;
+}
+
+const retryWorkerState: RetryWorkerState =
+  globalThis.__uniid_webhook_retry_worker__ ?? { timer: null, running: false };
+globalThis.__uniid_webhook_retry_worker__ = retryWorkerState;
 
 function shouldDeliver(events: string[], name: DomainEventName): boolean {
   if (events.length === 0) return false;
@@ -29,7 +45,27 @@ function sign(secret: string, body: string, timestamp: number): string {
   return h.digest("hex");
 }
 
+async function claimDelivery(deliveryId: string, leaseSeconds = DELIVERY_LEASE_SECONDS): Promise<boolean> {
+  const t = now();
+  const result = await prisma.webhookDelivery.updateMany({
+    where: {
+      id: deliveryId,
+      status: { in: ["pending", "failed"] },
+      OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: t } }]
+    },
+    data: {
+      status: "pending",
+      nextRetryAt: t + leaseSeconds,
+      updatedAt: t
+    }
+  });
+  return result.count > 0;
+}
+
 async function attemptDelivery(deliveryId: string) {
+  const claimed = await claimDelivery(deliveryId);
+  if (!claimed) return;
+
   const delivery = await prisma.webhookDelivery.findUnique({
     where: { id: deliveryId },
     include: { webhook: true }
@@ -60,7 +96,7 @@ async function attemptDelivery(deliveryId: string) {
     if (res.status >= 200 && res.status < 300) {
       await prisma.webhookDelivery.update({
         where: { id: deliveryId },
-        data: { status: "success", statusCode: res.status, durationMs, updatedAt: t }
+        data: { status: "success", statusCode: res.status, durationMs, nextRetryAt: null, updatedAt: t }
       });
       return;
     }
@@ -69,6 +105,49 @@ async function attemptDelivery(deliveryId: string) {
   } catch (err) {
     await scheduleRetry(deliveryId, delivery.attempt + 1, String(err));
   }
+}
+
+async function replayDueDeliveries(limit = 100): Promise<{ attempted: number; failed: number }> {
+  if (retryWorkerState.running) return { attempted: 0, failed: 0 };
+  retryWorkerState.running = true;
+  try {
+    const t = now();
+    const deliveries = await prisma.webhookDelivery.findMany({
+      where: {
+        status: { in: ["pending", "failed"] },
+        OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: t } }],
+        webhook: { isActive: 1 }
+      },
+      orderBy: { updatedAt: "asc" },
+      take: Math.min(Math.max(limit, 1), 500)
+    });
+
+    let failed = 0;
+    for (const delivery of deliveries) {
+      try {
+        await attemptDelivery(delivery.id);
+      } catch (err) {
+        failed += 1;
+        logger.error({ err, deliveryId: delivery.id }, "webhook due delivery replay failed");
+      }
+    }
+
+    return { attempted: deliveries.length, failed };
+  } finally {
+    retryWorkerState.running = false;
+  }
+}
+
+function startRetryWorker() {
+  if (retryWorkerState.timer) return;
+  retryWorkerState.timer = setInterval(() => {
+    replayDueDeliveries().then((result) => {
+      if (result.attempted > 0 || result.failed > 0) {
+        logger.info(result, "webhook due deliveries replay completed");
+      }
+    }).catch((err) => logger.error({ err }, "webhook due delivery worker failed"));
+  }, RETRY_WORKER_INTERVAL_MS);
+  (retryWorkerState.timer as { unref?: () => void }).unref?.();
 }
 
 async function scheduleRetry(deliveryId: string, nextAttempt: number, error: string, statusCode?: number, durationMs?: number) {
@@ -101,7 +180,7 @@ async function scheduleRetry(deliveryId: string, nextAttempt: number, error: str
       updatedAt: t
     }
   });
-  // 简单的 setTimeout 调度（单实例 OK）
+  // setTimeout 是快速路径；进程重启或错过窗口时由 retry worker 从数据库恢复。
   setTimeout(() => attemptDelivery(deliveryId).catch(() => {}), wait * 1000);
 }
 
@@ -147,6 +226,8 @@ function ensureBoot() {
     "file.deleted",
     "auth.login",
     "auth.logout",
+    "auth.email_verified",
+    "auth.password_reset",
     "authorization.granted",
     "authorization.revoked",
     "schema.activated"
@@ -154,12 +235,22 @@ function ensureBoot() {
   for (const e of events) {
     bus.on(e, (env) => dispatch(env));
   }
+  startRetryWorker();
+  replayDueDeliveries().then((result) => {
+    if (result.attempted > 0 || result.failed > 0) {
+      logger.info(result, "webhook due deliveries replay completed");
+    }
+  }).catch((err) => logger.error({ err }, "webhook due delivery replay failed"));
   booted = true;
 }
 
 export class WebhooksService {
   static ensureBoot() {
     ensureBoot();
+  }
+
+  static async replayDueDeliveries(limit = 100) {
+    return replayDueDeliveries(limit);
   }
 
   static async listForApp(appId: string) {

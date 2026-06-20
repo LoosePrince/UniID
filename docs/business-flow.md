@@ -261,7 +261,7 @@ id / appId / type / resourceType / resourceId / actor / before / after / diff / 
 - Function trigger：按事件触发函数。
 - Audit：记录关键动作和 explain 摘要。
 
-事件源统一通过持久化 Outbox 发布。运行时启动后会挂载 Realtime、Audit、Webhooks 和 Function event trigger，并对 pending/failed outbox 做一次 replay。这样 API 写入和异步消费使用同一份事件事实，不再出现“API 已过滤但 SSE 泄露”或“内存事件丢失后无法补偿”的双轨问题。
+事件源统一通过持久化 Outbox 发布。运行时启动后会挂载 Realtime、Audit、Webhooks 和 Function event trigger，并通过周期 worker 持续重放 pending/failed outbox；重放前会使用数据库短租约领取事件，失败超过上限后进入 dlq。这样 API 写入和异步消费使用同一份事件事实，不再出现“API 已过滤但 SSE 泄露”或“内存事件丢失后无法补偿”的双轨问题。
 
 ## Console
 

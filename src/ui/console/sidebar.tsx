@@ -11,6 +11,7 @@ import {
   Clock,
   Webhook,
   Shield,
+  ClipboardList,
   Users,
   Settings,
   BookOpen,
@@ -48,6 +49,7 @@ export function ConsoleSidebar({
         { href: `/console/apps/${appId}/functions`, label: t("common.functions"), icon: Code2 },
         { href: `/console/apps/${appId}/cron`, label: t("common.cron"), icon: Clock },
         { href: `/console/apps/${appId}/webhooks`, label: t("common.webhooks"), icon: Webhook },
+        { href: `/console/apps/${appId}/audit`, label: t("common.auditLogs"), icon: ClipboardList },
         { href: `/console/apps/${appId}/members`, label: t("common.members"), icon: Users },
         { href: "/docs", label: t("common.docs"), icon: BookOpen },
         { href: `/console/apps/${appId}/settings`, label: t("common.settings"), icon: Settings }

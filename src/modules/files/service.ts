@@ -145,6 +145,9 @@ export class FileService {
   static async getDownloadUrl(fileId: string): Promise<string> {
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
+    if (file.appId) {
+      await QuotaService.consume(file.appId, "egressBytes", file.size);
+    }
     const client = getS3ExternalClient();
     const url = await getSignedUrl(
       client,
@@ -218,6 +221,9 @@ export class FileService {
     if (!row || row.revokedAt) throw new ApiError("FILE_SHARE_TOKEN_INVALID");
     if (row.expiresAt <= now()) throw new ApiError("FILE_SHARE_TOKEN_INVALID");
     if (!row.file || row.file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
+    if (row.file.appId) {
+      await QuotaService.consume(row.file.appId, "egressBytes", row.file.size);
+    }
     const url = await getSignedUrl(
       getS3ExternalClient(),
       new GetObjectCommand({ Bucket: row.file.bucket, Key: row.file.objectKey }),

@@ -13,6 +13,21 @@ import { FunctionsService } from "@/modules/functions";
 import { logger } from "@/shared/logger";
 
 const now = () => Math.floor(Date.now() / 1000);
+const DEFAULT_RUN_LEASE_SECONDS = 30;
+
+function leaseSecondsForCron(cronExpr: string): number {
+  const parts = cronExpr.trim().split(/\s+/);
+  const seconds = parts[0];
+  if (parts.length !== 6 || !seconds) return DEFAULT_RUN_LEASE_SECONDS;
+  if (seconds === "*") return 1;
+
+  const step = seconds.match(/^\*\/(\d+)$/)?.[1];
+  if (!step) return DEFAULT_RUN_LEASE_SECONDS;
+
+  const value = Number(step);
+  if (!Number.isFinite(value) || value <= 1) return 1;
+  return Math.max(1, Math.min(DEFAULT_RUN_LEASE_SECONDS, value - 1));
+}
 
 declare global {
   // eslint-disable-next-line no-var
@@ -69,7 +84,7 @@ export class CronService {
     const t = now();
     const job = await prisma.cronJob.update({
       where: { id: existing.id },
-      data: { isActive: isActive ? 1 : 0, updatedAt: t }
+      data: { isActive: isActive ? 1 : 0, nextRunAt: isActive ? null : existing.nextRunAt, updatedAt: t }
     });
     if (isActive) this.startTask(job);
     else this.stopTask(job.id);
@@ -104,6 +119,7 @@ export class CronService {
         fnId,
         payload: input.payload === undefined ? undefined : JSON.stringify(input.payload),
         isActive: input.isActive === undefined ? undefined : input.isActive ? 1 : 0,
+        nextRunAt: input.cronExpr || input.isActive === true ? null : undefined,
         updatedAt: now()
       }
     });
@@ -161,6 +177,9 @@ export class CronService {
     this.stopTask(job.id);
     if (!cron.validate(job.cronExpr)) return;
     const task = cron.schedule(job.cronExpr, async () => {
+      const claimed = await this.claimScheduledRun(job);
+      if (!claimed) return;
+
       try {
         const payload = job.payload ? JSON.parse(job.payload) : {};
         const r = await FunctionsService.invoke({
@@ -182,6 +201,22 @@ export class CronService {
       }
     });
     tasks.set(job.id, task);
+  }
+
+  private static async claimScheduledRun(job: { id: string; cronExpr: string }) {
+    const t = now();
+    const result = await prisma.cronJob.updateMany({
+      where: {
+        id: job.id,
+        isActive: 1,
+        OR: [{ nextRunAt: null }, { nextRunAt: { lte: t } }]
+      },
+      data: {
+        nextRunAt: t + leaseSecondsForCron(job.cronExpr),
+        updatedAt: t
+      }
+    });
+    return result.count > 0;
   }
 
   private static stopTask(jobId: string) {

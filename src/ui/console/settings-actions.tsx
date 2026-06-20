@@ -6,7 +6,7 @@ import * as React from "react";
 
 import { useRouter } from "next/navigation";
 
-import { AlertTriangle, Globe2, Save, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Copy, Globe2, KeyRound, RefreshCw, RotateCcw, Save, Trash2 } from "lucide-react";
 
 import {
 
@@ -50,6 +50,29 @@ interface ApiErrorResponse {
 
 }
 
+interface ApiKeySummary {
+  id: string;
+  label: string;
+  prefix: string;
+  scopes: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+  revokedAt: number | null;
+  createdBy?: { id: string; username: string } | null;
+}
+
+interface DomainSummary {
+  id: string;
+  host: string;
+  verified: boolean;
+  verifyToken: string | null;
+  verification: {
+    type: string;
+    name: string;
+    value: string;
+  };
+}
+
 
 
 interface BasicInfoFormProps {
@@ -90,6 +113,30 @@ function apiMessage(json: ApiErrorResponse, fallback: string) {
 
   return json.error?.message ?? fallback;
 
+}
+
+async function copyText(value: string, label: string) {
+  await navigator.clipboard.writeText(value);
+  toast.success(label);
+}
+
+function parseScopes(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((item): item is string => typeof item === "string");
+  } catch {}
+  return [];
+}
+
+function parseScopeInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 
@@ -472,6 +519,174 @@ export function QuotaForm({ appId, quota }: QuotaFormProps) {
 
   );
 
+}
+
+export function ApiKeysPanel({ appId, keys }: { appId: string; keys: ApiKeySummary[] }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [label, setLabel] = React.useState("");
+  const [scopes, setScopes] = React.useState("*");
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [secret, setSecret] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function createKey(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    setBusy("create");
+    setError(null);
+    setSecret(null);
+    try {
+      const res = await fetch(`/api/v1/apps/${appId}/api-keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ label: trimmed, scopes: parseScopeInput(scopes) })
+      });
+      const json = (await res.json().catch(() => ({}))) as ApiErrorResponse & { secret?: string };
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      setLabel("");
+      setScopes("*");
+      setSecret(json.secret ?? null);
+      toast.success(t("settings.apiKeyCreated"), { description: trimmed });
+      router.refresh();
+    } catch (err) {
+      const message = String((err as Error).message ?? err);
+      setError(message);
+      toast.error(t("common.createFailed"), { description: message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function revokeKey(key: ApiKeySummary) {
+    setBusy(`revoke:${key.id}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/apps/${appId}/api-keys/${key.id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      toast.success(t("settings.apiKeyRevoked"), { description: key.label });
+      router.refresh();
+    } catch (err) {
+      const message = String((err as Error).message ?? err);
+      setError(message);
+      toast.error(t("common.operationFailed"), { description: message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rotateKey(key: ApiKeySummary) {
+    setBusy(`rotate:${key.id}`);
+    setError(null);
+    setSecret(null);
+    try {
+      const res = await fetch(`/api/v1/apps/${appId}/api-keys/${key.id}/rotate`, {
+        method: "POST",
+        credentials: "include"
+      });
+      const json = (await res.json().catch(() => ({}))) as ApiErrorResponse & { secret?: string };
+      if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+      setSecret(json.secret ?? null);
+      toast.success(t("settings.apiKeyRotated"), { description: key.label });
+      router.refresh();
+    } catch (err) {
+      const message = String((err as Error).message ?? err);
+      setError(message);
+      toast.error(t("common.operationFailed"), { description: message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={createKey} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
+        <Field htmlFor="api-key-label" label={t("settings.apiKeyLabel")} error={error ?? undefined}>
+          <Input
+            id="api-key-label"
+            maxLength={80}
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            disabled={busy !== null}
+            placeholder="CI import"
+          />
+        </Field>
+        <Field htmlFor="api-key-scopes" label={t("settings.apiKeyScopes")} help={t("settings.apiKeyScopesHelp")}>
+          <Input
+            id="api-key-scopes"
+            value={scopes}
+            onChange={(event) => setScopes(event.target.value)}
+            disabled={busy !== null}
+            placeholder="*"
+          />
+        </Field>
+        <Button type="submit" className="sm:mt-5" loading={busy === "create"} loadingText={t("common.creating")} disabled={!label.trim()}>
+          <KeyRound /> {t("settings.createApiKey")}
+        </Button>
+      </form>
+
+      {secret ? (
+        <div className="rounded-md border border-success-500/30 bg-success-50/70 p-3 text-sm dark:bg-success-700/20">
+          <div className="mb-2 flex items-center gap-2 font-medium text-success-700 dark:text-success-100">
+            <CheckCircle2 className="h-4 w-4" /> {t("settings.apiKeySecretTitle")}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <code className="min-w-0 flex-1 break-all rounded-md bg-white/70 px-3 py-2 text-xs text-ink-800 dark:bg-slate-900/60 dark:text-slate-100">
+              {secret}
+            </code>
+            <Button type="button" variant="outline" size="sm" onClick={() => copyText(secret, t("settings.copied"))}>
+              <Copy /> {t("settings.copy")}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-success-700/90 dark:text-success-100/80">{t("settings.apiKeySecretHelp")}</p>
+        </div>
+      ) : null}
+
+      {keys.length === 0 ? (
+        <p className="text-sm text-ink-500 dark:text-slate-400">{t("settings.apiKeysEmpty")}</p>
+      ) : (
+        <div className="divide-y divide-ink-100 rounded-md border border-ink-100 dark:divide-slate-700 dark:border-slate-700">
+          {keys.map((key) => {
+            const keyScopes = parseScopes(key.scopes);
+            const revoked = key.revokedAt != null;
+            return (
+              <div key={key.id} className="grid gap-3 p-3 text-sm lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink-900 dark:text-slate-100">{key.label}</span>
+                    <span className="font-mono text-xs text-ink-500">{key.prefix}</span>
+                    <span className={revoked ? "text-xs text-danger-700" : "text-xs text-success-700"}>
+                      {revoked ? t("settings.apiKeyRevokedStatus") : t("common.active")}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-ink-500 dark:text-slate-400">
+                    {t("settings.apiKeyMeta", {
+                      scopes: keyScopes.length ? keyScopes.join(", ") : "—",
+                      lastUsed: key.lastUsedAt ? new Date(key.lastUsedAt * 1000).toLocaleString() : t("settings.neverUsed")
+                    })}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => rotateKey(key)} loading={busy === `rotate:${key.id}`}>
+                    <RotateCcw /> {t("settings.rotateApiKey")}
+                  </Button>
+                  <Button type="button" variant="danger" size="sm" onClick={() => revokeKey(key)} loading={busy === `revoke:${key.id}`} disabled={revoked}>
+                    <Trash2 /> {t("settings.revokeApiKey")}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 
@@ -883,6 +1098,103 @@ export function RemoveDomainButton({
 
   );
 
+}
+
+export function DomainVerificationActions({
+  appId,
+  domain,
+  canManualVerify = false
+}: {
+  appId: string;
+  domain: DomainSummary;
+  canManualVerify?: boolean;
+}) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [busy, setBusy] = React.useState<"verify" | "manual" | "token" | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function post(path: string, body?: Record<string, unknown>) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      credentials: "include",
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const json = (await res.json().catch(() => ({}))) as ApiErrorResponse;
+    if (!res.ok) throw new Error(apiMessage(json, t("http.status", { status: String(res.status) })));
+  }
+
+  async function verify(manual: boolean) {
+    setBusy(manual ? "manual" : "verify");
+    setError(null);
+    try {
+      await post(`/api/v1/apps/${appId}/domains/${domain.id}/verify`, { manual });
+      toast.success(t(manual ? "settings.domainManualVerified" : "settings.domainVerified"), {
+        description: domain.host
+      });
+      router.refresh();
+    } catch (err) {
+      const message = String((err as Error).message ?? err);
+      setError(message);
+      toast.error(t("common.operationFailed"), { description: message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function rotateToken() {
+    setBusy("token");
+    setError(null);
+    try {
+      await post(`/api/v1/apps/${appId}/domains/${domain.id}/token`);
+      toast.success(t("settings.domainTokenRotated"), { description: domain.host });
+      router.refresh();
+    } catch (err) {
+      const message = String((err as Error).message ?? err);
+      setError(message);
+      toast.error(t("common.operationFailed"), { description: message });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-md border border-ink-100 bg-cream-50/60 p-3 dark:border-slate-700 dark:bg-slate-900/40">
+      <div className="grid gap-2 text-xs sm:grid-cols-[88px_1fr_auto] sm:items-center">
+        <span className="font-medium text-ink-500 dark:text-slate-400">{domain.verification.type}</span>
+        <code className="min-w-0 break-all rounded bg-white/70 px-2 py-1 text-ink-700 dark:bg-slate-800/70 dark:text-slate-100">
+          {domain.verification.name}
+        </code>
+        <Button type="button" variant="ghost" size="xs" onClick={() => copyText(domain.verification.name, t("settings.copied"))}>
+          <Copy /> {t("settings.copy")}
+        </Button>
+      </div>
+      <div className="grid gap-2 text-xs sm:grid-cols-[88px_1fr_auto] sm:items-center">
+        <span className="font-medium text-ink-500 dark:text-slate-400">{t("settings.domainTxtValue")}</span>
+        <code className="min-w-0 break-all rounded bg-white/70 px-2 py-1 text-ink-700 dark:bg-slate-800/70 dark:text-slate-100">
+          {domain.verification.value}
+        </code>
+        <Button type="button" variant="ghost" size="xs" onClick={() => copyText(domain.verification.value, t("settings.copied"))}>
+          <Copy /> {t("settings.copy")}
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => verify(false)} loading={busy === "verify"} disabled={domain.verified}>
+          <CheckCircle2 /> {t("settings.verifyDomain")}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={rotateToken} loading={busy === "token"}>
+          <RefreshCw /> {t("settings.rotateDomainToken")}
+        </Button>
+        {canManualVerify ? (
+          <Button type="button" variant="ghost" size="sm" onClick={() => verify(true)} loading={busy === "manual"} disabled={domain.verified}>
+            <CheckCircle2 /> {t("settings.manualVerifyDomain")}
+          </Button>
+        ) : null}
+      </div>
+      {error ? <p className="text-xs leading-5 text-danger-700">{error}</p> : null}
+    </div>
+  );
 }
 
 

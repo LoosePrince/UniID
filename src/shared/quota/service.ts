@@ -21,6 +21,10 @@ const monthUTC = () => {
 
 export type QuotaMetric = "apiCalls" | "fnInvocations" | "storageBytes" | "egressBytes";
 
+function periodForMetric(metric: QuotaMetric) {
+  return metric === "apiCalls" || metric === "fnInvocations" ? todayUTC() : monthUTC();
+}
+
 export class QuotaService {
   static async getOrDefault(appId: string) {
     const existing = await prisma.quota.findUnique({ where: { appId } });
@@ -32,7 +36,7 @@ export class QuotaService {
         rpsLimit: c.QUOTA_RPS_DEFAULT,
         dailyApiCalls: c.QUOTA_DAILY_API_DEFAULT,
         monthlyStorageBytes: BigInt(c.QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT),
-        monthlyEgressBytes: BigInt(c.QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT),
+        monthlyEgressBytes: BigInt(c.QUOTA_MONTHLY_EGRESS_BYTES_DEFAULT),
         fnInvocationsDaily: c.QUOTA_FN_INVOCATIONS_DAILY_DEFAULT,
         updatedAt: Math.floor(Date.now() / 1000)
       }
@@ -65,10 +69,19 @@ export class QuotaService {
     return row ?? { appId, period, apiCalls: 0, fnInvocations: 0, storageBytes: 0, egressBytes: 0 };
   }
 
+  /** 指定指标当前周期使用量。 */
+  static async usageForMetric(appId: string, metric: QuotaMetric) {
+    const period = periodForMetric(metric);
+    const row = await prisma.quotaUsage.findUnique({
+      where: { appId_period: { appId, period } }
+    });
+    return row ?? { appId, period, apiCalls: 0, fnInvocations: 0, storageBytes: BigInt(0), egressBytes: BigInt(0) };
+  }
+
   /** 累加使用量并检查是否超额。 */
   static async consume(appId: string, metric: QuotaMetric, amount: number | bigint = 1) {
     const quota = await this.getOrDefault(appId);
-    const period = todayUTC();
+    const period = periodForMetric(metric);
     const amt = typeof amount === "bigint" ? amount : BigInt(amount);
     const amtNum = typeof amount === "number" ? amount : Number(amount);
 
@@ -98,6 +111,9 @@ export class QuotaService {
     }
     if (metric === "storageBytes" && usage.storageBytes > quota.monthlyStorageBytes) {
       throw new ApiError("QUOTA_EXCEEDED", { message: "error.detail.quotaMonthlyStorageExceeded" });
+    }
+    if (metric === "egressBytes" && usage.egressBytes > quota.monthlyEgressBytes) {
+      throw new ApiError("QUOTA_EXCEEDED", { message: "error.detail.quotaMonthlyEgressExceeded" });
     }
 
     return usage;

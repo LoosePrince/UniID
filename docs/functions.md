@@ -28,8 +28,12 @@ export default async function handler(event) {
 ## Host API（注入到沙箱）
 
 - `uniid.log(...args)` — 记录到 `FunctionInvocation.logs`
-- `uniid.fetch(url, init?)` — 受 `FN_FETCH_WHITELIST` 限制；默认 5s 超时
-- `uniid.data.*` / `uniid.files.*`（未来）— 走 PolicyEngine，以 `$function:{name}` 身份
+- `uniid.fetch(url, init?)` — 受 `FN_FETCH_WHITELIST` 限制；默认 5s 超时，响应出站字节计入月度 egress 配额
+- `uniid.data.{query,get,create,update,delete,fieldOps}` — 走 PolicyEngine，以 `$function:{name}` 身份访问当前 App 数据
+- `uniid.files.{getDownloadUrl,share,getActiveShareToken,revokeShareTokens}` — 仅允许访问当前 App 文件，下载/分享访问计入 egress 配额
+- `uniid.broadcast(channel, payload?)` — 向当前 App 的 Realtime broadcast 频道发送消息
+
+`uniid.data.*` 默认不是管理员绕过；需要在 Policy DSL 中显式授权 `$function:{functionName}`。
 
 ## 限额
 

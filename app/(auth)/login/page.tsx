@@ -14,6 +14,8 @@ function LoginPageContent() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [needsMfa, setNeedsMfa] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -23,11 +25,17 @@ function LoginPageContent() {
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, ...(needsMfa ? { totpCode } : {}) }),
         credentials: "include"
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (data?.error?.code === "AUTH_MFA_REQUIRED") {
+          setNeedsMfa(true);
+          toast.info(data?.error?.message ?? "请输入两步验证码");
+          setLoading(false);
+          return;
+        }
         toast.error(t("auth.login.failed"), {
           description: data?.error?.message ?? t("http.status", { status: res.status })
         });
@@ -74,6 +82,21 @@ function LoginPageContent() {
               minLength={8}
             />
           </div>
+          {needsMfa ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="login-totp">两步验证码</Label>
+              <Input
+                id="login-totp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                required
+                minLength={6}
+                maxLength={6}
+              />
+            </div>
+          ) : null}
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
             {loading ? <Spinner className="text-cream-50" /> : null}
             {loading ? t("auth.login.submitting") : t("auth.login.submit")}

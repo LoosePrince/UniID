@@ -57,6 +57,15 @@ export type DomainEventMap = {
     sessionId: string;
     at: number;
   };
+  "auth.email_verified": {
+    userId: string;
+    email: string;
+    at: number;
+  };
+  "auth.password_reset": {
+    userId: string;
+    at: number;
+  };
   "authorization.granted": {
     userId: string;
     appId: string;

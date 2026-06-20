@@ -5,6 +5,7 @@ export const ErrorCodes = {
   // AUTH 认证 / 会话
   AUTH_INVALID_CREDENTIALS: { http: 401, message: "用户名或密码错误" },
   AUTH_INVALID_TOKEN: { http: 401, message: "Token 无效或已过期" },
+  AUTH_API_KEY_REVOKED: { http: 401, message: "API Key 已被吊销" },
   AUTH_TOKEN_EXPIRED: { http: 401, message: "Token 已过期" },
   AUTH_REFRESH_REUSED: { http: 401, message: "刷新令牌已被使用过，请重新登录" },
   AUTH_SESSION_NOT_FOUND: { http: 401, message: "会话不存在或已撤销" },
@@ -15,8 +16,13 @@ export const ErrorCodes = {
   AUTH_REGISTER_USERNAME_TAKEN: { http: 409, message: "用户名已被注册" },
   AUTH_REGISTER_EMAIL_TAKEN: { http: 409, message: "邮箱已被注册" },
   AUTH_CHANGE_PASSWORD_INVALID_OLD: { http: 400, message: "原密码不正确" },
+  AUTH_EMAIL_ALREADY_VERIFIED: { http: 409, message: "邮箱已完成验证" },
+  AUTH_EMAIL_REQUIRED: { http: 400, message: "当前账号未绑定邮箱" },
+  AUTH_MFA_INVALID: { http: 401, message: "两步验证码无效" },
+  AUTH_MFA_REQUIRED: { http: 401, message: "需要两步验证码" },
   AUTH_PARENT_ORIGIN_REQUIRED: { http: 400, message: "缺少 parent_origin 参数" },
   AUTH_PARENT_ORIGIN_MISMATCH: { http: 403, message: "parent_origin 与应用域名不匹配" },
+  AUTH_RESET_TOKEN_INVALID: { http: 401, message: "重置密码链接无效或已过期" },
   AUTH_SAME_ORIGIN_REQUIRED: { http: 403, message: "该接口仅允许同源请求" },
 
   // APP 应用注册 / 域名
@@ -25,6 +31,7 @@ export const ErrorCodes = {
   APP_ORIGIN_MISMATCH: { http: 403, message: "请求来源与应用注册的域名不匹配" },
   APP_FORBIDDEN: { http: 403, message: "无权操作该应用" },
   APP_DOMAIN_INVALID: { http: 400, message: "域名格式不合法" },
+  APP_DOMAIN_VERIFY_FAILED: { http: 400, message: "域名验证失败" },
 
   // DATA 数据记录
   DATA_RECORD_NOT_FOUND: { http: 404, message: "记录不存在" },

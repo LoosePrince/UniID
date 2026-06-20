@@ -44,6 +44,7 @@ const envSchema = z.object({
   QUOTA_RPS_DEFAULT: numberFromString.default("60"),
   QUOTA_DAILY_API_DEFAULT: numberFromString.default("1000000"),
   QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT: numberFromString.default("10737418240"),
+  QUOTA_MONTHLY_EGRESS_BYTES_DEFAULT: numberFromString.default("53687091200"),
   QUOTA_FN_INVOCATIONS_DAILY_DEFAULT: numberFromString.default("100000"),
 
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

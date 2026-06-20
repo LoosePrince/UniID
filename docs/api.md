@@ -81,13 +81,13 @@
 ## Realtime
 
 ```
-GET /api/v1/realtime/stream?app_id=app_xxx&channels=records:post,broadcast:room1
+GET /api/v1/realtime/stream?app_id=app_xxx&channels=records:post,broadcast:room1,presence:room1
 Authorization: Bearer ...
 Last-Event-ID: ...   # 可选，60s 内可重放
 Accept: text/event-stream
 ```
 
-返回 SSE 流；事件 payload：
+返回 SSE 流；服务端会写入 SSE `id:`，客户端可通过 `Last-Event-ID` 或 `last_event_id` query 在 60s 内重放。事件 payload：
 
 ```json
 { "type": "insert", "channel": "records:post", "payload": { ... } }
@@ -95,7 +95,7 @@ Accept: text/event-stream
 
 支持频道：
 - `records:{appId}:{dataType}` / `records:{appId}:{dataType}:{recordId}`
-- `query:{queryHash}`
+- `query:{appId}:{dataType}:{dslBase64Url?}` / SDK 简写 `query:{dataType}:{dslBase64Url?}`
 - `broadcast:{appId}:{name}`
 - `presence:{appId}:{name}`
 
