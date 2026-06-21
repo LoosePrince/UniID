@@ -1,12 +1,13 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { config } from "@/shared/config";
 
-export type ActionTokenPurpose = "email_verify" | "password_reset";
+export type ActionTokenPurpose = "email_verify" | "password_reset" | "register_email_code";
 
 export interface ActionTokenPayload {
   purpose: ActionTokenPurpose;
   userId: string;
   email?: string | null;
+  codeHash?: string | null;
   exp: number;
   nonce: string;
 }
@@ -29,12 +30,14 @@ export function issueActionToken(input: {
   purpose: ActionTokenPurpose;
   userId: string;
   email?: string | null;
+  codeHash?: string | null;
   ttlSeconds: number;
 }) {
   const payload: ActionTokenPayload = {
     purpose: input.purpose,
     userId: input.userId,
     email: input.email ?? null,
+    codeHash: input.codeHash ?? null,
     exp: Math.floor(Date.now() / 1000) + input.ttlSeconds,
     nonce: randomBytes(12).toString("base64url")
   };

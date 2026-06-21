@@ -8,7 +8,9 @@ const bodySchema = z.object({
   username: usernameSchema,
   password: passwordSchema,
   email: emailSchema,
-  displayName: z.string().max(64).optional()
+  displayName: z.string().max(64).optional(),
+  emailVerificationCode: z.string().trim().regex(/^\d{6}$/).optional(),
+  emailVerificationChallenge: z.string().trim().min(1).optional()
 });
 
 export const POST = withCors(

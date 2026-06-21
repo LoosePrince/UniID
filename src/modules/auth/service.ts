@@ -4,8 +4,10 @@
  * 不直接处理 HTTP；所有 HTTP/CORS/zod 由 route 层负责。
  */
 
+import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
+import { config } from "@/shared/config";
 import {
   hashPassword,
   verifyPassword,
@@ -22,9 +24,11 @@ import {
 } from "@/shared/iam";
 import { bus } from "@/shared/bus";
 import { escapeHtml, sendMail } from "@/shared/mail";
+import { getSystemConfig } from "@/shared/system-config";
 import { getAuthSecurityConfig } from "./security-config";
 
 const now = () => Math.floor(Date.now() / 1000);
+const REGISTER_EMAIL_CODE_TTL_SECONDS = 10 * 60;
 
 export interface CreatedSession {
   accessToken: string;
@@ -56,9 +60,19 @@ export class AuthService {
     password: string;
     email?: string;
     displayName?: string;
+    emailVerificationCode?: string;
+    emailVerificationChallenge?: string;
   }) {
+    const registrationConfig = await getSystemConfig();
+    if (!registrationConfig.registrationEnabled) throw new ApiError("AUTH_REGISTRATION_DISABLED");
+
+    const email = normalizeOptionalEmail(input.email);
+    const emailVerifiedAt = registrationConfig.registrationEmailVerificationRequired
+      ? verifyRequiredRegistrationEmail(email, input.emailVerificationCode, input.emailVerificationChallenge)
+      : undefined;
+
     const conflicts = await prisma.user.findFirst({
-      where: { OR: [{ username: input.username }, ...(input.email ? [{ email: input.email }] : [])] }
+      where: { OR: [{ username: input.username }, ...(email ? [{ email }] : [])] }
     });
     if (conflicts) {
       if (conflicts.username === input.username) throw new ApiError("AUTH_REGISTER_USERNAME_TAKEN");
@@ -70,13 +84,58 @@ export class AuthService {
       data: {
         username: input.username,
         passwordHash: hashed,
-        email: input.email,
+        email,
+        emailVerifiedAt,
         displayName: input.displayName ?? input.username,
         createdAt: t,
         updatedAt: t
       }
     });
     return user;
+  }
+
+  static async getRegistrationConfig() {
+    const c = await getSystemConfig();
+    return {
+      registrationEnabled: c.registrationEnabled,
+      registrationEmailVerificationRequired: c.registrationEmailVerificationRequired
+    };
+  }
+
+  static async requestRegistrationEmailCode(emailInput: string) {
+    const registrationConfig = await getSystemConfig();
+    if (!registrationConfig.registrationEnabled) throw new ApiError("AUTH_REGISTRATION_DISABLED");
+
+    const email = normalizeEmail(emailInput);
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) throw new ApiError("AUTH_REGISTER_EMAIL_TAKEN");
+
+    const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    const challenge = issueActionToken({
+      purpose: "register_email_code",
+      userId: "registration",
+      email,
+      codeHash: hashRegistrationEmailCode(email, code),
+      ttlSeconds: REGISTER_EMAIL_CODE_TTL_SECONDS
+    });
+
+    const mail = await sendMail({
+      to: email,
+      subject: "UniID 注册验证码",
+      text: `你的 UniID 注册验证码是：${code}\n\n该验证码 10 分钟内有效。如非本人操作，请忽略此邮件。`,
+      html: [
+        "<p>你的 UniID 注册验证码是：</p>",
+        `<p style="font-size: 24px; font-weight: 700; letter-spacing: 4px;">${escapeHtml(code)}</p>`,
+        "<p>该验证码 10 分钟内有效。如非本人操作，请忽略此邮件。</p>"
+      ].join("")
+    });
+
+    return {
+      sent: mail.sent,
+      challenge,
+      expiresIn: REGISTER_EMAIL_CODE_TTL_SECONDS,
+      code
+    };
   }
 
   /** 用户授权某 app：创建/更新 Authorization + 创建新的 AppSession + 颁发 access/refresh。 */
@@ -423,4 +482,43 @@ function buildActionUrl(baseUrl: string | undefined, path: string, token: string
   } catch {
     return null;
   }
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function normalizeOptionalEmail(email: string | undefined): string | undefined {
+  if (!email) return undefined;
+  const normalized = normalizeEmail(email);
+  return normalized || undefined;
+}
+
+function verifyRequiredRegistrationEmail(
+  email: string | undefined,
+  code: string | undefined,
+  challenge: string | undefined
+): number {
+  if (!email || !code || !challenge) throw new ApiError("AUTH_REGISTER_EMAIL_VERIFICATION_REQUIRED");
+  if (!/^\d{6}$/.test(code)) throw new ApiError("AUTH_REGISTER_EMAIL_VERIFICATION_INVALID");
+  const payload = verifyActionToken(challenge, "register_email_code");
+  if (!payload?.email || payload.email !== email || !payload.codeHash) {
+    throw new ApiError("AUTH_REGISTER_EMAIL_VERIFICATION_INVALID");
+  }
+  if (!safeEqual(payload.codeHash, hashRegistrationEmailCode(email, code))) {
+    throw new ApiError("AUTH_REGISTER_EMAIL_VERIFICATION_INVALID");
+  }
+  return now();
+}
+
+function hashRegistrationEmailCode(email: string, code: string): string {
+  return createHmac("sha256", config().AUTH_JWT_SECRET)
+    .update(`register_email_code:${email}:${code}`)
+    .digest("base64url");
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.byteLength === right.byteLength && timingSafeEqual(left, right);
 }

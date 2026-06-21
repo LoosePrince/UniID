@@ -108,6 +108,22 @@ export function SystemConfigForm({ initial }: { initial: SystemConfig }) {
             disabled={pending}
             onCheckedChange={(checked) => setBoolean("twoFactorEnabled", checked)}
           />
+          <ToggleField
+            id="registration-enabled"
+            title={t("admin.config.registrationEnabledLabel")}
+            description={t("admin.config.registrationEnabledHelp")}
+            checked={form.registrationEnabled}
+            disabled={pending}
+            onCheckedChange={(checked) => setBoolean("registrationEnabled", checked)}
+          />
+          <ToggleField
+            id="registration-email-verification-required"
+            title={t("admin.config.registrationEmailVerificationRequiredLabel")}
+            description={t("admin.config.registrationEmailVerificationRequiredHelp")}
+            checked={form.registrationEmailVerificationRequired}
+            disabled={pending}
+            onCheckedChange={(checked) => setBoolean("registrationEmailVerificationRequired", checked)}
+          />
         </div>
       </ConfigSection>
 
@@ -400,6 +416,8 @@ function defaultCompatSystemConfig(): SystemConfig {
     argon2Parallelism: 1,
     emailVerificationEnabled: true,
     twoFactorEnabled: true,
+    registrationEnabled: true,
+    registrationEmailVerificationRequired: false,
     smtpEnabled: false,
     smtpHost: "",
     smtpPort: 587,

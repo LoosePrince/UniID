@@ -16,6 +16,8 @@ const systemConfigSchema = z.object({
 
   emailVerificationEnabled: z.boolean().default(true),
   twoFactorEnabled: z.boolean().default(true),
+  registrationEnabled: z.boolean().default(true),
+  registrationEmailVerificationRequired: z.boolean().default(false),
 
   smtpEnabled: z.boolean().default(false),
   smtpHost: z.string().trim().default(""),

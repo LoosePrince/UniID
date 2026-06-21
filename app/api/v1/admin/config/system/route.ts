@@ -14,6 +14,8 @@ const body = z.object({
 
   emailVerificationEnabled: z.boolean().optional(),
   twoFactorEnabled: z.boolean().optional(),
+  registrationEnabled: z.boolean().optional(),
+  registrationEmailVerificationRequired: z.boolean().optional(),
 
   smtpEnabled: z.boolean().optional(),
   smtpHost: z.string().optional(),
