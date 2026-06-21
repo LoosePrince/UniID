@@ -2,6 +2,7 @@
  * 系统管理 · 全局配置
  *
  * - 默认配额（rps / 每日 API / 每月存储 / 每日函数调用）
+ * - 邮箱验证 / 两步验证开关
  * - 任意 k/v 配置表单化编辑
  */
 import { redirect } from "next/navigation";
@@ -10,7 +11,7 @@ import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
 import { ConfigEntryActions } from "@/ui/console/admin-config-entry-actions";
-import { DefaultQuotaForm } from "@/ui/console/admin-config-form";
+import { AuthSecurityForm, DefaultQuotaForm } from "@/ui/console/admin-config-form";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,9 @@ export default async function AdminConfigPage() {
     redirect("/console");
   }
 
-  const [defaults, all] = await Promise.all([
+  const [defaults, authSecurity, all] = await Promise.all([
     AdminService.getDefaultQuota(),
+    AdminService.getAuthSecurityConfig(),
     AdminService.listConfig()
   ]);
   const entries = Object.entries(all)
@@ -45,6 +47,16 @@ export default async function AdminConfigPage() {
         </CardHeader>
         <CardContent>
           <DefaultQuotaForm initial={defaults} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("admin.config.authSecurityTitle")}</CardTitle>
+          <CardDescription>{t("admin.config.authSecurityDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AuthSecurityForm initial={authSecurity} />
         </CardContent>
       </Card>
 

@@ -21,6 +21,7 @@ import {
   verifyTotp
 } from "@/shared/iam";
 import { bus } from "@/shared/bus";
+import { getAuthSecurityConfig } from "./security-config";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -41,7 +42,8 @@ export class AuthService {
     if (!user || user.deletedAt) throw new ApiError("AUTH_INVALID_CREDENTIALS");
     const ok = await verifyPassword(user.passwordHash, password);
     if (!ok) throw new ApiError("AUTH_INVALID_CREDENTIALS");
-    if (user.twoFactorSecret) {
+    const authSecurity = await getAuthSecurityConfig();
+    if (authSecurity.twoFactorEnabled && user.twoFactorSecret) {
       if (!totpCode) throw new ApiError("AUTH_MFA_REQUIRED");
       if (!verifyTotp(user.twoFactorSecret, totpCode)) throw new ApiError("AUTH_MFA_INVALID");
     }
@@ -247,6 +249,8 @@ export class AuthService {
   }
 
   static async createEmailVerification(userId: string, baseUrl?: string) {
+    const authSecurity = await getAuthSecurityConfig();
+    if (!authSecurity.emailVerificationEnabled) throw new ApiError("AUTH_EMAIL_VERIFICATION_DISABLED");
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
     if (!user.email) throw new ApiError("AUTH_EMAIL_REQUIRED");
@@ -264,6 +268,8 @@ export class AuthService {
   }
 
   static async verifyEmail(token: string) {
+    const authSecurity = await getAuthSecurityConfig();
+    if (!authSecurity.emailVerificationEnabled) throw new ApiError("AUTH_EMAIL_VERIFICATION_DISABLED");
     const payload = verifyActionToken(token, "email_verify");
     if (!payload) throw new ApiError("AUTH_INVALID_TOKEN");
     const user = await prisma.user.findUnique({ where: { id: payload.userId } });
@@ -331,6 +337,8 @@ export class AuthService {
   }
 
   static async beginTwoFactorSetup(userId: string) {
+    const authSecurity = await getAuthSecurityConfig();
+    if (!authSecurity.twoFactorEnabled) throw new ApiError("AUTH_MFA_DISABLED");
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deletedAt) throw new ApiError("AUTH_SESSION_NOT_FOUND");
     const secret = generateTotpSecret();
@@ -345,6 +353,8 @@ export class AuthService {
   }
 
   static async enableTwoFactor(userId: string, secret: string, code: string) {
+    const authSecurity = await getAuthSecurityConfig();
+    if (!authSecurity.twoFactorEnabled) throw new ApiError("AUTH_MFA_DISABLED");
     if (!verifyTotp(secret, code)) throw new ApiError("AUTH_MFA_INVALID");
     await prisma.user.update({
       where: { id: userId },

@@ -12,6 +12,11 @@ import { hashPassword } from "@/shared/iam";
 import { ApiError } from "@/shared/errors";
 import { AuditService } from "@/shared/audit";
 import { config } from "@/shared/config";
+import {
+  AUTH_SECURITY_CONFIG_KEY,
+  type AuthSecurityConfig,
+  normalizeAuthSecurityConfig
+} from "@/modules/auth/security-config";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -283,6 +288,20 @@ export class AdminService {
     const cur = await this.getDefaultQuota();
     const merged = { ...cur, ...patch };
     await this.setConfig(actorId, "default_quota", merged);
+    return merged;
+  }
+
+  // ---------- Auth security（写入到 GlobalConfig 内） ----------
+
+  static async getAuthSecurityConfig(): Promise<AuthSecurityConfig> {
+    const rows = await this.listConfig();
+    return normalizeAuthSecurityConfig(rows[AUTH_SECURITY_CONFIG_KEY]);
+  }
+
+  static async setAuthSecurityConfig(actorId: string, patch: Partial<AuthSecurityConfig>) {
+    const cur = await this.getAuthSecurityConfig();
+    const merged = normalizeAuthSecurityConfig({ ...cur, ...patch });
+    await this.setConfig(actorId, AUTH_SECURITY_CONFIG_KEY, merged);
     return merged;
   }
 }

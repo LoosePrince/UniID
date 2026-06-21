@@ -6,25 +6,29 @@ import { AccountProfileForm } from "@/ui/console/account-profile-form";
 import { ChangePasswordForm } from "@/ui/console/change-password-form";
 import { EmailVerificationActions } from "@/ui/console/email-verification-actions";
 import { TwoFactorActions } from "@/ui/console/two-factor-actions";
+import { getAuthSecurityConfig } from "@/modules/auth/security-config";
 
 export default async function ConsoleAccountSettingsPage() {
   const auth = await requireConsoleAuth();
   const { t, formatDateTime } = createI18n(normalizeLocale(auth.user.locale));
-  const user = await prisma.user.findUnique({
-    where: { id: auth.user.id },
-    select: {
-      id: true,
-      username: true,
-      email: true,
-      emailVerifiedAt: true,
-      displayName: true,
-      role: true,
-      locale: true,
-      twoFactorSecret: true,
-      createdAt: true,
-      updatedAt: true
-    }
-  });
+  const [user, authSecurity] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: auth.user.id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        emailVerifiedAt: true,
+        displayName: true,
+        role: true,
+        locale: true,
+        twoFactorSecret: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    }),
+    getAuthSecurityConfig()
+  ]);
 
   const roleLabel = user?.role === "admin" ? t("accountSettings.role.admin") : t("accountSettings.role.user");
 
@@ -75,7 +79,11 @@ export default async function ConsoleAccountSettingsPage() {
           <CardDescription>验证邮箱后可用于找回密码和账号安全通知。</CardDescription>
         </CardHeader>
         <CardContent>
-          <EmailVerificationActions email={user?.email ?? null} verifiedAt={user?.emailVerifiedAt ?? null} />
+          <EmailVerificationActions
+            email={user?.email ?? null}
+            verifiedAt={user?.emailVerifiedAt ?? null}
+            featureEnabled={authSecurity.emailVerificationEnabled}
+          />
         </CardContent>
       </Card>
 
@@ -95,7 +103,7 @@ export default async function ConsoleAccountSettingsPage() {
           <CardDescription>使用兼容 TOTP 的认证器应用保护控制台登录。</CardDescription>
         </CardHeader>
         <CardContent>
-          <TwoFactorActions enabled={Boolean(user?.twoFactorSecret)} />
+          <TwoFactorActions enabled={Boolean(user?.twoFactorSecret)} featureEnabled={authSecurity.twoFactorEnabled} />
         </CardContent>
       </Card>
     </div>

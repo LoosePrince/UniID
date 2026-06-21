@@ -6,13 +6,19 @@ import { Button, toast } from "@/ui/primitives";
 
 export function EmailVerificationActions({
   email,
-  verifiedAt
+  verifiedAt,
+  featureEnabled = true
 }: {
   email: string | null;
   verifiedAt: number | null;
+  featureEnabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [devLink, setDevLink] = useState<string | null>(null);
+
+  if (!featureEnabled) {
+    return <p className="text-sm text-ink-500 dark:text-slate-400">邮箱验证功能已由系统管理员关闭。</p>;
+  }
 
   if (!email) {
     return <p className="text-sm text-ink-500 dark:text-slate-400">绑定邮箱后即可请求验证链接。</p>;

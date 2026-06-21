@@ -4,12 +4,26 @@ import { useState, useTransition } from "react";
 import { KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
 import { Button, Field, Input, toast } from "@/ui/primitives";
 
-export function TwoFactorActions({ enabled }: { enabled: boolean }) {
+export function TwoFactorActions({
+  enabled,
+  featureEnabled = true
+}: {
+  enabled: boolean;
+  featureEnabled?: boolean;
+}) {
   const [pending, startTransition] = useTransition();
   const [setup, setSetup] = useState<{ secret: string; otpauthUrl: string } | null>(null);
   const [code, setCode] = useState("");
   const [disableCode, setDisableCode] = useState("");
   const [isEnabled, setIsEnabled] = useState(enabled);
+
+  if (!featureEnabled) {
+    return (
+      <p className="text-sm text-ink-500 dark:text-slate-400">
+        两步验证功能已由系统管理员关闭；登录时不会要求 TOTP 验证码。
+      </p>
+    );
+  }
 
   function beginSetup() {
     startTransition(async () => {
