@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { config } from "@/shared/config";
 
 export type ActionTokenPurpose = "email_verify" | "password_reset";
 
@@ -13,7 +14,7 @@ export interface ActionTokenPayload {
 const encoder = new TextEncoder();
 
 function secret() {
-  return process.env.AUTH_ACTION_TOKEN_SECRET ?? process.env.JWT_SECRET ?? "uniid-dev-action-token-secret";
+  return config().AUTH_JWT_SECRET;
 }
 
 function base64url(input: string | Buffer) {

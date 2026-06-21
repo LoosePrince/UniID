@@ -1,12 +1,13 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/shared/prisma";
 import { config } from "@/shared/config";
+import { getSystemConfig } from "@/shared/system-config";
 
 /**
  * 命名 CORS 策略。每条路由声明一种策略，由 withCors 解析后产生 Allow-Origin 头。
  */
 export type CorsPolicyName =
-  | "admin-only" // UniID 自身 / ADMIN_ALLOWED_ORIGINS
+  | "admin-only" // UniID 自身 / 全局配置的 adminAllowedOrigins
   | "app-domain" // 已注册 app.domain（含 AppDomain 副域名）
   | "app-or-admin" // app-domain ∪ admin-only
   | "public"; // 任意 Origin，无凭证
@@ -28,8 +29,8 @@ function isLocalDevOrigin(origin: string): boolean {
   }
 }
 
-function matchAdminOrigin(origin: string): boolean {
-  const allowed = config().adminAllowedOrigins;
+async function matchAdminOrigin(origin: string): Promise<boolean> {
+  const allowed = (await getSystemConfig()).adminAllowedOrigins;
   return allowed.some((base) => {
     try {
       const a = new URL(base);
@@ -93,7 +94,7 @@ export async function resolveOrigin(
     case "public":
       return { allowOrigin: origin, credentials: false };
     case "admin-only":
-      return matchAdminOrigin(origin)
+      return (await matchAdminOrigin(origin))
         ? { allowOrigin: origin, credentials: true }
         : { allowOrigin: null, credentials: false };
     case "app-domain":
@@ -101,7 +102,7 @@ export async function resolveOrigin(
         ? { allowOrigin: origin, credentials: true }
         : { allowOrigin: null, credentials: false };
     case "app-or-admin":
-      if (matchAdminOrigin(origin)) return { allowOrigin: origin, credentials: true };
+      if (await matchAdminOrigin(origin)) return { allowOrigin: origin, credentials: true };
       return (await matchAppDomainFromRequest(req, host))
         ? { allowOrigin: origin, credentials: true }
         : { allowOrigin: null, credentials: false };

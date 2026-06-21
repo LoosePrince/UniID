@@ -6,8 +6,8 @@
  * - 触发限额时抛出 ApiError("QUOTA_EXCEEDED")。
  */
 import { prisma } from "@/shared/prisma";
-import { config } from "@/shared/config";
 import { ApiError } from "@/shared/errors";
+import { getSystemConfig } from "@/shared/system-config";
 
 const todayUTC = () => {
   const d = new Date();
@@ -29,15 +29,15 @@ export class QuotaService {
   static async getOrDefault(appId: string) {
     const existing = await prisma.quota.findUnique({ where: { appId } });
     if (existing) return existing;
-    const c = config();
+    const c = await getSystemConfig();
     return prisma.quota.create({
       data: {
         appId,
-        rpsLimit: c.QUOTA_RPS_DEFAULT,
-        dailyApiCalls: c.QUOTA_DAILY_API_DEFAULT,
-        monthlyStorageBytes: BigInt(c.QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT),
-        monthlyEgressBytes: BigInt(c.QUOTA_MONTHLY_EGRESS_BYTES_DEFAULT),
-        fnInvocationsDaily: c.QUOTA_FN_INVOCATIONS_DAILY_DEFAULT,
+        rpsLimit: c.quotaRpsDefault,
+        dailyApiCalls: c.quotaDailyApiDefault,
+        monthlyStorageBytes: BigInt(c.quotaMonthlyStorageBytesDefault),
+        monthlyEgressBytes: BigInt(c.quotaMonthlyEgressBytesDefault),
+        fnInvocationsDaily: c.quotaFnInvocationsDailyDefault,
         updatedAt: Math.floor(Date.now() / 1000)
       }
     });

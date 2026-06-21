@@ -206,7 +206,7 @@ const uiMessagesZh: MessageDictionary = {
     "admin.apps.title": "全部应用",
     "admin.apps.description": "查看并管理所有注册应用。",
     "admin.apps.summary": "共 {total} 个匹配应用，当前显示 {shown} 个。",
-    "admin.config.description": "全局默认配额、认证安全与配置项。",
+    "admin.config.description": "管理运行期配置、功能开关与少量自定义全局配置项。",
 
     "sessions.title": "会话",
     "sessions.description": "管理所有登录设备与 SDK 会话。",
@@ -534,7 +534,7 @@ const uiMessagesEn: MessageDictionary = {
     "admin.apps.title": "All apps",
     "admin.apps.description": "View and manage every registered app.",
     "admin.apps.summary": "{total} matching apps, showing {shown}.",
-    "admin.config.description": "Default quotas, auth security, and global configuration entries.",
+    "admin.config.description": "Manage runtime settings, feature toggles, and custom global config entries.",
 
     "sessions.title": "Sessions",
     "sessions.description": "Manage all signed-in devices and SDK sessions.",

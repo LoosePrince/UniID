@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
 import { runSandbox, type SandboxResult } from "@/shared/sandbox";
-import { config } from "@/shared/config";
+import { getSystemConfig } from "@/shared/system-config";
 import { QuotaService } from "@/shared/quota";
 
 const now = () => Math.floor(Date.now() / 1000);
@@ -22,6 +22,12 @@ function truncate(s: unknown, limit = INPUT_PREVIEW_BYTES): string {
   } catch {
     return "";
   }
+}
+
+async function requireFunctionsEnabled() {
+  const config = await getSystemConfig();
+  if (!config.functionsEnabled) throw new ApiError("FUNC_DISABLED");
+  return config;
 }
 
 export class FunctionsService {
@@ -53,14 +59,15 @@ export class FunctionsService {
     env?: Record<string, string>;
     createdById: string;
   }) {
+    const config = await requireFunctionsEnabled();
     const t = now();
     const fn = await prisma.functionDefinition.create({
       data: {
         appId: input.appId,
         name: input.name,
         description: input.description,
-        memoryMb: input.memoryMb ?? config().FN_DEFAULT_MEMORY_MB,
-        timeoutMs: input.timeoutMs ?? config().FN_DEFAULT_TIMEOUT_MS,
+        memoryMb: input.memoryMb ?? config.fnDefaultMemoryMb,
+        timeoutMs: input.timeoutMs ?? config.fnDefaultTimeoutMs,
         env: input.env ? JSON.stringify(input.env) : null,
         createdAt: t,
         updatedAt: t,
@@ -75,6 +82,7 @@ export class FunctionsService {
     sourceCode: string;
     deployedById?: string;
   }) {
+    await requireFunctionsEnabled();
     const fn = await prisma.functionDefinition.findUnique({ where: { id: input.fnId } });
     if (!fn) throw new ApiError("FUNC_NOT_FOUND");
     if (!input.sourceCode || input.sourceCode.length === 0) {
@@ -113,6 +121,7 @@ export class FunctionsService {
     timeoutMs?: number;
     env?: Record<string, string> | null;
   }) {
+    await requireFunctionsEnabled();
     const fn = await prisma.functionDefinition.findFirst({
       where: { id: input.fnId, appId: input.appId }
     });
@@ -131,6 +140,7 @@ export class FunctionsService {
   }
 
   static async deleteOne(appId: string, fnId: string) {
+    await requireFunctionsEnabled();
     const fn = await prisma.functionDefinition.findFirst({ where: { id: fnId, appId } });
     if (!fn) throw new ApiError("FUNC_NOT_FOUND");
     await prisma.functionDefinition.delete({ where: { id: fn.id } });
@@ -148,6 +158,7 @@ export class FunctionsService {
     payload: unknown;
     trigger: "http" | "cron" | "event" | "sdk";
   }): Promise<{ invocationId: string } & SandboxResult> {
+    await requireFunctionsEnabled();
     const fn = await prisma.functionDefinition.findFirst({
       where: {
         appId: input.appId,
@@ -225,6 +236,7 @@ export class FunctionsService {
     isActive?: boolean;
     createdById?: string;
   }) {
+    await requireFunctionsEnabled();
     const fn = await prisma.functionDefinition.findFirst({
       where: { id: input.fnId, appId: input.appId }
     });
@@ -254,6 +266,7 @@ export class FunctionsService {
     filter?: unknown;
     isActive?: boolean;
   }) {
+    await requireFunctionsEnabled();
     const existing = await prisma.functionEventTrigger.findFirst({
       where: { id: input.triggerId, appId: input.appId }
     });
@@ -280,6 +293,7 @@ export class FunctionsService {
   }
 
   static async deleteEventTrigger(appId: string, triggerId: string) {
+    await requireFunctionsEnabled();
     const existing = await prisma.functionEventTrigger.findFirst({
       where: { id: triggerId, appId }
     });

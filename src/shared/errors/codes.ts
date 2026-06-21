@@ -68,6 +68,7 @@ export const ErrorCodes = {
   BUSINESS_WORKFLOW_FORBIDDEN: { http: 403, message: "业务流程状态流转被拒绝" },
 
   // FILE
+  FILE_DISABLED: { http: 403, message: "文件功能已关闭" },
   FILE_NOT_FOUND: { http: 404, message: "文件不存在" },
   FILE_TOO_LARGE: { http: 413, message: "文件超过大小上限" },
   FILE_UPLOAD_FAILED: { http: 500, message: "文件上传失败" },
@@ -76,6 +77,7 @@ export const ErrorCodes = {
   FILE_MULTIPART_INVALID: { http: 400, message: "分片上传参数不合法" },
 
   // FUNCTION
+  FUNC_DISABLED: { http: 403, message: "云函数功能已关闭" },
   FUNC_NOT_FOUND: { http: 404, message: "函数不存在" },
   FUNC_FORBIDDEN: { http: 403, message: "无权调用该函数" },
   FUNC_TIMEOUT: { http: 504, message: "函数执行超时" },
@@ -86,6 +88,9 @@ export const ErrorCodes = {
   // CRON
   CRON_NOT_FOUND: { http: 404, message: "定时任务不存在" },
   CRON_INVALID_EXPR: { http: 400, message: "cron 表达式不合法" },
+
+  // REALTIME
+  REALTIME_DISABLED: { http: 403, message: "实时订阅功能已关闭" },
 
   // WEBHOOK
   HOOK_NOT_FOUND: { http: 404, message: "Webhook 不存在" },

@@ -5,8 +5,8 @@ import Database from "better-sqlite3";
 import type { Database as DatabaseHandle, Statement } from "better-sqlite3";
 import type { AppDatabase, AppDatabaseKey } from "@prisma/client";
 import { ApiError } from "@/shared/errors";
-import { config } from "@/shared/config";
 import { prisma } from "@/shared/prisma";
+import { getSystemConfig } from "@/shared/system-config";
 import { AuditService } from "@/shared/audit";
 import { QuotaService } from "@/shared/quota";
 import { enforceRateLimit } from "@/shared/ratelimit";
@@ -167,15 +167,16 @@ function makeFilename(appId: string, name: string) {
   return `${appId}-${safeName}-${randomUUID()}.sqlite`;
 }
 
-function databasesRoot(): string {
-  return path.resolve(process.cwd(), config().UNIID_DATABASES_DIR);
+async function databasesRoot(): Promise<string> {
+  const systemConfig = await getSystemConfig();
+  return path.resolve(process.cwd(), systemConfig.uniidDatabasesDir);
 }
 
-export function resolveDatabasePath(filename: string): string {
+export async function resolveDatabasePath(filename: string): Promise<string> {
   if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
     throw new ApiError("DATABASE_PATH_INVALID");
   }
-  const root = databasesRoot();
+  const root = await databasesRoot();
   const full = path.resolve(root, filename);
   const rel = path.relative(root, full);
   if (rel.startsWith("..") || path.isAbsolute(rel)) throw new ApiError("DATABASE_PATH_INVALID");
@@ -298,7 +299,7 @@ export class AppDatabaseService {
     if (!app) throw new ApiError("APP_NOT_FOUND");
     const t = now();
     const filename = makeFilename(input.appId, input.name);
-    const filePath = resolveDatabasePath(filename);
+    const filePath = await resolveDatabasePath(filename);
     const generated = input.createKey === false ? null : generateDatabaseKey();
     const beforeSize = sqlFileSize(filePath);
     const dbh = openSqlite(filePath);
@@ -445,7 +446,7 @@ export class AppDatabaseService {
   static async permanentDelete(appId: string, databaseId: string, actorUserId?: string | null) {
     const existing = await prisma.appDatabase.findFirst({ where: { id: databaseId, appId } });
     if (!existing) throw new ApiError("DATABASE_NOT_FOUND");
-    const filePath = resolveDatabasePath(existing.filename);
+    const filePath = await resolveDatabasePath(existing.filename);
     const size = sqlFileSize(filePath);
     await prisma.appDatabase.delete({ where: { id: existing.id } });
     for (const candidate of [filePath, `${filePath}-wal`, `${filePath}-shm`]) {
@@ -616,7 +617,7 @@ export class AppDatabaseService {
     const normalized = statements.map(normalizeStatement);
     if (opts.external) normalized.forEach((stmt) => assertSqlSafe(stmt.sql));
 
-    const filePath = resolveDatabasePath(db.filename);
+    const filePath = await resolveDatabasePath(db.filename);
     const before = sqlFileSize(filePath);
     const handle = openSqlite(filePath);
     let results: unknown[];
@@ -658,7 +659,7 @@ export class AppDatabaseService {
 
   static async stats(appId: string, databaseId: string) {
     const db = await assertDatabaseAccessible(databaseId, appId);
-    const filePath = resolveDatabasePath(db.filename);
+    const filePath = await resolveDatabasePath(db.filename);
     const sizeBytes = Number(sqlFileSize(filePath));
     const handle = openSqlite(filePath, true);
     try {
@@ -675,7 +676,7 @@ export class AppDatabaseService {
     await assertDatabaseAccessible(databaseId, appId);
     const db = await prisma.appDatabase.findUnique({ where: { id: databaseId } });
     if (!db) throw new ApiError("DATABASE_NOT_FOUND");
-    const handle = openSqlite(resolveDatabasePath(db.filename), true);
+    const handle = openSqlite(await resolveDatabasePath(db.filename), true);
     try {
       const tables = handle
         .prepare("select name, sql from sqlite_master where type = 'table' and name not like 'sqlite_%' order by name")
@@ -691,7 +692,7 @@ export class AppDatabaseService {
     validateIdentifier(table, "table");
     const db = await prisma.appDatabase.findUnique({ where: { id: databaseId } });
     if (!db) throw new ApiError("DATABASE_NOT_FOUND");
-    const handle = openSqlite(resolveDatabasePath(db.filename), true);
+    const handle = openSqlite(await resolveDatabasePath(db.filename), true);
     try {
       const columns = handle.prepare(`pragma table_info(${quoteIdentifier(table)})`).all();
       const indexes = handle.prepare(`pragma index_list(${quoteIdentifier(table)})`).all();
@@ -714,7 +715,7 @@ export class AppDatabaseService {
     if (!db) throw new ApiError("DATABASE_NOT_FOUND");
     const limit = Math.min(Math.max(input.limit ?? 50, 1), 500);
     const offset = Math.max(input.offset ?? 0, 0);
-    const handle = openSqlite(resolveDatabasePath(db.filename), true);
+    const handle = openSqlite(await resolveDatabasePath(db.filename), true);
     try {
       const table = quoteIdentifier(input.table);
       const rows = coerceRows(handle.prepare(`select rowid as _rowid_, * from ${table} limit ? offset ?`).all(limit, offset));
@@ -821,7 +822,7 @@ export class AppDatabaseService {
       orderBy: { createdAt: "asc" }
     });
 
-    const filePath = resolveDatabasePath(db.filename);
+    const filePath = await resolveDatabasePath(db.filename);
     const before = sqlFileSize(filePath);
     const handle = openSqlite(filePath);
     try {
@@ -919,16 +920,16 @@ export class AppDatabaseService {
       throw new ApiError("DATA_STORAGE_EXTERNAL_SQL", { details: binding });
     }
 
-    const c = config();
+    const systemConfig = await getSystemConfig();
     const records = await prisma.record.findMany({
       where: { appId: input.appId, deletedAt: null },
       select: { id: true, data: true }
     });
     const creating = !input.recordId || !records.some((record) => record.id === input.recordId);
     const nextCount = records.length + (creating ? 1 : 0);
-    if (nextCount > c.DEFAULT_MAIN_RECORD_LIMIT) {
+    if (nextCount > systemConfig.defaultMainRecordLimit) {
       throw new ApiError("DATA_STORAGE_MAIN_LIMIT_EXCEEDED", {
-        details: { limit: c.DEFAULT_MAIN_RECORD_LIMIT, count: nextCount }
+        details: { limit: systemConfig.defaultMainRecordLimit, count: nextCount }
       });
     }
     const currentBytes = records.reduce((sum, record) => sum + Buffer.byteLength(record.data, "utf8"), 0);
@@ -936,9 +937,9 @@ export class AppDatabaseService {
       ? Buffer.byteLength(records.find((record) => record.id === input.recordId)?.data ?? "", "utf8")
       : 0;
     const nextBytes = currentBytes - previousBytes + jsonByteLength(input.data);
-    if (nextBytes > c.DEFAULT_MAIN_STORAGE_BYTES) {
+    if (nextBytes > systemConfig.defaultMainStorageBytes) {
       throw new ApiError("DATA_STORAGE_MAIN_LIMIT_EXCEEDED", {
-        details: { limitBytes: c.DEFAULT_MAIN_STORAGE_BYTES, bytes: nextBytes }
+        details: { limitBytes: systemConfig.defaultMainStorageBytes, bytes: nextBytes }
       });
     }
   }

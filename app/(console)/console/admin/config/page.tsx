@@ -1,8 +1,7 @@
 /**
  * 系统管理 · 全局配置
  *
- * - 默认配额（rps / 每日 API / 每月存储 / 每日函数调用）
- * - 邮箱验证 / 两步验证开关
+ * - 系统运行时配置和功能开关
  * - 任意 k/v 配置表单化编辑
  */
 import { redirect } from "next/navigation";
@@ -11,7 +10,8 @@ import { requireSystemAdmin } from "@/shared/iam";
 import { AdminService } from "@/modules/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/primitives";
 import { ConfigEntryActions } from "@/ui/console/admin-config-entry-actions";
-import { AuthSecurityForm, DefaultQuotaForm } from "@/ui/console/admin-config-form";
+import { SystemConfigForm } from "@/ui/console/admin-config-form";
+import { SYSTEM_CONFIG_KEY } from "@/shared/system-config";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,12 @@ export default async function AdminConfigPage() {
     redirect("/console");
   }
 
-  const [defaults, authSecurity, all] = await Promise.all([
-    AdminService.getDefaultQuota(),
-    AdminService.getAuthSecurityConfig(),
+  const [systemConfig, all] = await Promise.all([
+    AdminService.getSystemConfig(),
     AdminService.listConfig()
   ]);
   const entries = Object.entries(all)
+    .filter(([key]) => key !== SYSTEM_CONFIG_KEY && key !== "auth_security" && key !== "default_quota")
     .map(([key, value]) => ({ key, value }))
     .sort((a, b) => a.key.localeCompare(b.key));
 
@@ -42,21 +42,11 @@ export default async function AdminConfigPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{t("admin.config.defaultQuotaTitle")}</CardTitle>
-          <CardDescription>{t("admin.config.defaultQuotaDescription")}</CardDescription>
+          <CardTitle>{t("admin.config.systemTitle")}</CardTitle>
+          <CardDescription>{t("admin.config.systemDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <DefaultQuotaForm initial={defaults} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("admin.config.authSecurityTitle")}</CardTitle>
-          <CardDescription>{t("admin.config.authSecurityDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AuthSecurityForm initial={authSecurity} />
+          <SystemConfigForm initial={systemConfig} />
         </CardContent>
       </Card>
 

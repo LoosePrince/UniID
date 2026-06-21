@@ -4,7 +4,7 @@ import { withCors } from "@/shared/cors";
 import { requireAppAccess } from "@/shared/iam";
 import { ApiError } from "@/shared/errors";
 import { FileService } from "@/modules/files";
-import { config } from "@/shared/config";
+import { getSystemConfig } from "@/shared/system-config";
 import { prisma } from "@/shared/prisma";
 
 const params = z.object({ appId: idSchema, fileId: idSchema });
@@ -24,7 +24,7 @@ export const POST = withCors(
       const auth = await requireAppAccess(p.appId);
       await requireAppFile(auth.app.id, p.fileId);
       const token = await FileService.createShareTokenForAuthorizedFile(p.fileId, auth.user.id, body.ttl);
-      const ttl = body.ttl ?? config().FILE_SHARE_TOKEN_TTL_SECONDS;
+      const ttl = body.ttl ?? (await getSystemConfig()).fileShareTokenTtlSeconds;
       return {
         token,
         url: `/api/v1/files/public/${token}`,

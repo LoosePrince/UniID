@@ -4,6 +4,7 @@ import { withCors } from "@/shared/cors";
 import { requireSdkAuth } from "@/shared/iam";
 import { RealtimeService } from "@/modules/realtime";
 import { ApiError } from "@/shared/errors";
+import { getSystemConfig } from "@/shared/system-config";
 
 const body = z.object({
   channel: z.string().min(1).max(200),
@@ -17,6 +18,9 @@ export const POST = withCors(
     schema: { body },
     handler: async ({ body: b }, { req }) => {
       const auth = await requireSdkAuth(req);
+      const systemConfig = await getSystemConfig();
+      RealtimeService.configure(systemConfig);
+      if (!systemConfig.realtimeEnabled) throw new ApiError("REALTIME_DISABLED");
       const result = RealtimeService.broadcast(
         auth.app.id,
         b.channel,

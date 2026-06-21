@@ -17,8 +17,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { bus } from "@/shared/bus";
 import type { DomainEventEnvelope } from "@/shared/bus";
 import { prisma } from "@/shared/prisma";
+import { ApiError } from "@/shared/errors";
 import { PolicyEngine, type AuthContext } from "@/shared/policy";
 import type { DataQuery } from "@/modules/data";
+import { DEFAULT_SYSTEM_CONFIG, type SystemConfig } from "@/shared/system-config";
 
 export type RealtimeEventType = "insert" | "update" | "delete" | "broadcast" | "presence" | "query";
 
@@ -86,7 +88,10 @@ type HistoryEntry =
 const subscribers = new Set<Subscriber>();
 const presenceMembers = new Map<string, Map<string, PresenceMember>>();
 const history: HistoryEntry[] = [];
-const HISTORY_TTL_MS = 60_000;
+let realtimeRuntimeConfig = {
+  enabled: DEFAULT_SYSTEM_CONFIG.realtimeEnabled,
+  historyTtlMs: DEFAULT_SYSTEM_CONFIG.realtimeReplayWindowSeconds * 1000
+};
 const HISTORY_MAX = 1_000;
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -174,7 +179,8 @@ function dispatch(
 }
 
 function remember(entry: HistoryEntry) {
-  const cutoff = Date.now() - HISTORY_TTL_MS;
+  if (!realtimeRuntimeConfig.enabled) return;
+  const cutoff = Date.now() - realtimeRuntimeConfig.historyTtlMs;
   while (history.length > 0 && (history[0]?.createdAtMs ?? 0) < cutoff) history.shift();
   history.push(entry);
   while (history.length > HISTORY_MAX) history.shift();
@@ -421,6 +427,7 @@ bus.on("record.deleted", (env) => {
 });
 
 function fanout(env: DomainEventEnvelope, channels: string[]) {
+  if (!realtimeRuntimeConfig.enabled) return;
   const appId = (env.payload as { appId?: string }).appId;
   if (!appId || channels.length === 0) return;
   const set = new Set(channels);
@@ -448,6 +455,7 @@ function fanout(env: DomainEventEnvelope, channels: string[]) {
 }
 
 function fanoutQueries(env: DomainEventEnvelope) {
+  if (!realtimeRuntimeConfig.enabled) return;
   const payload = env.payload as { appId?: string; dataType?: string };
   if (!payload.appId || !payload.dataType) return;
   const emitted = new Set<string>();
@@ -475,7 +483,21 @@ async function replayRecord(entry: Extract<HistoryEntry, { kind: "record" }>, su
 }
 
 export const RealtimeService = {
+  configure(config: Pick<SystemConfig, "realtimeEnabled" | "realtimeReplayWindowSeconds">) {
+    realtimeRuntimeConfig = {
+      enabled: config.realtimeEnabled,
+      historyTtlMs: Math.max(1, config.realtimeReplayWindowSeconds) * 1000
+    };
+    if (!config.realtimeEnabled) {
+      for (const sub of Array.from(subscribers)) {
+        this.removeSubscriber(sub);
+        sub.close();
+      }
+      history.length = 0;
+    }
+  },
   addSubscriber(sub: Subscriber) {
+    if (!realtimeRuntimeConfig.enabled) throw new ApiError("REALTIME_DISABLED");
     subscribers.add(sub);
     addPresence(sub);
     sendInitialQuerySnapshots(sub);
@@ -505,6 +527,7 @@ export const RealtimeService = {
   },
   /** 手动 broadcast（被 SDK、Functions 沙箱或 console 调用） */
   broadcast(appId: string, channel: string, eventName: string, payload: unknown) {
+    if (!realtimeRuntimeConfig.enabled) throw new ApiError("REALTIME_DISABLED");
     const fullChannel = normalizeRealtimeChannel(appId, channel);
     if (!fullChannel) return { channel: null, delivered: 0 };
 

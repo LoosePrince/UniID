@@ -28,7 +28,7 @@ export default async function handler(event) {
 ## Host API（注入到沙箱）
 
 - `uniid.log(...args)` — 记录到 `FunctionInvocation.logs`
-- `uniid.fetch(url, init?)` — 受 `FN_FETCH_WHITELIST` 限制；默认 5s 超时，响应出站字节计入月度 egress 配额
+- `uniid.fetch(url, init?)` — 受全局配置中的 Fetch 域名白名单限制；默认 5s 超时，响应出站字节计入月度 egress 配额
 - `uniid.data.{query,get,create,update,delete,fieldOps}` — 走 PolicyEngine，以 `$function:{name}` 身份访问当前 App 数据
 - `uniid.files.{getDownloadUrl,share,getActiveShareToken,revokeShareTokens}` — 仅允许访问当前 App 文件，下载/分享访问计入 egress 配额
 - `uniid.broadcast(channel, payload?)` — 向当前 App 的 Realtime broadcast 频道发送消息
@@ -41,7 +41,7 @@ export default async function handler(event) {
 |------|------|--------|
 | 内存 | 64 MB | per-function `memoryMb` |
 | 时长 | 5000 ms | per-function `timeoutMs` |
-| `fetch` 域名 | 空（全禁） | `FN_FETCH_WHITELIST=api.example.com,...` |
+| `fetch` 域名 | 空（全禁） | 全局配置中的 Fetch 域名白名单 |
 
 超出 → `FUNC_TIMEOUT` / `FUNC_OOM` 错误码。
 

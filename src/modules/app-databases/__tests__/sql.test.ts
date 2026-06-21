@@ -42,9 +42,8 @@ describe("SQL helpers", () => {
 });
 
 describe("database paths", () => {
-  it("rejects path traversal filenames", () => {
-    expect(() => resolveDatabasePath("../escape.sqlite")).toThrow(ApiError);
-    expect(() => resolveDatabasePath("nested/escape.sqlite")).toThrow(ApiError);
+  it("rejects path traversal filenames", async () => {
+    await expect(resolveDatabasePath("../escape.sqlite")).rejects.toBeInstanceOf(ApiError);
+    await expect(resolveDatabasePath("nested/escape.sqlite")).rejects.toBeInstanceOf(ApiError);
   });
 });
-

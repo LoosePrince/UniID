@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-vi.mock("@/shared/config", () => ({
-  config: () => ({
-    DEFAULT_MAIN_RECORD_LIMIT: 2,
-    DEFAULT_MAIN_STORAGE_BYTES: 24,
-    UNIID_DATABASES_DIR: "./data/app-databases"
-  })
+vi.mock("@/shared/system-config", () => ({
+  getSystemConfig: vi.fn(async () => ({
+    defaultMainRecordLimit: 2,
+    defaultMainStorageBytes: 24,
+    uniidDatabasesDir: "./data/app-databases"
+  }))
 }));
 
 vi.mock("@/shared/prisma", () => ({

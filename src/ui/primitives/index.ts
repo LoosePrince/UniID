@@ -1,6 +1,7 @@
 export * from "./utils";
 export * from "./button";
 export * from "./input";
+export type { TextareaProps } from "./input";
 export * from "./select";
 export * from "./field";
 export * from "./label";

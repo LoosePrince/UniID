@@ -27,17 +27,15 @@ def generate_secret() -> str:
 
 
 def build_env_content(
-    host: str,
-    port: str,
-    nextauth_secret: str,
     auth_jwt_secret: str,
+    session_cookie_secret: str,
 ) -> str:
-    nextauth_url = f"http://{host}:{port}"
-
     lines = [
-        f'NEXTAUTH_URL="{nextauth_url}"',
-        f'NEXTAUTH_SECRET="{nextauth_secret}"',
         f'AUTH_JWT_SECRET="{auth_jwt_secret}"',
+        f'SESSION_COOKIE_SECRET="{session_cookie_secret}"',
+        "LOG_LEVEL=info",
+        "LOG_PRETTY=true",
+        "NODE_ENV=development",
         "",
     ]
     return "\n".join(lines)
@@ -49,24 +47,9 @@ def main() -> None:
     print(f"目标 .env 文件: {ENV_PATH}")
     print()
 
-    # 1. IP 和端口
-    default_host = "localhost"
-    default_port = "3000"
-    host = prompt_with_default("服务 IP / 主机名", default_host)
-    port = prompt_with_default("服务端口", default_port)
+    print("运行期业务配置与功能开关请在 /console/admin/config 中管理。")
 
-    # 2. NEXTAUTH_SECRET
-    print()
-    use_default_nextauth = yes_no("为 NEXTAUTH_SECRET 使用随机生成的安全值？", True)
-    if use_default_nextauth:
-        nextauth_secret = generate_secret()
-        print("已生成 NEXTAUTH_SECRET。")
-    else:
-        nextauth_secret = prompt_with_default(
-            "请输入 NEXTAUTH_SECRET（留空会重新生成随机值）", generate_secret()
-        )
-
-    # 3. AUTH_JWT_SECRET
+    # 1. AUTH_JWT_SECRET
     print()
     use_default_jwt = yes_no("为 AUTH_JWT_SECRET 使用随机生成的安全值？", True)
     if use_default_jwt:
@@ -77,12 +60,21 @@ def main() -> None:
             "请输入 AUTH_JWT_SECRET（留空会重新生成随机值）", generate_secret()
         )
 
+    # 2. SESSION_COOKIE_SECRET
+    print()
+    use_default_session = yes_no("为 SESSION_COOKIE_SECRET 使用随机生成的安全值？", True)
+    if use_default_session:
+        session_cookie_secret = generate_secret()
+        print("已生成 SESSION_COOKIE_SECRET。")
+    else:
+        session_cookie_secret = prompt_with_default(
+            "请输入 SESSION_COOKIE_SECRET（留空会重新生成随机值）", generate_secret()
+        )
+
     # 构造 env 内容
     content = build_env_content(
-        host=host,
-        port=port,
-        nextauth_secret=nextauth_secret,
         auth_jwt_secret=auth_jwt_secret,
+        session_cookie_secret=session_cookie_secret,
     )
 
     print("\n=== 生成的 .env 内容预览 ===\n")

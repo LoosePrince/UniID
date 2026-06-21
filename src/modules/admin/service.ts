@@ -11,7 +11,12 @@ import { prisma } from "@/shared/prisma";
 import { hashPassword } from "@/shared/iam";
 import { ApiError } from "@/shared/errors";
 import { AuditService } from "@/shared/audit";
-import { config } from "@/shared/config";
+import {
+  SYSTEM_CONFIG_KEY,
+  type SystemConfig,
+  getSystemConfig,
+  normalizeSystemConfig
+} from "@/shared/system-config";
 import {
   AUTH_SECURITY_CONFIG_KEY,
   type AuthSecurityConfig,
@@ -247,6 +252,9 @@ export class AdminService {
   }
 
   static async setConfig(actorId: string, key: string, value: unknown) {
+    if (key === SYSTEM_CONFIG_KEY || key === AUTH_SECURITY_CONFIG_KEY || key === "default_quota") {
+      throw new ApiError("APP_FORBIDDEN", { message: "error.detail.configReservedKey" });
+    }
     const json = JSON.stringify(value);
     const before = await prisma.globalConfig.findUnique({ where: { key } });
     await prisma.globalConfig.upsert({
@@ -264,19 +272,43 @@ export class AdminService {
     });
   }
 
-  // ---------- Default quota（写入到 GlobalConfig 内） ----------
+  static async getSystemConfig(): Promise<SystemConfig> {
+    return getSystemConfig();
+  }
+
+  static async setSystemConfig(actorId: string, patch: Partial<SystemConfig>) {
+    const cur = await getSystemConfig();
+    const merged = normalizeSystemConfig({ ...cur, ...patch });
+    const before = await prisma.globalConfig.findUnique({ where: { key: SYSTEM_CONFIG_KEY } });
+    await prisma.globalConfig.upsert({
+      where: { key: SYSTEM_CONFIG_KEY },
+      create: { key: SYSTEM_CONFIG_KEY, value: JSON.stringify(merged), updatedAt: now() },
+      update: { value: JSON.stringify(merged), updatedAt: now() }
+    });
+    AuditService.log({
+      userId: actorId,
+      action: "admin.config.set",
+      resourceType: "global_config",
+      resourceId: SYSTEM_CONFIG_KEY,
+      before: before ? safeParse(before.value) : null,
+      after: merged
+    });
+    await import("@/modules/realtime")
+      .then(({ RealtimeService }) => RealtimeService.configure(merged))
+      .catch(() => {});
+    return merged;
+  }
+
+  // ---------- Default quota（兼容旧接口，实际写入 system 配置） ----------
 
   static async getDefaultQuota() {
-    const c = config();
-    const rows = await this.listConfig();
-    const defaults = {
-      rpsLimit: c.QUOTA_RPS_DEFAULT,
-      dailyApiCalls: c.QUOTA_DAILY_API_DEFAULT,
-      monthlyStorageBytes: c.QUOTA_MONTHLY_STORAGE_BYTES_DEFAULT,
-      fnInvocationsDaily: c.QUOTA_FN_INVOCATIONS_DAILY_DEFAULT
+    const c = await getSystemConfig();
+    return {
+      rpsLimit: c.quotaRpsDefault,
+      dailyApiCalls: c.quotaDailyApiDefault,
+      monthlyStorageBytes: c.quotaMonthlyStorageBytesDefault,
+      fnInvocationsDaily: c.quotaFnInvocationsDailyDefault
     };
-    const override = (rows["default_quota"] as Record<string, number> | undefined) ?? {};
-    return { ...defaults, ...override };
   }
 
   static async setDefaultQuota(actorId: string, patch: Partial<{
@@ -287,21 +319,29 @@ export class AdminService {
   }>) {
     const cur = await this.getDefaultQuota();
     const merged = { ...cur, ...patch };
-    await this.setConfig(actorId, "default_quota", merged);
+    await this.setSystemConfig(actorId, {
+      quotaRpsDefault: merged.rpsLimit,
+      quotaDailyApiDefault: merged.dailyApiCalls,
+      quotaMonthlyStorageBytesDefault: merged.monthlyStorageBytes,
+      quotaFnInvocationsDailyDefault: merged.fnInvocationsDaily
+    });
     return merged;
   }
 
-  // ---------- Auth security（写入到 GlobalConfig 内） ----------
+  // ---------- Auth security（兼容旧接口，实际写入 system 配置） ----------
 
   static async getAuthSecurityConfig(): Promise<AuthSecurityConfig> {
-    const rows = await this.listConfig();
-    return normalizeAuthSecurityConfig(rows[AUTH_SECURITY_CONFIG_KEY]);
+    const c = await getSystemConfig();
+    return normalizeAuthSecurityConfig({
+      emailVerificationEnabled: c.emailVerificationEnabled,
+      twoFactorEnabled: c.twoFactorEnabled
+    });
   }
 
   static async setAuthSecurityConfig(actorId: string, patch: Partial<AuthSecurityConfig>) {
     const cur = await this.getAuthSecurityConfig();
     const merged = normalizeAuthSecurityConfig({ ...cur, ...patch });
-    await this.setConfig(actorId, AUTH_SECURITY_CONFIG_KEY, merged);
+    await this.setSystemConfig(actorId, merged);
     return merged;
   }
 }

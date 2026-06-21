@@ -26,11 +26,12 @@ vi.mock("@/modules/schema", () => ({
   }
 }));
 
-vi.mock("@/shared/config", () => ({
-  config: () => ({
-    DEFAULT_MAIN_RECORD_LIMIT: 1000,
-    DEFAULT_MAIN_STORAGE_BYTES: 5 * 1024 * 1024
-  })
+vi.mock("@/shared/system-config", () => ({
+  getSystemConfig: vi.fn(async () => ({
+    defaultMainRecordLimit: 1000,
+    defaultMainStorageBytes: 5 * 1024 * 1024,
+    uniidDatabasesDir: "./data/app-databases"
+  }))
 }));
 
 vi.mock("@/shared/bus", () => ({

@@ -16,7 +16,8 @@
  */
 
 import { getQuickJS, type QuickJSHandle } from "quickjs-emscripten";
-import { config } from "@/shared/config";
+import { ApiError } from "@/shared/errors";
+import { getSystemConfig, type SystemConfig } from "@/shared/system-config";
 import type { AuthContext } from "@/shared/policy";
 
 export interface SandboxOptions {
@@ -74,8 +75,8 @@ interface FileCall {
   ttlSeconds?: number;
 }
 
-function fetchAllowed(targetUrl: string): boolean {
-  const list = config().fetchWhitelistHosts;
+function fetchAllowed(targetUrl: string, config: SystemConfig): boolean {
+  const list = config.fnFetchWhitelist;
   if (list.length === 0) return false;
   try {
     const u = new URL(targetUrl);
@@ -153,8 +154,9 @@ async function appOwnerId(appId: string): Promise<string> {
 export async function runSandbox(opts: SandboxOptions): Promise<SandboxResult> {
   const start = Date.now();
   const logs: string[] = [];
-  const timeoutMs = opts.timeoutMs ?? config().FN_DEFAULT_TIMEOUT_MS;
-  const memoryMb = opts.memoryMb ?? config().FN_DEFAULT_MEMORY_MB;
+  const systemConfig = await getSystemConfig();
+  const timeoutMs = opts.timeoutMs ?? systemConfig.fnDefaultTimeoutMs;
+  const memoryMb = opts.memoryMb ?? systemConfig.fnDefaultMemoryMb;
 
   let QuickJS;
   try {
@@ -301,7 +303,7 @@ export async function runSandbox(opts: SandboxOptions): Promise<SandboxResult> {
     const fetchRawFn = hostFunction("__fetchRaw", async (urlArg, initArg) => {
       const url = requireString(urlArg, "uniid.fetch.url");
       const init = asObject(initArg) as FetchInitDump;
-      if (!fetchAllowed(url)) throw new Error("uniid.fetch: host not whitelisted");
+      if (!fetchAllowed(url, systemConfig)) throw new Error("uniid.fetch: host not whitelisted");
 
       const method = (init.method ?? "GET").toUpperCase();
       if (!["GET", "POST", "PUT", "DELETE", "PATCH"].includes(method)) {
@@ -483,6 +485,7 @@ export async function runSandbox(opts: SandboxOptions): Promise<SandboxResult> {
     fileRevokeSharesFn.dispose();
 
     const broadcastFn = hostFunction("__broadcast", async (first, second, third) => {
+      if (!systemConfig.realtimeEnabled) throw new ApiError("REALTIME_DISABLED");
       const appId = requireAppId("uniid.broadcast");
       const { RealtimeService } = await import("@/modules/realtime");
       const raw = asObject(first);

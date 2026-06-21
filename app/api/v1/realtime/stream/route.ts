@@ -9,8 +9,8 @@ import { withCors } from "@/shared/cors";
 import { requireSdkAuth } from "@/shared/iam";
 import { RealtimeService, normalizeRealtimeChannels, type Subscriber } from "@/modules/realtime";
 import { randomUUID } from "node:crypto";
-import { config } from "@/shared/config";
 import { ApiError, toErrorResponse } from "@/shared/errors";
+import { getSystemConfig } from "@/shared/system-config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,6 +18,9 @@ export const runtime = "nodejs";
 async function handler(req: NextRequest): Promise<Response> {
   try {
     const auth = await requireSdkAuth(req);
+    const systemConfig = await getSystemConfig();
+    RealtimeService.configure(systemConfig);
+    if (!systemConfig.realtimeEnabled) throw new ApiError("REALTIME_DISABLED");
     const requestedChannels = (req.nextUrl.searchParams.get("channels") || "")
       .split(",")
       .map((s) => s.trim())
@@ -30,7 +33,7 @@ async function handler(req: NextRequest): Promise<Response> {
     }
 
     const encoder = new TextEncoder();
-    const keepaliveSec = config().REALTIME_KEEPALIVE_SECONDS;
+    const keepaliveSec = systemConfig.realtimeKeepaliveSeconds;
 
     let subscriber: Subscriber | null = null;
     let keepaliveTimer: ReturnType<typeof setInterval> | null = null;

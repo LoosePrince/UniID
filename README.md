@@ -37,7 +37,7 @@
 # 克隆后进入项目目录
 npm install
 
-# 复制环境变量并填写密钥（见下方「环境变量」）
+# 复制环境变量并填写启动期密钥（见下方「环境变量」）
 Copy-Item .env.example .env
 # AUTH_JWT_SECRET、SESSION_COOKIE_SECRET 至少 32 字节随机值，例如：
 # [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Maximum 256 }))
@@ -215,18 +215,16 @@ API 前缀：`/api/v1/...`，错误响应为统一 envelope。完整列表见 [d
 
 ## 环境变量
 
-从 [.env.example](.env.example) 复制为 `.env`。常用项：
+从 [.env.example](.env.example) 复制为 `.env`。环境变量只保留启动期和不可动态更改的配置：
 
 | 变量 | 说明 |
 |------|------|
 | `AUTH_JWT_SECRET` | SDK Access JWT 签名密钥（必填，≥32 字节） |
 | `SESSION_COOKIE_SECRET` | 控制台 Cookie 会话密钥（必填） |
-| `PUBLIC_URL` | 对外 URL，默认 `http://localhost:3000` |
-| `S3_*` | 对象存储；留空时文件上传相关功能不可用 |
-| `FN_FETCH_WHITELIST` | 函数沙箱 `uniid.fetch` 允许的主机列表（逗号分隔，空=禁止出站） |
-| `QUOTA_*` | 新应用默认配额 |
+| `LOG_LEVEL` / `LOG_PRETTY` | 日志级别与开发期美化输出 |
+| `NODE_ENV` | Next.js / Node 运行环境 |
 
-主 SQLite 数据库固定使用 `data/uniid.db`，无需配置数据库路径环境变量。
+业务运行期配置统一在 `/console/admin/config` 的「系统配置」中管理，包括公开 URL、CORS origins、邮箱验证、两步验证、对象存储、文件、函数、实时订阅、独立 SQLite 目录、主库存储上限和新应用默认配额。主 SQLite 数据库固定使用 `data/uniid.db`，无需配置数据库路径环境变量。
 
 ---
 
@@ -257,7 +255,7 @@ API 前缀：`/api/v1/...`，错误响应为统一 envelope。完整列表见 [d
 1. **密钥**：生产环境必须设置强随机 `AUTH_JWT_SECRET` 与 `SESSION_COOKIE_SECRET`，勿提交 `.env`。
 2. **SQLite**：适合单机与小规模；多实例部署需迁移到 PostgreSQL 等并调整 Prisma datasource。
 3. **Cron / Webhook / Outbox**：内置进程级 worker 会重放 pending/failed outbox、恢复到期 Webhook 重试，并用数据库短租约降低多实例重复触发；严格高可用水平扩展仍建议接外置调度与队列。
-4. **S3**：文件与分片上传依赖 S3 兼容端点；未配置时仅元数据/数据库能力可用。
+4. **全局配置**：首次部署后进入 `/console/admin/config` 配置公开 URL、CORS、S3、函数出站白名单、实时订阅和默认配额。
 5. **构建**：`npm run build` 已通过；Server 端依赖 `node:` 内置模块与 `node-cron` 已在 `next.config.mjs` 中 externalize。
 
 ---

@@ -1,4 +1,4 @@
-import { prisma } from "@/shared/prisma";
+import { getSystemConfig } from "@/shared/system-config";
 
 export interface AuthSecurityConfig {
   emailVerificationEnabled: boolean;
@@ -13,16 +13,11 @@ export const DEFAULT_AUTH_SECURITY_CONFIG: AuthSecurityConfig = {
 };
 
 export async function getAuthSecurityConfig(): Promise<AuthSecurityConfig> {
-  const row = await prisma.globalConfig.findUnique({
-    where: { key: AUTH_SECURITY_CONFIG_KEY },
-    select: { value: true }
-  });
-  if (!row) return { ...DEFAULT_AUTH_SECURITY_CONFIG };
-  try {
-    return normalizeAuthSecurityConfig(JSON.parse(row.value));
-  } catch {
-    return { ...DEFAULT_AUTH_SECURITY_CONFIG };
-  }
+  const config = await getSystemConfig();
+  return {
+    emailVerificationEnabled: config.emailVerificationEnabled,
+    twoFactorEnabled: config.twoFactorEnabled
+  };
 }
 
 export function normalizeAuthSecurityConfig(value: unknown): AuthSecurityConfig {

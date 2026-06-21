@@ -22,7 +22,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { prisma } from "@/shared/prisma";
 import { ApiError } from "@/shared/errors";
 import { bucketName, getS3ExternalClient, getS3InternalClient, peekImageSize, isImageMime } from "@/shared/storage";
-import { config } from "@/shared/config";
+import { getSystemConfig, type SystemConfig } from "@/shared/system-config";
 import { bus } from "@/shared/bus";
 import { QuotaService } from "@/shared/quota";
 
@@ -39,6 +39,12 @@ function makeObjectKey(ownerId: string, originalName: string): string {
 
 function sha256Hex(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
+}
+
+async function requireFilesEnabled(): Promise<SystemConfig> {
+  const config = await getSystemConfig();
+  if (!config.filesEnabled) throw new ApiError("FILE_DISABLED");
+  return config;
 }
 
 export interface UploadResult {
@@ -58,11 +64,11 @@ export class FileService {
     appId: string | null;
     visibility?: "private" | "public";
   }): Promise<UploadResult> {
-    const c = config();
-    if (input.file.buffer.byteLength > c.FILE_MAX_SIZE_BYTES) {
+    const c = await requireFilesEnabled();
+    if (input.file.buffer.byteLength > c.fileMaxSizeBytes) {
       throw new ApiError("FILE_TOO_LARGE");
     }
-    const bucket = bucketName();
+    const bucket = await bucketName();
     const objectKey = makeObjectKey(input.ownerId, input.file.originalName);
     const checksum = sha256Hex(input.file.buffer);
 
@@ -83,7 +89,7 @@ export class FileService {
     }
 
     try {
-      await getS3InternalClient().send(
+      await (await getS3InternalClient()).send(
         new PutObjectCommand({
           Bucket: bucket,
           Key: objectKey,
@@ -143,21 +149,23 @@ export class FileService {
   }
 
   static async getDownloadUrl(fileId: string): Promise<string> {
+    const c = await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.appId) {
       await QuotaService.consume(file.appId, "egressBytes", file.size);
     }
-    const client = getS3ExternalClient();
+    const client = await getS3ExternalClient();
     const url = await getSignedUrl(
       client,
       new GetObjectCommand({ Bucket: file.bucket, Key: file.objectKey }),
-      { expiresIn: config().FILE_PRESIGN_TTL_SECONDS }
+      { expiresIn: c.filePresignTtlSeconds }
     );
     return url;
   }
 
   static async createShareToken(fileId: string, createdById: string, ttlSeconds?: number): Promise<string> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== createdById) throw new ApiError("FILE_FORBIDDEN");
@@ -169,16 +177,16 @@ export class FileService {
     createdById: string,
     ttlSeconds?: number
   ): Promise<string> {
+    const c = await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
-    const c = config();
     const token = randomBytes(24).toString("base64url");
     const t = now();
     await prisma.fileShareToken.create({
       data: {
         fileId,
         token,
-        expiresAt: t + (ttlSeconds ?? c.FILE_SHARE_TOKEN_TTL_SECONDS),
+        expiresAt: t + (ttlSeconds ?? c.fileShareTokenTtlSeconds),
         createdById,
         createdAt: t
       }
@@ -187,6 +195,7 @@ export class FileService {
   }
 
   static async getActiveShareToken(fileId: string): Promise<{ token: string; expiresAt: number } | null> {
+    await requireFilesEnabled();
     return prisma.fileShareToken.findFirst({
       where: {
         fileId,
@@ -199,6 +208,7 @@ export class FileService {
   }
 
   static async revokeShareTokens(fileId: string, actorId: string): Promise<number> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== actorId) throw new ApiError("FILE_FORBIDDEN");
@@ -206,6 +216,7 @@ export class FileService {
   }
 
   static async revokeShareTokensForAuthorizedFile(fileId: string): Promise<number> {
+    await requireFilesEnabled();
     const result = await prisma.fileShareToken.updateMany({
       where: { fileId, revokedAt: null },
       data: { revokedAt: now() }
@@ -214,6 +225,7 @@ export class FileService {
   }
 
   static async resolveShareToken(token: string): Promise<string> {
+    await requireFilesEnabled();
     const row = await prisma.fileShareToken.findUnique({
       where: { token },
       include: { file: true }
@@ -225,7 +237,7 @@ export class FileService {
       await QuotaService.consume(row.file.appId, "egressBytes", row.file.size);
     }
     const url = await getSignedUrl(
-      getS3ExternalClient(),
+      await getS3ExternalClient(),
       new GetObjectCommand({ Bucket: row.file.bucket, Key: row.file.objectKey }),
       { expiresIn: 300 }
     );
@@ -233,6 +245,7 @@ export class FileService {
   }
 
   static async delete(fileId: string, actorId: string): Promise<void> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== actorId) throw new ApiError("FILE_FORBIDDEN");
@@ -240,10 +253,11 @@ export class FileService {
   }
 
   static async deleteAuthorizedFile(fileId: string): Promise<void> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     try {
-      await getS3InternalClient().send(
+      await (await getS3InternalClient()).send(
         new DeleteObjectCommand({ Bucket: file.bucket, Key: file.objectKey })
       );
     } catch {
@@ -258,6 +272,7 @@ export class FileService {
   }
 
   static async list(input: { appId?: string; ownerId?: string; limit?: number }) {
+    await requireFilesEnabled();
     const limit = Math.min(input.limit ?? 50, 200);
     return prisma.fileObject.findMany({
       where: {
@@ -286,11 +301,12 @@ export class FileService {
     mimeType: string;
     visibility?: "private" | "public";
   }): Promise<{ fileId: string; uploadId: string; bucket: string; objectKey: string }> {
-    const bucket = bucketName();
+    await requireFilesEnabled();
+    const bucket = await bucketName();
     const objectKey = makeObjectKey(input.ownerId, input.originalName);
     const t = now();
 
-    const mp = await getS3InternalClient().send(
+    const mp = await (await getS3InternalClient()).send(
       new CreateMultipartUploadCommand({
         Bucket: bucket,
         Key: objectKey,
@@ -325,6 +341,7 @@ export class FileService {
     body: Buffer;
     actorId: string;
   }): Promise<{ etag: string; partNumber: number; size: number }> {
+    await requireFilesEnabled();
     if (input.partNumber < 1 || input.partNumber > 10_000) {
       throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartPartNumberRange" });
     }
@@ -333,7 +350,7 @@ export class FileService {
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
     if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartAlreadyComplete" });
 
-    const res = await getS3InternalClient().send(
+    const res = await (await getS3InternalClient()).send(
       new UploadPartCommand({
         Bucket: file.bucket,
         Key: file.objectKey,
@@ -365,6 +382,7 @@ export class FileService {
     fileId: string;
     actorId: string;
   }): Promise<UploadResult> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: input.fileId } });
     if (!file || file.deletedAt) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
@@ -378,7 +396,7 @@ export class FileService {
       throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartNoParts" });
     }
 
-    await getS3InternalClient().send(
+    await (await getS3InternalClient()).send(
       new CompleteMultipartUploadCommand({
         Bucket: file.bucket,
         Key: file.objectKey,
@@ -427,12 +445,13 @@ export class FileService {
   }
 
   static async abortMultipart(input: { fileId: string; actorId: string }): Promise<void> {
+    await requireFilesEnabled();
     const file = await prisma.fileObject.findUnique({ where: { id: input.fileId } });
     if (!file) throw new ApiError("FILE_NOT_FOUND");
     if (file.ownerId !== input.actorId) throw new ApiError("FILE_FORBIDDEN");
     if (!file.uploadId) throw new ApiError("FILE_MULTIPART_INVALID", { message: "error.detail.multipartNoActiveUpload" });
 
-    await getS3InternalClient()
+    await (await getS3InternalClient())
       .send(new AbortMultipartUploadCommand({
         Bucket: file.bucket,
         Key: file.objectKey,
