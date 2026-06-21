@@ -108,6 +108,7 @@ export const ErrorCodes = {
 
   // INTERNAL
   INTERNAL_ERROR: { http: 500, message: "服务器内部错误" },
+  MAIL_SEND_FAILED: { http: 502, message: "邮件发送失败" },
   NOT_IMPLEMENTED: { http: 501, message: "功能尚未实现" }
 } as const;
 

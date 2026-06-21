@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
-import { Save, ShieldCheck, Database, Radio, FolderArchive, Cloud, Globe2, Gauge } from "lucide-react";
+import { Save, ShieldCheck, Database, Radio, FolderArchive, Cloud, Globe2, Gauge, Mail } from "lucide-react";
 import { Button, Field, Input, Switch, Textarea, toast } from "@/ui/primitives";
 import { useI18n } from "@/ui/i18n";
 import type { SystemConfig } from "@/shared/system-config";
@@ -108,6 +108,45 @@ export function SystemConfigForm({ initial }: { initial: SystemConfig }) {
             disabled={pending}
             onCheckedChange={(checked) => setBoolean("twoFactorEnabled", checked)}
           />
+        </div>
+      </ConfigSection>
+
+      <ConfigSection icon={<Mail />} title={t("admin.config.smtpTitle")}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ToggleField
+            id="smtp-enabled"
+            title={t("admin.config.smtpEnabledLabel")}
+            description={t("admin.config.smtpEnabledHelp")}
+            checked={form.smtpEnabled}
+            disabled={pending}
+            onCheckedChange={(checked) => setBoolean("smtpEnabled", checked)}
+          />
+          <ToggleField
+            id="smtp-secure"
+            title={t("admin.config.smtpSecureLabel")}
+            description={t("admin.config.smtpSecureHelp")}
+            checked={form.smtpSecure}
+            disabled={pending}
+            onCheckedChange={(checked) => setBoolean("smtpSecure", checked)}
+          />
+          <Field label={t("admin.config.smtpHostLabel")} htmlFor="smtp-host">
+            <Input id="smtp-host" value={form.smtpHost} onChange={(event) => setString("smtpHost", event.target.value)} disabled={pending} />
+          </Field>
+          <Field label={t("admin.config.smtpPortLabel")} htmlFor="smtp-port">
+            <Input id="smtp-port" type="number" min={1} max={65535} value={form.smtpPort} onChange={(event) => setNumber("smtpPort", event.target.value)} disabled={pending} />
+          </Field>
+          <Field label={t("admin.config.smtpUserLabel")} htmlFor="smtp-user">
+            <Input id="smtp-user" value={form.smtpUser} onChange={(event) => setString("smtpUser", event.target.value)} disabled={pending} />
+          </Field>
+          <Field label={t("admin.config.smtpPasswordLabel")} htmlFor="smtp-password">
+            <Input id="smtp-password" type="password" value={form.smtpPassword} onChange={(event) => setString("smtpPassword", event.target.value)} disabled={pending} />
+          </Field>
+          <Field label={t("admin.config.smtpFromLabel")} htmlFor="smtp-from">
+            <Input id="smtp-from" value={form.smtpFrom} onChange={(event) => setString("smtpFrom", event.target.value)} disabled={pending} />
+          </Field>
+          <Field label={t("admin.config.smtpReplyToLabel")} htmlFor="smtp-reply-to">
+            <Input id="smtp-reply-to" value={form.smtpReplyTo} onChange={(event) => setString("smtpReplyTo", event.target.value)} disabled={pending} />
+          </Field>
         </div>
       </ConfigSection>
 
@@ -361,6 +400,14 @@ function defaultCompatSystemConfig(): SystemConfig {
     argon2Parallelism: 1,
     emailVerificationEnabled: true,
     twoFactorEnabled: true,
+    smtpEnabled: false,
+    smtpHost: "",
+    smtpPort: 587,
+    smtpSecure: false,
+    smtpUser: "",
+    smtpPassword: "",
+    smtpFrom: "",
+    smtpReplyTo: "",
     filesEnabled: true,
     s3EndpointInternal: "",
     s3EndpointExternal: "",

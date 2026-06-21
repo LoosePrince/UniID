@@ -40,18 +40,22 @@ export function EmailVerificationActions({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data?.error?.message ?? "无法创建验证链接");
+        toast.error(data?.error?.message ?? "无法发送验证邮件");
         return;
       }
       setDevLink(data.verifyUrl ?? null);
-      toast.success("验证链接已创建");
+      if (data.sent) {
+        toast.success("验证邮件已发送");
+      } else {
+        toast.warning("验证链接已创建，但 SMTP 未启用或未配置完整");
+      }
     });
   }
 
   return (
     <div className="space-y-3">
       <Button onClick={requestVerify} loading={pending}>
-        <Send /> 发送验证链接
+        <Send /> 发送验证邮件
       </Button>
       {devLink ? (
         <p className="max-w-xl break-all rounded-md border border-ink-100 bg-cream-50 px-3 py-2 font-mono text-xs text-ink-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">

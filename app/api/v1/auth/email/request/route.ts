@@ -11,7 +11,8 @@ export const POST = withCors(
       const result = await AuthService.createEmailVerification(auth.user.id, req.nextUrl.origin);
       return {
         success: true,
-        ...(process.env.NODE_ENV !== "production" ? result : { verifyUrl: result.verifyUrl })
+        sent: result.sent,
+        ...(process.env.NODE_ENV !== "production" ? { verifyUrl: result.verifyUrl } : {})
       };
     }
   })

@@ -17,6 +17,15 @@ const systemConfigSchema = z.object({
   emailVerificationEnabled: z.boolean().default(true),
   twoFactorEnabled: z.boolean().default(true),
 
+  smtpEnabled: z.boolean().default(false),
+  smtpHost: z.string().trim().default(""),
+  smtpPort: z.number().int().min(1).max(65535).default(587),
+  smtpSecure: z.boolean().default(false),
+  smtpUser: z.string().trim().default(""),
+  smtpPassword: z.string().default(""),
+  smtpFrom: z.string().trim().default(""),
+  smtpReplyTo: z.string().trim().default(""),
+
   filesEnabled: z.boolean().default(true),
   s3EndpointInternal: z.string().trim().default(""),
   s3EndpointExternal: z.string().trim().default(""),

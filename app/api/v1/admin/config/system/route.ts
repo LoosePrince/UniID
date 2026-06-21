@@ -15,6 +15,15 @@ const body = z.object({
   emailVerificationEnabled: z.boolean().optional(),
   twoFactorEnabled: z.boolean().optional(),
 
+  smtpEnabled: z.boolean().optional(),
+  smtpHost: z.string().optional(),
+  smtpPort: z.number().int().min(1).max(65535).optional(),
+  smtpSecure: z.boolean().optional(),
+  smtpUser: z.string().optional(),
+  smtpPassword: z.string().optional(),
+  smtpFrom: z.string().optional(),
+  smtpReplyTo: z.string().optional(),
+
   filesEnabled: z.boolean().optional(),
   s3EndpointInternal: z.string().optional(),
   s3EndpointExternal: z.string().optional(),

@@ -21,6 +21,7 @@ import {
   verifyTotp
 } from "@/shared/iam";
 import { bus } from "@/shared/bus";
+import { escapeHtml, sendMail } from "@/shared/mail";
 import { getAuthSecurityConfig } from "./security-config";
 
 const now = () => Math.floor(Date.now() / 1000);
@@ -261,9 +262,24 @@ export class AuthService {
       email: user.email,
       ttlSeconds: 24 * 60 * 60
     });
+    const verifyUrl = buildActionUrl(baseUrl, "/api/v1/auth/email/verify", token);
+    const mail = verifyUrl
+      ? await sendMail({
+          to: user.email,
+          subject: "验证你的 UniID 邮箱",
+          text: `请打开以下链接完成邮箱验证：\n\n${verifyUrl}\n\n该链接 24 小时内有效。`,
+          html: [
+            "<p>请打开以下链接完成邮箱验证：</p>",
+            `<p><a href="${escapeHtml(verifyUrl)}">验证邮箱</a></p>`,
+            "<p>该链接 24 小时内有效。</p>"
+          ].join("")
+        })
+      : { sent: false as const, reason: "incomplete" as const };
+
     return {
       token,
-      verifyUrl: buildActionUrl(baseUrl, "/api/v1/auth/email/verify", token)
+      verifyUrl,
+      sent: mail.sent
     };
   }
 

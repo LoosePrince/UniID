@@ -78,6 +78,7 @@ const zh: Record<ErrorCode, string> = {
   VALIDATION_FAILED: "请求参数校验失败",
   CORS_ORIGIN_REJECTED: "Origin 不在允许列表中",
   INTERNAL_ERROR: "服务器内部错误",
+  MAIL_SEND_FAILED: "邮件发送失败",
   NOT_IMPLEMENTED: "功能尚未实现"
 };
 
@@ -157,6 +158,7 @@ const en: Record<ErrorCode, string> = {
   VALIDATION_FAILED: "Request validation failed",
   CORS_ORIGIN_REJECTED: "Origin is not allowed",
   INTERNAL_ERROR: "Internal server error",
+  MAIL_SEND_FAILED: "Failed to send email",
   NOT_IMPLEMENTED: "Not implemented"
 };
 
