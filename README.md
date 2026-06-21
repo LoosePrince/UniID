@@ -219,13 +219,14 @@ API 前缀：`/api/v1/...`，错误响应为统一 envelope。完整列表见 [d
 
 | 变量 | 说明 |
 |------|------|
-| `DATABASE_URL` | SQLite 路径，默认 `file:./data/uniid.db` |
 | `AUTH_JWT_SECRET` | SDK Access JWT 签名密钥（必填，≥32 字节） |
 | `SESSION_COOKIE_SECRET` | 控制台 Cookie 会话密钥（必填） |
 | `PUBLIC_URL` | 对外 URL，默认 `http://localhost:3000` |
 | `S3_*` | 对象存储；留空时文件上传相关功能不可用 |
 | `FN_FETCH_WHITELIST` | 函数沙箱 `uniid.fetch` 允许的主机列表（逗号分隔，空=禁止出站） |
 | `QUOTA_*` | 新应用默认配额 |
+
+主 SQLite 数据库固定使用 `data/uniid.db`，无需配置数据库路径环境变量。
 
 ---
 

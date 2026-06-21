@@ -27,17 +27,14 @@ def generate_secret() -> str:
 
 
 def build_env_content(
-    db_filename: str,
     host: str,
     port: str,
     nextauth_secret: str,
     auth_jwt_secret: str,
 ) -> str:
-    database_url = f'file:./{db_filename}'
     nextauth_url = f"http://{host}:{port}"
 
     lines = [
-        f'DATABASE_URL="{database_url}"',
         f'NEXTAUTH_URL="{nextauth_url}"',
         f'NEXTAUTH_SECRET="{nextauth_secret}"',
         f'AUTH_JWT_SECRET="{auth_jwt_secret}"',
@@ -52,17 +49,13 @@ def main() -> None:
     print(f"目标 .env 文件: {ENV_PATH}")
     print()
 
-    # 1. 数据库文件名
-    default_db_file = "db.db"
-    db_filename = prompt_with_default("数据库文件名（仅文件名）", default_db_file)
-
-    # 2. IP 和端口
+    # 1. IP 和端口
     default_host = "localhost"
     default_port = "3000"
     host = prompt_with_default("服务 IP / 主机名", default_host)
     port = prompt_with_default("服务端口", default_port)
 
-    # 3. NEXTAUTH_SECRET
+    # 2. NEXTAUTH_SECRET
     print()
     use_default_nextauth = yes_no("为 NEXTAUTH_SECRET 使用随机生成的安全值？", True)
     if use_default_nextauth:
@@ -73,7 +66,7 @@ def main() -> None:
             "请输入 NEXTAUTH_SECRET（留空会重新生成随机值）", generate_secret()
         )
 
-    # 4. AUTH_JWT_SECRET
+    # 3. AUTH_JWT_SECRET
     print()
     use_default_jwt = yes_no("为 AUTH_JWT_SECRET 使用随机生成的安全值？", True)
     if use_default_jwt:
@@ -86,7 +79,6 @@ def main() -> None:
 
     # 构造 env 内容
     content = build_env_content(
-        db_filename=db_filename,
         host=host,
         port=port,
         nextauth_secret=nextauth_secret,
